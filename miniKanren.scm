@@ -1,14 +1,7 @@
 ;; In order to use "basic" miniKanren
 
-(load "mk.scm")
 (load "ck.scm")
-
-(import (mk))
 (import (ck))
-
-(process-prefix (lambda (p c) identitym))
-(enforce-constraints (lambda (x) unitg))
-(reify-constraints (lambda (m r) unitg))
 
 (define-syntax run1 (syntax-rules () ((_ (x) g0 g ...) (run 1 (x) g0 g ...))))
 (define-syntax run2 (syntax-rules () ((_ (x) g0 g ...) (run 2 (x) g0 g ...))))

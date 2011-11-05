@@ -73,9 +73,9 @@
     ((_ op-c (arg0 arg ...) (z ...) args)
      (build-oc-aux op-c (arg ...) (z ... q) args))))
 
-(define process-prefix (make-parameter 'dummy))
-(define enforce-constraints (make-parameter 'dummy))
-(define reify-constraints (make-parameter 'dummy))
+(define process-prefix (make-parameter (lambda (p c) identitym)))
+(define enforce-constraints (make-parameter (lambda (x) unitg)))
+(define reify-constraints (make-parameter (lambda (m r) unitg)))
     
 (define oc->proc car)
 (define oc->rands cddr)
