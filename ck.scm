@@ -168,30 +168,6 @@
            (any-relevant/var? (cdr t) x*)))
       (else #f))))
 
-;; (define smaller
-;;   (lambda (d seen)
-;;     (cond
-;;       ((null? d) '())
-;;       ((memq (caar d) seen) (smaller (cdr d) seen))
-;;       (else
-;;        (cons (car d) (smaller (cdr d) (cons (caar d) seen)))))))
-;; (define rem/run   ;;; For tracing.
-;;   (lambda (oc)
-;;     (lambdam@ (a : s d c)
-;;       (begin
-;;         (write (smaller d '()))
-;;         (newline)
-;;         (write (smaller c '()))
-;;         (newline)
-;;         (newline)
-;;         (cond
-;;         ((memq oc c)
-;;          (let ((c^ (remq oc c)))
-;;            ((oc->proc oc) (make-a s d c^))))
-;;         (else a))
-;;         )
-;;       )))
-
 (define-syntax run
   (syntax-rules ()
     ((_ n (x) g0 g ...)
