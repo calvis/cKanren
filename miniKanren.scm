@@ -49,12 +49,12 @@
 
 (define caro
   (lambda (p a)
-    (exist (d)
+    (fresh (d)
       (== (cons a d) p))))
 
 (define cdro
   (lambda (p d)
-    (exist (a)
+    (fresh (a)
       (== (cons a d) p))))
 
 (define conso
@@ -71,16 +71,16 @@
 
 (define pairo
   (lambda (p)
-    (exist (a d)
+    (fresh (a d)
       (conso a d p))))
 
 (define membero
   (lambda (x l)
     (conde      
-      ((exist (a)
+      ((fresh (a)
          (caro l a)
          (== a x)))
-      ((exist (d)
+      ((fresh (d)
          (cdro l d)
          (membero x d))))))
 
@@ -89,7 +89,7 @@
     (conde
       ((nullo l) (== '() out))
       ((caro l x) (cdro l out))
-      ((exist (a d res)
+      ((fresh (a d res)
          (conso a d l)
          (rembero x d res)
          (conso a res out))))))
@@ -98,7 +98,7 @@
   (lambda (l s out)
     (conde
       ((nullo l) (== s out))
-      ((exist (a d res)
+      ((fresh (a d res)
          (conso a d l)
          (conso a res out)
          (appendo d s res))))))
@@ -108,7 +108,7 @@
     (conde
       ((nullo s) (== '() out))
       ((pairo s)
-       (exist (a d res-a res-d)
+       (fresh (a d res-a res-d)
          (conso a d s)
          (flatteno a res-a)
          (flatteno d res-d)
@@ -139,12 +139,12 @@
 
 (define poso
   (lambda (n)
-    (exist (a d)
+    (fresh (a d)
       (== `(,a . ,d) n))))
 
 (define >1o
   (lambda (n)
-    (exist (a ad dd)
+    (fresh (a ad dd)
       (== `(,a ,ad . ,dd) n))))
 
 (define full-addero
@@ -170,7 +170,7 @@
       ((== 1 d) (== '() n) (poso m)
        (addero 0 '(1) m r))
       ((== '(1) n) (== '(1) m)
-       (exist (a c)
+       (fresh (a c)
          (== `(,a ,c) r)
          (full-addero d 1 1 a c)))
       ((== '(1) n) (gen-addero d n m r))
@@ -180,7 +180,7 @@
 
 (define gen-addero
   (lambda (d n m r)
-    (exist (a b c e x y z)
+    (fresh (a b c e x y z)
       (== `(,a . ,x) n)
       (== `(,b . ,y) m) (poso y)
       (== `(,c . ,z) r) (poso z)
@@ -202,23 +202,23 @@
       ((poso n) (== '() m) (== '() p))  
       ((== '(1) n) (poso m) (== m p))   
       ((>1o n) (== '(1) m) (== n p))
-      ((exist (x z)
+      ((fresh (x z)
          (== `(0 . ,x) n) (poso x)
          (== `(0 . ,z) p) (poso z)
          (>1o m)
          (*o x m z)))
-      ((exist (x y)
+      ((fresh (x y)
          (== `(1 . ,x) n) (poso x)
          (== `(0 . ,y) m) (poso y)
          (*o m n p)))
-      ((exist (x y)
+      ((fresh (x y)
          (== `(1 . ,x) n) (poso x)      
          (== `(1 . ,y) m) (poso y)
          (odd-*o x n m p))))))
 
 (define odd-*o
   (lambda (x n m p)
-    (exist (q)
+    (fresh (q)
       (bound-*o q p n m)
       (*o x m q)
       (pluso `(0 . ,q) m p))))
@@ -227,7 +227,7 @@
   (lambda (q p n m)
     (conde
       ((nullo q) (pairo p))
-      ((exist (x y z)
+      ((fresh (x y z)
          (cdro q x)
          (cdro p y)
          (conde
@@ -242,7 +242,7 @@
     (conde
       ((== '() n) (== '() m))
       ((== '(1) n) (== '(1) m))
-      ((exist (a x b y)
+      ((fresh (a x b y)
          (== `(,a . ,x) n) (poso x)
          (== `(,b . ,y) m) (poso y)
          (=lo x y))))))
@@ -252,7 +252,7 @@
     (conde
       ((== '() n) (poso m))
       ((== '(1) n) (>1o m))
-      ((exist (a x b y)
+      ((fresh (a x b y)
          (== `(,a . ,x) n) (poso x)
          (== `(,b . ,y) m) (poso y)
          (<lo x y))))))
@@ -268,7 +268,7 @@
     (conde
       ((<lo n m))
       ((=lo n m)
-       (exist (x)
+       (fresh (x)
          (poso x)
          (pluso n x m))))))
 
@@ -287,7 +287,7 @@
       ((<lo m n)                        
        (<o r m)                        
        (poso q)                 
-       (exist (nh nl qh ql qlm qlmr rr rh)
+       (fresh (nh nl qh ql qlm qlmr rr rh)
          (splito n r nl nh)
          (splito q r ql qh)
          (conde
@@ -306,27 +306,27 @@
   (lambda (n r l h)
     (conde
       ((== '() n) (== '() h) (== '() l))
-      ((exist (b n^)
+      ((fresh (b n^)
          (== `(0 ,b . ,n^) n)
          (== '() r)
          (== `(,b . ,n^) h)
          (== '() l)))
-      ((exist (n^)
+      ((fresh (n^)
          (==  `(1 . ,n^) n)
          (== '() r)
          (== n^ h)
          (== '(1) l)))
-      ((exist (b n^ a r^)
+      ((fresh (b n^ a r^)
          (== `(0 ,b . ,n^) n)
          (== `(,a . ,r^) r)
          (== '() l)
          (splito `(,b . ,n^) r^ '() h)))
-      ((exist (n^ a r^)
+      ((fresh (n^ a r^)
          (== `(1 . ,n^) n)
          (== `(,a . ,r^) r)
          (== '(1) l)
          (splito n^ r^ '() h)))
-      ((exist (b n^ a r^ l^)
+      ((fresh (b n^ a r^ l^)
          (== `(,b . ,n^) n)
          (== `(,a . ,r^) r)
          (== `(,b . ,l^) l)
@@ -342,22 +342,22 @@
      ((== '(1) b) (poso q) (pluso r '(1) n))
      ((== '() b) (poso q) (== r n))
      ((== '(0 1) b)
-      (exist (a ad dd)
+      (fresh (a ad dd)
         (poso dd)
         (== `(,a ,ad . ,dd) n)
         (exp2 n '() q)
-        (exist (s)
+        (fresh (s)
           (splito n dd r s))))
-     ((exist (a ad add ddd)
+     ((fresh (a ad add ddd)
         (conde
           ((== '(1 1) b))
           ((== `(,a ,ad ,add . ,ddd) b))))
       (<lo b n)
-      (exist (bw1 bw nw nw1 ql1 ql s)
+      (fresh (bw1 bw nw nw1 ql1 ql s)
         (exp2 b '() bw1)
         (pluso bw1 '(1) bw)
         (<lo q n)
-        (exist (q1 bwq1)
+        (fresh (q1 bwq1)
           (pluso q '(1) q1)
           (*o bw q1 bwq1)
           (<o nw1 bwq1))
@@ -366,13 +366,13 @@
           (/o nw bw ql1 s)
           (pluso ql '(1) ql1)
           (<=lo ql q)
-          (exist (bql qh s qdh qd)
+          (fresh (bql qh s qdh qd)
             (repeated-mul b ql bql)
             (/o nw bw1 qh s)
             (pluso ql qdh qh)
             (pluso ql qd q)
             (<=o qd qdh)
-            (exist (bqd bq1 bq)
+            (fresh (bqd bq1 bq)
               (repeated-mul b qd bqd)
               (*o bql bqd bq)
               (*o b bq bq1)
@@ -384,15 +384,15 @@
     (conde
       ((== '(1) n) (== '() q))
       ((>1o n) (== '(1) q)
-       (exist (s)
+       (fresh (s)
          (splito n b s '(1))))
-      ((exist (q1 b2)
+      ((fresh (q1 b2)
          (== `(0 . ,q1) q)
          (poso q1)
          (<lo b n)
          (appendo b `(1 . ,b) b2)
          (exp2 n b2 q1)))
-      ((exist (q1 nh b2 s)
+      ((fresh (q1 nh b2 s)
          (== `(1 . ,q1) q)
          (poso q1)
          (poso nh)
@@ -406,7 +406,7 @@
       ((poso n) (== '() q) (== '(1) nq))
       ((== '(1) q) (== n nq))
       ((>1o q)
-       (exist (q1 nq1)
+       (fresh (q1 nq1)
          (pluso q1 '(1) q)
          (repeated-mul n q1 nq1)
          (*o nq1 n nq))))))
