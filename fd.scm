@@ -24,7 +24,7 @@
     (rnrs)
     (only (chezscheme) trace-define)
     (mk)
-    (sminimk))
+    (ck))
 
 ;;; little helpers
 

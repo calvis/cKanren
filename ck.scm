@@ -24,6 +24,14 @@
     run-constraints
     run
     run*
+    conde
+    conda
+    condu
+    fresh
+    project
+    onceo
+    ifa
+    ifu
     
     ;; parameters
     process-prefix
