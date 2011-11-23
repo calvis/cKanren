@@ -17,8 +17,6 @@
     (only (chezscheme) make-parameter)
     (mk))
 
-;; ---HELPERS-unchanged--------------------------------------------
-
 (define any/var?
   (lambda (p)
     (cond
@@ -46,8 +44,6 @@
             ((eq? s^ s) '())
             (else (cons (car s^) (loop (cdr s^))))))))))
 
-;; ---SUBSITUTION-changed------------------------------------------
-
 (define empty-s '())
 
 (define ext-s
@@ -65,8 +61,6 @@
         ((run-constraints (if (var? v) `(,x ,v) `(,x)) c)
          (make-a s^ c))))))
 
-;; ---CONSTRAINT STORE-changed-------------------------------------
-
 (define empty-c '())
 
 (define ext-c
@@ -81,12 +75,8 @@
     (lambdam@ (a : s c)
       (make-a s (ext-c oc c)))))
 
-;; ---PACKAGE-unchanged--------------------------------------------
-
 (define empty-a (lambda () (cons empty-s empty-c)))
 (define make-a (lambda (s c) (cons s c)))
-
-;; ---GOAL WRAPPER-unchanged---------------------------------------
 
 (define goal-construct
   (lambda (fm)
@@ -94,8 +84,6 @@
       (cond
         ((fm a) => unitg)
         (else (mzerog))))))
-
-;; ---M-PROCS-changed----------------------------------------------
 
 (define-syntax lambdam@
   (syntax-rules (:)
@@ -110,8 +98,6 @@
     (lambdam@ (a)
       (let ((a (fm a)))
         (and a (f^m a))))))
-
-;; ---BUILD-OC-unchanged-------------------------------------------
 
 (define-syntax build-oc
   (syntax-rules ()
@@ -128,8 +114,6 @@
 (define oc->proc car)
 (define oc->rands cddr)
 (define oc->rator cadr)
-
-;; ---FIXED POINT-unchanged----------------------------------------
 
 (define run-constraints
   (lambda (x* c)
@@ -150,8 +134,6 @@
            ((oc->proc oc) (make-a s c^))))
         (else a)))))
 
-;; ---ENFORCE CONSTRAINTS-changed----------------------------------
-
 (define enforce-fns (make-parameter '()))
 
 (define extend-enforce-fns
@@ -169,8 +151,6 @@
                ((car fn*) x)
                (loop (cdr fn*))))))
        a))))
-
-;; ---REIFICATION-changed------------------------------------------
 
 (define reify-fns (make-parameter '()))
 
@@ -211,8 +191,6 @@
           ((null? c) (choiceg v empty-f))
           (else (choiceg `(,v : . ,c) empty-f)))))))
 
-;; ---MACROS-changed-----------------------------------------------
-
 (define-syntax run
   (syntax-rules ()
     ((_ n (x) g0 g1 ...)
@@ -225,8 +203,6 @@
 (define-syntax run*
   (syntax-rules ()
     ((_ (x) g ...) (run #f (x) g ...))))
-
-;; ----------------------------------------------------------------
 
 )
 
