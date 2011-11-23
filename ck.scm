@@ -2,98 +2,22 @@
   (ck)
 
   (export
-    ;; goals
-    build-oc
-    ==
-    succeed
-    fail
-    prt
-    prefix-s
-    ext-d
-    ext-c
-    identitym
-    oc->rands
-    oc->proc
-    oc->rator
-    any/var?
-    lambdam@
-    composem
-    goal-construct
-    
     ;; framework
-    run-constraints
-    run
-    run*
-    conde
-    conda
-    condu
-    fresh
-    project
-    onceo
-    ifa
-    ifu
-    
-    ;; parameters
-    process-prefix
-    enforce-constraints
-    reify-constraints)
+    lhs rhs update-s update-c make-a any/var? prefix-s
+    lambdam@ identitym composem goal-construct ext-c
+    build-oc oc->proc oc->rands oc->rator run run* prt
+    extend-enforce-fns extend-reify-fns enforce-fns reify-fns
 
-(import
-  (rnrs)
-  (only (chezscheme)
-    make-parameter
-    pretty-print)
-  (mk))
+    ;; mk
+    walk walk* var? lambdag@ mzerog unitg onceo
+    conde conda condu ifa ifu project fresh :)
+  
+  (import
+    (rnrs)
+    (only (chezscheme) make-parameter)
+    (mk))
 
-(define-syntax lambdam@
-  (syntax-rules (:)
-    ((_ (a : s d c) body)
-     (lambda (a)
-       (let ((s (car a)) (d (cadr a)) (c (cddr a)))
-         body)))
-    ((_ (a) body) (lambda (a) body))))
-
-(define identitym (lambdam@ (a) a))
-
-(define composem
-  (lambda (fm f^m)
-    (lambdam@ (a)
-      (let ((a (fm a)))
-        (and a (f^m a))))))
-
-(define goal-construct
-  (lambda (fm)
-    (lambdag@ (a)
-      (cond
-        ((fm a) => unitg)
-        (else (mzerog))))))
-
-(define-syntax build-oc
-  (syntax-rules ()
-    ((_ op-c arg ...)
-     (build-oc-aux op-c (arg ...) () (arg ...)))))
-
-(define-syntax build-oc-aux  ;;; (op-c z ...) evaluates to a seq.
-  (syntax-rules ()
-    ((_  op-c () (z ...) (arg ...))
-     (let ((z arg) ...)
-       `(,(op-c z ...) op-c ,z ...)))
-    ((_ op-c (arg0 arg ...) (z ...) args)
-     (build-oc-aux op-c (arg ...) (z ... q) args))))
-
-(define process-prefix (make-parameter (lambda (p c) identitym)))
-(define enforce-constraints (make-parameter (lambda (x) unitg)))
-(define reify-constraints (make-parameter (lambda (m r) unitg)))
-    
-(define oc->proc car)
-(define oc->rands cddr)
-(define oc->rator cadr)
-(define ext-d (lambda (x fd d) (cons `(,x . ,fd) d)))
-(define ext-c
-  (lambda (oc c)
-    (cond
-     ((any/var? (oc->rands oc)) (cons oc c))
-     (else c))))
+;; ---HELPERS-unchanged--------------------------------------------
 
 (define any/var?
   (lambda (p)
@@ -102,70 +26,6 @@
       ((pair? p)
        (or (any/var? (car p)) (any/var? (cdr p))))
       (else #f))))
-
-(define == (lambda (u v) (goal-construct (==-c u v))))
-
-(define ==-c  ;;; returns an ma if ((process-prefix) p c) => seq.
-  (lambda (u v)
-    (lambdam@ (a : s d c)
-      (cond
-        ((unify `((,u . ,v)) s)
-         => (lambda (s^)
-              (cond
-                ((eq? s s^) a)
-                (else
-                 (let ((p (prefix-s s s^))
-                       (a (make-a s^ d c)))
-                   (((process-prefix) p c) a))))))
-        (else #f)))))
-
-(define prefix-s
-  (lambda (s s^)
-    (cond
-      ((null? s) s^)
-      (else (let loop ((s^ s^))
-              (cond
-                ((eq? s^ s) '())
-                (else (cons (car s^) (loop (cdr s^))))))))))
-    
-(define succeed (== #f #f))
-(define fail (== #f #t))
-(define prt (lambda (a) (pretty-print a) (succeed a)))
-
-(define run-constraints0 ;;; unitm is a sequel
-  (lambda (x*-ignored c)
-    (cond
-      ((null? c) identitym)
-      (else
-       (composem (oc->proc (car c))
-         (run-constraints0 x*-ignored (cdr c)))))))
-
-(define run-constraints1 ;;; unitm is a sequel
-  (lambda (x* c)
-    (cond
-      ((null? c) identitym)
-      ((any-relevant/var? (oc->rands (car c)) x*)
-       (composem (oc->proc (car c))
-         (run-constraints1 x* (cdr c))))
-      (else (run-constraints1 x* (cdr c))))))
-
-(define run-constraints ;;; unitm is a sequel
-  (lambda (x* c)
-    (cond
-      ((null? c) identitym)
-      ((any-relevant/var? (oc->rands (car c)) x*)
-       (composem (rem/run (car c))
-         (run-constraints x* (cdr c))))
-      (else (run-constraints x* (cdr c))))))
-
-(define rem/run  ;;; returns a seq.
-  (lambda (oc)
-    (lambdam@ (a : s d c)
-      (cond
-        ((memq oc c)
-         (let ((c^ (remq oc c)))
-           ((oc->proc oc) (make-a s d c^))))
-        (else a)))))
 
 (define any-relevant/var?
   (lambda (t x*)
@@ -176,37 +36,198 @@
            (any-relevant/var? (cdr t) x*)))
       (else #f))))
 
+(define prefix-s
+  (lambda (s s^)
+    (cond
+      ((null? s) s^)
+      (else
+        (let loop ((s^ s^))
+          (cond
+            ((eq? s^ s) '())
+            (else (cons (car s^) (loop (cdr s^))))))))))
+
+;; ---SUBSITUTION-changed------------------------------------------
+
+(define empty-s '())
+
+(define ext-s
+  (lambda (x v s)
+    (cons `(,x . ,v) s)))
+
+(define size-s
+  (lambda (x)
+    (length x)))
+
+(define update-s
+  (lambda (x v)
+    (lambdam@ (a : s c)
+      (let ((s^ (ext-s x v s)))
+        ((run-constraints (if (var? v) `(,x ,v) `(,x)) c)
+         (make-a s^ c))))))
+
+;; ---CONSTRAINT STORE-changed-------------------------------------
+
+(define empty-c '())
+
+(define ext-c
+  (lambda (oc c)
+    (cond
+     ((any/var? (oc->rands oc))
+      (cons oc c))
+     (else c))))
+
+(define update-c
+  (lambda (oc)
+    (lambdam@ (a : s c)
+      (make-a s (ext-c oc c)))))
+
+;; ---PACKAGE-unchanged--------------------------------------------
+
+(define empty-a (lambda () (cons empty-s empty-c)))
+(define make-a (lambda (s c) (cons s c)))
+
+;; ---GOAL WRAPPER-unchanged---------------------------------------
+
+(define goal-construct
+  (lambda (fm)
+    (lambdag@ (a)
+      (cond
+        ((fm a) => unitg)
+        (else (mzerog))))))
+
+;; ---M-PROCS-changed----------------------------------------------
+
+(define-syntax lambdam@
+  (syntax-rules (:)
+    ((_ (a) e) (lambda (a) e))
+    ((_ (a : s c) e)
+     (lambdam@ (a) (let ((s (car a)) (c (cdr a))) e)))))
+
+(define identitym (lambdam@ (a) a))
+
+(define composem
+  (lambda (fm f^m)
+    (lambdam@ (a)
+      (let ((a (fm a)))
+        (and a (f^m a))))))
+
+;; ---BUILD-OC-unchanged-------------------------------------------
+
+(define-syntax build-oc
+  (syntax-rules ()
+    ((_ op arg ...)
+     (build-oc-aux op (arg ...) () (arg ...)))))
+
+(define-syntax build-oc-aux
+  (syntax-rules ()
+    ((_ op () (z ...) (arg ...))
+     (let ((z arg) ...) `(,(op z ...) . (op ,z ...))))
+    ((_ op (arg0 arg ...) (z ...) args)
+     (build-oc-aux op (arg ...) (z ... q) args))))
+
+(define oc->proc car)
+(define oc->rands cddr)
+(define oc->rator cadr)
+
+;; ---FIXED POINT-unchanged----------------------------------------
+
+(define run-constraints
+  (lambda (x* c)
+    (cond
+      ((null? c) identitym)
+      ((any-relevant/var? (oc->rands (car c)) x*)
+       (composem
+         (rem/run (car c))
+         (run-constraints x* (cdr c))))
+      (else (run-constraints x* (cdr c))))))
+
+(define rem/run
+  (lambda (oc)
+    (lambdam@ (a : s c)
+      (cond
+        ((memq oc c)
+         (let ((c^ (remq oc c)))
+           ((oc->proc oc) (make-a s c^))))
+        (else a)))))
+
+;; ---ENFORCE CONSTRAINTS-changed----------------------------------
+
+(define enforce-fns (make-parameter '()))
+
+(define extend-enforce-fns
+  (lambda (fn)
+    (enforce-fns (cons fn (enforce-fns)))))
+
+(define enforce-constraints
+  (lambda (x)
+    (lambdag@ (a : s c)
+      ((let loop ((fn* (enforce-fns)))
+         (cond
+           ((null? fn*) unitg)
+           (else
+             (fresh ()
+               ((car fn*) x)
+               (loop (cdr fn*))))))
+       a))))
+
+;; ---REIFICATION-changed------------------------------------------
+
+(define reify-fns (make-parameter '()))
+
+(define extend-reify-fns
+  (lambda (fn)
+    (reify-fns (cons fn (reify-fns)))))
+
+(define reify-s
+  (lambda (v s)
+    (let ((v (walk v s)))
+      (cond
+        ((var? v) `((,v . ,(reify-n (size-s s))) . ,s))
+        ((pair? v) (reify-s (cdr v) (reify-s (car v) s)))
+        (else s)))))
+
+(define reify-n
+  (lambda (n)
+    (string->symbol
+      (string-append "_" "." (number->string n)))))
+
+(define reify
+  (lambda (x)
+    (lambdag@ (a : s c)
+      (let* ((v (walk* x s))
+             (r (reify-s v empty-s)))
+        (cond
+          ((null? r) (choiceg v empty-f))
+          (else
+            (let ((v (walk* v r)))
+              ((reify-constraints v r) a))))))))
+
+(define reify-constraints
+  (lambda (v r)
+    (lambdag@ (a : s c)
+      (let ((c (apply append
+                 (map (lambda (fn) ((fn v r) a)) (reify-fns)))))
+        (cond
+          ((null? c) (choiceg v empty-f))
+          (else (choiceg `(,v : . ,c) empty-f)))))))
+
+;; ---MACROS-changed-----------------------------------------------
+
 (define-syntax run
   (syntax-rules ()
-    ((_ n (x) g0 g ...)
+    ((_ n (x) g0 g1 ...)
      (take n
        (lambdaf@ ()
-         ((fresh (x) g0 g ... (reify x))
-          empty-a))))))
+         ((fresh (x) g0 g1 ...
+            (enforce-constraints x) (reify x))
+          (empty-a)))))))
 
 (define-syntax run*
   (syntax-rules ()
     ((_ (x) g ...) (run #f (x) g ...))))
 
-(define reify
-  (lambda (x)
-    (fresh ()
-      ((enforce-constraints) x)
-      (lambdag@ (a : s d c)
-        (choiceg
-          (let* ((v (walk* x s))
-                 (r (reify-s v empty-s)))
-            (cond
-              ((null? r) v)
-              (else
-               (let ((v (walk* v r)))
-                 (cond
-                   ((null? c) v)
-                   (else (((reify-constraints) v r) a)))))))
-          empty-f)))))
+;; ----------------------------------------------------------------
 
- )
+)
 
-
-
-
+(import (ck))

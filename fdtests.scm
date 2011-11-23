@@ -1,13 +1,6 @@
-(load "mk.scm")
 (load "ck.scm")
 (load "fd.scm")
-
-(import
-  (mk)
-  (ck)
-  (fd))
-
-(usefd)
+(load "tree-unify.scm")
 
 (define-syntax test-check
   (syntax-rules ()
@@ -34,34 +27,35 @@
     (apply printf args)
     (error 'WiljaCodeTester "That's all, folks!")))
 
-(test-check "-1"
-  (run* (q)
-    (fresh (w x y z)
-      (infd w z (range 1 5))
-      (all-difffd q)
-      (== q `(,x ,y ,z))
-      (== `(,x 2) `(1 ,y))
-      (plusfd x y w)
-      (plusfd w y z)))
-  '((1 2 5)))
 
-;;; #!eof  (when tracing, uncomment)
+;; (test-check "-1"
+;;   (run* (q)
+;;     (fresh (w x y z)
+;;       (infd w z (range 1 5))
+;;       (all-difffd q)
+;;       (== q `(,x ,y ,z))
+;;       (== `(,x 2) `(1 ,y))
+;;       (plusfd x y w)
+;;       (plusfd w y z)))
+;;   '((1 2 5)))
 
-(test-check "0"
-  (run* (q)
-    (fresh (a b c)
-      (all-difffd q)
-      (== q `(,a ,b ,c))
-      (infd a b c '(1 2 3))
-      (== a 1)
-      (== b 2)
-      (<=fd c 5)))
-  '((1 2 3)))
+;; ;;; #!eof  (when tracing, uncomment)
+
+
+;; (test-check "0"
+;;   (run* (q)
+;;     (fresh (a b c)
+;;       (all-difffd q)
+;;       (== q `(,a ,b ,c))
+;;       (infd a b c '(1 2 3))
+;;       (== a 1)
+;;       (== b 2)
+;;       (<=fd c 5)))
+;;  '((1 2 3)))
 
 (test-check "1^^"
   (run* (x)
-    (infd x '(1 2))
-    prt)
+    (infd x '(1 2)))
   '(1 2))
 
 (test-check "1^"
@@ -73,9 +67,9 @@
 (test-check "1"
   (run* (q)
     (fresh (x)
-      (infd x '(1 2))
+      (infd x q '(1 2))
       (=/=fd x 1)
-      (== x q)))
+      (=fd x q)))
   `(2))
 
 (test-check "2"
@@ -83,10 +77,10 @@
     (fresh (x y z)
       (infd x '(1 2 3))
       (infd y '(3 4 5))
-      (== x y)
+      (=fd x y)
       (infd z '(1 3 5 7 8))
       (infd z '(5 6))
-      (== z 5)
+      (=fd z 5)
       (== q `(,x ,y ,z))))
   `((3 3 5)))
 
@@ -95,10 +89,10 @@
     (fresh (x y z)
       (infd x '(1 2 3))
       (infd y '(3 4 5))
-      (== x y)
+      (=fd x y)
       (infd z '(1 3 5 7 8))
       (infd z '(5 6))
-      (== z x)
+      (=fd z x)
       (== q `(,x ,y ,z))))
   '())
 
@@ -107,20 +101,20 @@
     (fresh (x y z) 
       (infd x '(1 2))
       (infd y '(2 3))
-      (infd z '(2 4))
-      (== x y)
+      (infd z q '(2 4))
+      (=fd x y)
       (=/=fd x z)
-      (== q z)))
+      (=fd q z)))
   `(4))
 
 (test-check "4.1"
   (run* (q)
     (fresh (x y z) 
-      (== x y)
+      (=fd x y)
       (infd y '(2 3))
       (=/=fd x z)
-      (infd z '(2 4))
-      (== q z)
+      (infd z q '(2 4))
+      (=fd q z)
       (infd x '(1 2))))
   `(4))
 
@@ -131,7 +125,7 @@
       (infd y '(0 1 2 3 4))
       (<fd x y)
       (=/=fd x 1)
-      (== y 3)
+      (=fd y 3)
       (== q `(,x ,y))))
   `((2 3)))
 
@@ -140,7 +134,7 @@
     (fresh (x y)
       (infd x '(1 2))
       (infd y '(2 3))
-      (== x y)
+      (=fd x y)
       (== q `(,x ,y))))
   `((2 2)))
 
@@ -181,19 +175,19 @@
   (run* (q)
     (fresh (x)
       (<=fd x 5)
-      (infd x (range 0 10))
-      (== q x)))
+      (infd x q (range 0 10))
+      (=fd q x)))
   `(0 1 2 3 4 5))
 
 (test-check "13"
   (run* (q)
     (fresh (x y z)
-      (infd x y z (range 0 9))
+      (infd x y z q (range 0 9))
       (=/=fd x y)
       (=/=fd y z)
       (=/=fd x z)
-      (== x 2)
-      (== q 3)
+      (=fd x 2)
+      (=fd q 3)
       (plusfd y 3 z)))
   `(3))
 
@@ -216,7 +210,7 @@
       (== q `(,a ,b ,c))))
   '((3 1 2) (3 2 1)))
 
-(define long-addition-stepo
+(define add-digitso
   (lambda (augend addend carry-in carry digit)
     (fresh (partial-sum sum)
       (infd partial-sum (range 0 18))
@@ -224,18 +218,20 @@
       (plusfd augend addend partial-sum)
       (plusfd partial-sum carry-in sum)
       (conde
-        ((<fd 9 sum) (== carry 1) (plusfd digit 10 sum))
-        ((<=fd sum 9) (== carry 0) (== digit sum))))))
+        ((<fd 9 sum) (=fd carry 1) (plusfd digit 10 sum))
+        ((<=fd sum 9) (=fd carry 0) (=fd digit sum))))))
 
 ;;; 34 + 89
 
-(run* (q)
-  (fresh (digit1 digit2 carry0 carry1)
-    (infd carry0 carry1 (range 0 1))
-    (infd digit1 digit2 (range 0 9))
-    (long-addition-stepo 4 9 0 carry0 digit1)
-    (long-addition-stepo 3 8 carry0 carry1 digit2)
-    (== q `(,carry1 ,digit2 ,digit1))))
+(test-check "long-addition-step"
+  (run* (q)
+    (fresh (digit1 digit2 carry0 carry1)
+      (infd carry0 carry1 (range 0 1))
+      (infd digit1 digit2 (range 0 9))
+      (add-digitso 4 9 0 carry0 digit1)
+      (add-digitso 3 8 carry0 carry1 digit2)
+      (== q `(,carry1 ,digit2 ,digit1))))
+  '((1 2 3)))
 
 ;;; ((1 2 3))
   
@@ -247,10 +243,10 @@
       (infd s m (range 1 9))
       (infd e n d o r y (range 0 9))
       (infd carry0 carry1 carry2 (range 0 1))      
-      (long-addition-stepo d e 0 carry0 y)
-      (long-addition-stepo n r carry0 carry1 e)
-      (long-addition-stepo e o carry1 carry2 n)
-      (long-addition-stepo s m carry2 m o))))
+      (add-digitso d e 0 carry0 y)
+      (add-digitso n r carry0 carry1 e)
+      (add-digitso e o carry1 carry2 n)
+      (add-digitso s m carry2 m o))))
 
 (define send-more-moneyo
   (lambda (letters)
@@ -260,159 +256,10 @@
       (infd s m (range 1 9))
       (infd e n d o r y (range 0 9))
       (infd carry0 carry1 carry2 (range 0 1))      
-      (long-addition-stepo s m carry2 m o)
-      (long-addition-stepo e o carry1 carry2 n)
-      (long-addition-stepo n r carry0 carry1 e)
-      (long-addition-stepo d e 0 carry0 y))))
-
-(define smm
-  (lambda ()
-    (run* (q) (send-more-moneyo q))))
-
-;; (define diagonals
-;;   (lambda (n l)
-;;     (let loop ((r l) (s (cdr l)) (i 0) (j 1))
-;;       (cond
-;;         ((or (null? r) (null? (cdr r))) succeed)
-;;         ((null? s) (loop (cdr r) (cddr r) (+ i 1) (+ i 2)))
-;;         (else
-;;           (let ((qi (car r)) (qj (car s)))
-;;             (fresh (si sj)
-;;               (infd si sj (range 0 (* 2 n)))
-;;               (=/=fd qi sj)
-;;               (=/=fd qj si)
-;;               (plusfd qi (- j i) si)
-;;               (plusfd qj (- j i) sj)
-;;               (loop r (cdr s) i (+ j 1)))))))))
-
-;; (define n-queens
-;;   (lambda (n)
-;;     (lambda ()
-;;       (run* (q)
-;;         (let loop ((i n) (l '()))
-;;           (cond
-;;             ((zero? i)
-;;              (fresh ()
-;;                (== q l)
-;;                (all-difffd l)
-;;                (diagonals n l)))
-;;             (else
-;;               (fresh (x)
-;;                 (infd x (range 1 n))
-;;                 (loop (sub1 i) (cons x l))))))))))
-
-;; (printf "~s\n" (time (smm)))
-;; (let ((ans (time ((n-queens 8)))))
-;;   (printf "~s\n" (length ans)))
-
-
-
-;; (define n-queens
-;;   (lambda (n)
-;;     (run* (q)
-;;       (let loop ((i n) (l '()))
-;;         (cond
-;;           ((zero? i)
-;;            (fresh ()
-;;              (== q l)
-;;              (all-difffd l)
-;;              (diagonals n l)))
-;;           (else
-;;            (fresh (x)
-;;              (infd x (range 1 n))
-;;              (loop (sub1 i) (cons x l)))))))))
-
-(define diagonals
-  (let ((range0-16 (range 0 (* 2 8))))
-    (lambda (l)
-      (let loop ((r l) (s (cdr l)) (i 0) (j 1))
-        (cond
-          ((null? (cdr r)) succeed)
-          ((null? s)
-           (let ((r (cdr r)))
-             (loop r (cdr r) (+ i 1) (+ i 2))))
-          (else
-           (let ((qi (car r)) (qj (car s)))
-             (fresh (si sj)
-               (infd si sj range0-16)
-               (=/=fd qi sj)
-               (=/=fd qj si)
-               (plusfd qi (- j i) si)
-               (plusfd qj (- j i) sj)
-               (loop r (cdr s) i (+ j 1))))))))))
-
-;; (define driveqo
-;;   (let ((range1-8 (range 1 8)))
-;;     (lambda (q count acc)
-;;       (cond
-;;         ((zero? count)
-;;          (fresh ()
-;;            (== q acc)  ;;; q is a list of 8 variables in the range 1-8.
-;;            (all-difffd acc) ;; Now make sure they are never the same.
-;;            (diagonals acc))) ;;; 
-;;         (else
-;;          (fresh (x)
-;;            (infd x range1-8)   ;; x is either column or row.
-;;            (driveqo q (sub1 count) (cons x acc))))))))
-
-;; driveqo creates a list of 8 variables, each of whose domain is in the range 1-8
-;; and no two of these variables can be bound to the same value.
-
-(define diagonals
-  (lambda (x*)
-    (let row ((x* x*) (i 0) (j 1))
-      (cond
-        ((null? x*) succeed)
-        (else
-         (let ((qi (car x*)) (x^* (cdr x*)))
-           (let column ((y* x^*) (j j))
-             (cond
-               ((null? y*) (row x^* (+ i 1) (+ i 2)))
-               (else
-                (fresh ()
-                  (aux-diagonal qi (car y*) (- j i))
-                  (column (cdr y*) (+ j 1))))))))))))
-
-(define aux-diagonal
-  (let ((rng (range 0 (* 2 8))))
-    (lambda (qi qj d)
-      (fresh (si sj)
-        (infd si sj rng)
-        (=/=fd qi sj)
-        (=/=fd qj si)
-        (plusfd qi d si)
-        (plusfd qj d sj)))))
-
-(define testq
-  (lambda ()
-    (length
-      (run* (q)
-        (fresh (x0 x1 x2 x3 x4 x5 x6 x7)
-          (let ((x* `(,x0 ,x1 ,x2 ,x3 ,x4 ,x5 ,x6 ,x7)))
-            (fresh ()
-              (dom*fd x* (range 1 8))
-              (all-difffd x*)
-              (diagonals x*)
-              (== q x*))))))))
-
-;; Of course, it is trivial to generate x* recursively if we pass in N.
-
-;; (printf "~s\n" (time (smm)))
-;; (printf "~s\n" (time (testq)))
-
-(define n-queenso
-  (lambda (q n)
-    (let loop ((i n) (l '()))
-      (cond
-        ((zero? i)
-         (fresh ()
-           (== q l)
-           (all-difffd l)
-           (diagonalso n l)))
-        (else
-         (fresh (x)
-           (infd x (range 1 n))
-           (loop (sub1 i) (cons x l))))))))
+      (add-digitso s m carry2 m o)
+      (add-digitso e o carry1 carry2 n)
+      (add-digitso n r carry0 carry1 e)
+      (add-digitso d e 0 carry0 y))))
 
 (define diagonalso
   (lambda (n l)
@@ -425,15 +272,6 @@
             (fresh ()
               (diago qi qj (- j i) (range 0 (* 2 n)))
               (loop r (cdr s) i (+ j 1)))))))))
-
-;; (define diago
-;;   (lambda (qi qj d rng)
-;;     (fresh (si sj)
-;;       (infd si sj rng)
-;;       (=/=fd qi sj)
-;;       (plusfd qi d si)
-;;       (=/=fd qj si)
-;;       (plusfd qj d sj))))
 
 (define diago
   (lambda (qi qj d rng)
@@ -454,11 +292,9 @@
            (diagonalso n l)
            (== q* l)))
         (else (fresh (x)
-                (infd x(range 1 n))
+                (infd x (range 1 n))
                 (loop (sub1 i) (cons x l))))))))
 
-(length (run* (q) (n-queenso q 8)))
-
-(printf "~s\n" (time (smm)))
+(printf "~s\n" (time (run* (q) (send-more-moneyo q))))
 (printf "~s\n" (time (run 1 (q) (n-queenso q 8))))
 (printf "~s\n" (time (length (run* (q) (n-queenso q 8)))))

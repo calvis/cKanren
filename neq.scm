@@ -1,21 +1,8 @@
 (library
   (neq)
-
-  (export
-    ;; goals
-    =/=
-    all-diffo
-    useneq
-
-    ;; for composition
-    process-prefixneq
-    enforce-constraintsneq
-    reify-constraintsneq)
-
-  (import
-    (rnrs)
-    (mk)
-    (ck))
+  (export =/= add=/=)
+  (import (rnrs) (mk) (ck) (only (tree-unify) unify)
+    (only (chezscheme) pretty-print trace-define))
 
 ;;; little helpers
 
@@ -39,38 +26,22 @@
 
 ;;; serious functions
 
-(define process-prefixneq
-  (lambda (p c)
-    (run-constraints (recover/vars p) c)))
-
 (define oc->prefix
   (lambda (oc)
     (car (oc->rands oc))))
 
-(define enforce-constraintsneq (lambda (x) unitg))
-
-;; (define reify-constraintsneq
-;;   (lambda (m r)
-;;     (lambdag@ (a : s d c)
-;;       (let* ((c (walk* c r))
-;;              (p* (map oc->prefix c))
-;;              (c (remp any/var? p*)))
-;;         (cond
-;;           ((null? c) m)
-;;           (else `(,m : . ((=/= . ,c)))))))))
-
 (define reify-constraintsneq
-  (lambda (m r)
-    (lambdag@ (a : s d c)
-      (let* ((c (walk* c r))
-             (p* (remp any/var? (map oc->prefix c))))
-        (cond
-          ((null? p*) m)
-          (else `(,m : . ((=/= . ,p*)))))))))
+  (lambda (v r)
+    (lambdag@ (a : s c)
+      (let ((c (filter (lambda (oc) (eq? (oc->rator oc) '=/=neq-c)) c)))
+        (let ((c (remp any/var? (walk* (map oc->prefix c) r))))
+          (cond
+            ((null? c) '())
+            (else `((=/= . ,(walk* c r))))))))))
 
 (define =/=neq-c
   (lambda (p)
-    (lambdam@ (a : s d c)
+    (lambdam@ (a : s c)
       (cond
         ((unify p s)
          =>
@@ -83,12 +54,12 @@
 
 (define normalize-store
   (lambda (p)
-    (lambdam@ (a : s d c)
+    (lambdam@ (a : s c)
       (let loop ((c c) (c^ '()))
         (cond
           ((null? c)
            (let ((c^ (ext-c (build-oc =/=neq-c p) c^)))
-             (make-a s d c^)))
+             (make-a s c^)))
           ((eq? (oc->rator (car c)) '=/=neq-c)
            (let* ((oc (car c))
                   (p^ (oc->prefix oc)))
@@ -101,22 +72,10 @@
 (define subsumes?
   (lambda (p s)
     (cond
-      ((unify p s)
-       => (lambda (s^) (eq? s s^)))
+      ((unify p s) => (lambda (s^) (eq? s s^)))
       (else #f))))
 
-;;;-----------------------------------------------------------------
-
 ;;; goals
-
-;; (define =/=
-;;   (lambda (u v)
-;;     (lambdag@ (a : s d c)
-;;       (cond
-;;         ((unify `((,u . ,v)) s)
-;;          => (lambda (s^)
-;;               ((=/=neq-c (prefix-s s s^)) a)))
-;;         (else (unitg a))))))
 
 (define =/=
   (lambda (u v)
@@ -124,30 +83,18 @@
 
 (define =/=-c
   (lambda (u v)
-    (lambdam@ (a : s d c)
+    (lambdam@ (a : s c)
       (cond
         ((unify `((,u . ,v)) s)
          => (lambda (s^)
               ((=/=neq-c (prefix-s s s^)) a)))
         (else a)))))
 
-(define all-diffo
-  (lambda (l)
-    (conde
-      ((== l '()))
-      ((fresh (a) (== l `(,a))))
-      ((fresh (a ad dd)
-         (== l `(,a ,ad . ,dd))
-         (=/= a ad)
-         (all-diffo `(,a . ,dd))
-         (all-diffo `(,ad . ,dd)))))))
-
-;;; to use the =/= definitions, invoke (useneverequalo)
-
-(define useneq
+(define add=/=
   (lambda ()
-    (process-prefix process-prefixneq)
-    (enforce-constraints enforce-constraintsneq)
-    (reify-constraints reify-constraintsneq)))
+    (extend-reify-fns reify-constraintsneq)))
 
 )
+
+(import (neq))
+(add=/=)

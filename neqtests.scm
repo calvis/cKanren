@@ -1,13 +1,17 @@
-(load "mk.scm")
 (load "ck.scm")
+(load "tree-unify.scm")
 (load "neq.scm")
 
-(import
-  (mk)
-  (ck)
-  (neq))
-
-(useneq)
+(define all-diffo
+  (lambda (l)
+    (conde
+      ((== l '()))
+      ((fresh (a) (== l `(,a))))
+      ((fresh (a ad dd)
+         (== l `(,a ,ad . ,dd))
+         (=/= a ad)
+         (all-diffo `(,a . ,dd))
+         (all-diffo `(,ad . ,dd)))))))
 
 (define-syntax test-check
   (syntax-rules ()
@@ -53,9 +57,7 @@
   (run* (q)
     (fresh (x y)
       (=/= `(,x 1) `(2 ,y))
-      prt
-      (== `(,x ,y) q)
-      prt))
+      (== `(,x ,y) q)))
   '(((_.0 _.1) : (=/= ((_.0 . 2) (_.1 . 1))))))
 
 ;;; #!eof (when tracing)
@@ -73,9 +75,7 @@
 (test-check "=/=-1"
   (run* (q)
     (=/= 3 q)
-    prt
-    (== q 3)
-    prt)
+    (== q 3))
   '())
 
 (test-check "=/=-2"
