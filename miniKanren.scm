@@ -1,7 +1,6 @@
 ;; In order to use "basic" miniKanren
 
 (load "ck.scm")
-(import (ck))
 
 (define-syntax run1 (syntax-rules () ((_ (x) g0 g ...) (run 1 (x) g0 g ...))))
 (define-syntax run2 (syntax-rules () ((_ (x) g0 g ...) (run 2 (x) g0 g ...))))
