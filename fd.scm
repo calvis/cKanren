@@ -2,9 +2,8 @@
   (fd)
   (export
     infd domfd =fd =/=fd <=fd <fd
-    plusfd all-difffd range addfd)
-  (import (rnrs) (ck)
-    (only (chezscheme) trace-define pretty-print))
+    plusfd distinctfd range)
+  (import (rnrs) (ck))
 
 ;;; helpers
 
@@ -24,18 +23,19 @@
     ((_ (a) e) (lambdag@ (a) e))
     ((_ (a : s c) e) (lambdag@ (a : s c) e))))
 
+(define pred_x
+  (lambda (x)
+    (lambda (oc)
+      (and (eq? (oc->rator oc) 'domfd-c)
+           (eq? (car (oc->rands oc)) x)))))
+
 (define ext-d
   (lambda (x dom c)
     (let ((oc (build-oc domfd-c x dom)))
-      (cond
-        ((find (lambda (oc) (and (eq? (oc->rator oc) 'domfd-c)
-                            (eq? (car (oc->rands oc)) x)))
-           c)
-         (cons oc
-           (remp (lambda (oc) (and (eq? (oc->rator oc) 'domfd-c)
-                            (eq? (car (oc->rands oc)) x)))
-             c)))
-        (else (cons oc c))))))
+      (let ((pred (pred_x x)))
+        (cond
+          ((find pred c) (cons oc (remp pred c)))
+          (else (cons oc c)))))))
 
 ;;; domains (sorted lists of integers)
 
@@ -148,11 +148,18 @@
 ;;; procedures below this point cannot
 ;;; expose the representations of doms!
 
+;; (define get-dom
+;;   (lambda (x c)
+;;     (cond
+;;       ((find (lambda (oc) (and (eq? (oc->rator oc) 'domfd-c)
+;;                           (eq? (car (oc->rands oc)) x))) c)
+;;        => (lambda (oc) (cadr (oc->rands oc))))
+;;       (else #f))))
+
 (define get-dom
   (lambda (x c)
     (cond
-      ((find (lambda (oc) (and (eq? (oc->rator oc) 'domfd-c)
-                          (eq? (car (oc->rands oc)) x))) c)
+      ((find (pred_x x) c)
        => (lambda (oc) (cadr (oc->rands oc))))
       (else #f))))
 
@@ -238,29 +245,29 @@
                   a))
                 (else ((update-c oc) a))))))))))
 
-(define all-difffd-c
+(define distinctfd-c
   (lambda (v*)
     (lambdamfd@ (a : s c)
       (let ((v* (walk v* s)))
         (cond
           ((var? v*)
-           (let ((oc (build-oc all-difffd-c v*)))
+           (let ((oc (build-oc distinctfd-c v*)))
              ((update-c oc) a))) 
           (else
             (let-values (((x* n*) (partition var? v*)))
               (let ((n* (list-sort < n*)))
                 (cond
                   ((list-sorted? < n*)
-                   ((all-diff/fd-c x* n*) a))
+                   ((distinct/fd-c x* n*) a))
                   (else #f))))))))))
 
-(define all-diff/fd-c
+(define distinct/fd-c
   (lambda (y* n*)
     (lambdamfd@ (a : s c)
       (let loop ((y* y*) (n* n*) (x* '()))
         (cond
           ((null? y*)
-           (let* ((oc (build-oc all-diff/fd-c x* n*)))
+           (let* ((oc (build-oc distinct/fd-c x* n*)))
              ((composem
                 (update-c oc)
                 (exclude-from-dom (make-dom n*) c x*))
@@ -285,7 +292,7 @@
                 (loop (cdr x*)))))
         (else (loop (cdr x*)))))))
 
-(define-syntax c-op  ;;; returns sequeal.
+(define-syntax c-op  ;;; returns sequel.
   (syntax-rules (:)
     ((_ op ((u : d_u) ...) body)
      (lambdamfd@ (a : s c)
@@ -393,16 +400,13 @@
   (lambda (u v w)
     (goal-construct (plusfd-c u v w))))
 
-(define all-difffd
+(define distinctfd
   (lambda (v*)
-    (goal-construct (all-difffd-c v*))))
+    (goal-construct (distinctfd-c v*))))
 
-(define addfd
-  (lambda ()
-    (extend-enforce-fns enforce-constraintsfd)))
+(extend-enforce-fns 'fd enforce-constraintsfd)
 
 )
 
 (import (fd))
-(addfd)
 

@@ -9,7 +9,7 @@
         ((zero? i)
          (fresh ()
            (== q l)
-           (all-difffd l)
+           (distinctfd l)
            (diagonalso n l)))
         (else
          (fresh (x)
@@ -37,7 +37,7 @@
       (=/=fd qj si)
       (plusfd qj d sj))))
 
-(define all-diffo
+(define distincto
   (lambda (l)
     (conde
       ((== l '()))
@@ -45,11 +45,11 @@
       ((fresh (a ad dd)
          (== l `(,a ,ad . ,dd))
          (=/= a ad)
-         (all-diffo `(,a . ,dd))
-         (all-diffo `(,ad . ,dd)))))))
+         (distincto `(,a . ,dd))
+         (distincto `(,ad . ,dd)))))))
 
-(pretty-print (run* (q) (n-queenso q 8) (all-diffo q)))
+(pretty-print (run* (q) (n-queenso q 8) (distincto q)))
 (pretty-print
   (let ((answers (run* (q) (n-queenso q 4))))
-    (run* (q) (all-diffo answers))))
-(pretty-print (run* (q) (infd q '(2 3 4)) (all-diffo `(a 3 ,q))))
+    (run* (q) (distincto answers))))
+(pretty-print (run* (q) (infd q '(2 3 4)) (distincto `(a 3 ,q))))

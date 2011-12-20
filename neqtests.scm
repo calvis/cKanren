@@ -2,7 +2,7 @@
 (load "tree-unify.scm")
 (load "neq.scm")
 
-(define all-diffo
+(define distincto
   (lambda (l)
     (conde
       ((== l '()))
@@ -10,8 +10,8 @@
       ((fresh (a ad dd)
          (== l `(,a ,ad . ,dd))
          (=/= a ad)
-         (all-diffo `(,a . ,dd))
-         (all-diffo `(,ad . ,dd)))))))
+         (distincto `(,a . ,dd))
+         (distincto `(,ad . ,dd)))))))
 
 (define-syntax test-check
   (syntax-rules ()
@@ -448,7 +448,7 @@
 
 (test-check "=/=-50"
   (run* (q)
-    (all-diffo `(2 3 ,q)))
+    (distincto `(2 3 ,q)))
   '((_.0 : (=/= ((_.0 . 2)) ((_.0 . 3))))))
 
 (define rembero

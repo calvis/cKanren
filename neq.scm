@@ -1,8 +1,8 @@
 (library
   (neq)
-  (export =/= add=/=)
-  (import (rnrs) (mk) (ck) (only (tree-unify) unify)
-    (only (chezscheme) pretty-print trace-define))
+  (export =/=)
+  (import (rnrs) (ck)
+    (only (tree-unify) unify))
 
 ;;; little helpers
 
@@ -34,10 +34,11 @@
   (lambda (v r)
     (lambdag@ (a : s c)
       (let ((c (filter (lambda (oc) (eq? (oc->rator oc) '=/=neq-c)) c)))
-        (let ((c (remp any/var? (walk* (map oc->prefix c) r))))
-          (cond
-            ((null? c) '())
-            (else `((=/= . ,(walk* c r))))))))))
+        (let ((p* (walk* (map oc->prefix c) r)))
+          (let ((p* (remp any/var? p*)))
+            (cond
+              ((null? p*) '())
+              (else `((=/= . ,p*))))))))))
 
 (define =/=neq-c
   (lambda (p)
@@ -90,11 +91,8 @@
               ((=/=neq-c (prefix-s s s^)) a)))
         (else a)))))
 
-(define add=/=
-  (lambda ()
-    (extend-reify-fns reify-constraintsneq)))
+(extend-reify-fns 'neq reify-constraintsneq)
 
 )
 
 (import (neq))
-(add=/=)

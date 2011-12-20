@@ -3,19 +3,19 @@
 
   (export
     ;; framework
-    lhs rhs update-s update-c make-a any/var? prefix-s
+    update-s update-c make-a any/var? prefix-s
     lambdam@ identitym composem goal-construct ext-c
     build-oc oc->proc oc->rands oc->rator run run* prt
-    extend-enforce-fns extend-reify-fns enforce-fns reify-fns
+    extend-enforce-fns extend-reify-fns
 
     ;; mk
-    walk walk* var? lambdag@ mzerog unitg onceo
+    lhs rhs walk walk* var? lambdag@ mzerog unitg onceo
     conde conda condu ifa ifu project fresh :)
   
-  (import
-    (rnrs)
-    (only (chezscheme) make-parameter)
-    (mk))
+  (import (rnrs) (mk)
+    (only (chezscheme) make-parameter))
+
+;; ---HELPERS-unchanged--------------------------------------------
 
 (define any/var?
   (lambda (p)
@@ -44,6 +44,8 @@
             ((eq? s^ s) '())
             (else (cons (car s^) (loop (cdr s^))))))))))
 
+;; ---SUBSITUTION-changed------------------------------------------
+
 (define empty-s '())
 
 (define ext-s
@@ -54,20 +56,35 @@
   (lambda (x)
     (length x)))
 
-(define update-s
+(define update-s-check
   (lambda (x v)
     (lambdam@ (a : s c)
-      (let ((s^ (ext-s x v s)))
-        ((run-constraints (if (var? v) `(,x ,v) `(,x)) c)
-         (make-a s^ c))))))
+      (let ((x (walk x s))
+            (v (walk v s)))
+        (cond
+          ((or (var? x) (var? v))
+           (let ((s^ (ext-s x v s)))
+             ((run-constraints (if (var? v) `(,x ,v) `(,x)) c)
+              (make-a s^ c))))
+          ((equal? x v) a)
+          (else #f))))))
+
+(define update-s-nocheck
+  (lambda (x v)
+    (lambdam@ (a : s c)
+      ((run-constraints (if (var? v) `(,x ,v) `(,x)) c)
+       (make-a (ext-s x v s) c)))))
+
+(define update-s update-s-check)
+
+;; ---CONSTRAINT STORE-changed-------------------------------------
 
 (define empty-c '())
 
 (define ext-c
   (lambda (oc c)
     (cond
-     ((any/var? (oc->rands oc))
-      (cons oc c))
+     ((any/var? (oc->rands oc)) (cons oc c))
      (else c))))
 
 (define update-c
@@ -75,8 +92,12 @@
     (lambdam@ (a : s c)
       (make-a s (ext-c oc c)))))
 
+;; ---PACKAGE-unchanged--------------------------------------------
+
 (define empty-a (lambda () (cons empty-s empty-c)))
 (define make-a (lambda (s c) (cons s c)))
+
+;; ---GOAL WRAPPER-unchanged---------------------------------------
 
 (define goal-construct
   (lambda (fm)
@@ -84,6 +105,8 @@
       (cond
         ((fm a) => unitg)
         (else (mzerog))))))
+
+;; ---M-PROCS-changed----------------------------------------------
 
 (define-syntax lambdam@
   (syntax-rules (:)
@@ -98,6 +121,8 @@
     (lambdam@ (a)
       (let ((a (fm a)))
         (and a (f^m a))))))
+
+;; ---BUILD-OC-unchanged-------------------------------------------
 
 (define-syntax build-oc
   (syntax-rules ()
@@ -115,6 +140,8 @@
 (define oc->rands cddr)
 (define oc->rator cadr)
 
+;; ---FIXED POINT-unchanged----------------------------------------
+
 (define run-constraints
   (lambda (x* c)
     (cond
@@ -130,20 +157,27 @@
     (lambdam@ (a : s c)
       (cond
         ((memq oc c)
-         (let ((c^ (remq oc c)))
-           ((oc->proc oc) (make-a s c^))))
+         ((oc->proc oc) (make-a s (remq oc c))))
         (else a)))))
 
-(define enforce-fns (make-parameter '()))
+;; ---PARAMETERS-changed-------------------------------------------
 
-(define extend-enforce-fns
-  (lambda (fn)
-    (enforce-fns (cons fn (enforce-fns)))))
+(define extend-parameter
+  (lambda (param)
+    (lambda (tag fn)
+      (let ((fns (param)))
+        (and (not (assq tag fns))
+             (param (cons `(,tag . ,fn) fns)))))))
+
+;; ---ENFORCE CONSTRAINTS-changed----------------------------------
+
+(define enforce-fns (make-parameter '()))
+(define extend-enforce-fns (extend-parameter enforce-fns))
 
 (define enforce-constraints
   (lambda (x)
     (lambdag@ (a : s c)
-      ((let loop ((fn* (enforce-fns)))
+      ((let loop ((fn* (map cdr (enforce-fns))))
          (cond
            ((null? fn*) unitg)
            (else
@@ -152,11 +186,10 @@
                (loop (cdr fn*))))))
        a))))
 
-(define reify-fns (make-parameter '()))
+;; ---REIFICATION-changed------------------------------------------
 
-(define extend-reify-fns
-  (lambda (fn)
-    (reify-fns (cons fn (reify-fns)))))
+(define reify-fns (make-parameter '()))
+(define extend-reify-fns (extend-parameter reify-fns))
 
 (define reify-s
   (lambda (v s)
@@ -186,10 +219,13 @@
   (lambda (v r)
     (lambdag@ (a : s c)
       (let ((c (apply append
-                 (map (lambda (fn) ((fn v r) a)) (reify-fns)))))
+                 (map (lambda (fn) ((fn v r) a))
+                   (map cdr (reify-fns))))))
         (cond
           ((null? c) (choiceg v empty-f))
           (else (choiceg `(,v : . ,c) empty-f)))))))
+
+;; ---MACROS-changed-----------------------------------------------
 
 (define-syntax run
   (syntax-rules ()
@@ -203,6 +239,8 @@
 (define-syntax run*
   (syntax-rules ()
     ((_ (x) g ...) (run #f (x) g ...))))
+
+;; ----------------------------------------------------------------
 
 )
 
