@@ -31,14 +31,13 @@
     (car (oc->rands oc))))
 
 (define reify-constraintsneq
-  (lambda (v r)
-    (lambdag@ (a : s c)
-      (let ((c (filter (lambda (oc) (eq? (oc->rator oc) '=/=neq-c)) c)))
-        (let ((p* (walk* (map oc->prefix c) r)))
-          (let ((p* (remp any/var? p*)))
-            (cond
-              ((null? p*) '())
-              (else `((=/= . ,p*))))))))))
+  (lambda (v r c)
+    (let ((c (filter (lambda (oc) (eq? (oc->rator oc) '=/=neq-c)) c)))
+      (let ((p* (walk* (map oc->prefix c) r)))
+        (let ((p* (remp any/var? p*)))
+          (cond
+            ((null? p*) '())
+            (else `((=/= . ,p*)))))))))
 
 (define =/=neq-c
   (lambda (p)

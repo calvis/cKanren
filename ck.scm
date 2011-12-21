@@ -218,12 +218,22 @@
 (define reify-constraints
   (lambda (v r)
     (lambdag@ (a : s c)
-      (let ((c (apply append
-                 (map (lambda (fn) ((fn v r) a))
-                   (map cdr (reify-fns))))))
+      (choiceg
         (cond
-          ((null? c) (choiceg v empty-f))
-          (else (choiceg `(,v : . ,c) empty-f)))))))
+          ((null? c) v)
+          (else
+            (let ((c^ (run-reify-fns v r c)))
+              (cond
+                ((null? c^) v)
+                (else `(,v : . ,c^))))))
+        empty-f))))
+
+(define run-reify-fns
+  (lambda (v r c)
+    (let loop ((fns (map cdr (reify-fns))) (c c))
+      (cond
+        ((null? fns) c)
+        (else (loop (cdr fns) ((car fns) v r c)))))))
 
 ;; ---MACROS-changed-----------------------------------------------
 
