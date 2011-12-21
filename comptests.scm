@@ -48,8 +48,19 @@
          (distincto `(,a . ,dd))
          (distincto `(,ad . ,dd)))))))
 
-(pretty-print (run* (q) (n-queenso q 8) (distincto q)))
-(pretty-print
+(test-check "Distinct Queens 1"
+  (run* (q)
+    (fresh (x)
+      (n-queenso x 8)
+      (distincto x)))
+  '(_.0))
+
+(test-check "Distinct Queens 2"
   (let ((answers (run* (q) (n-queenso q 4))))
-    (run* (q) (distincto answers))))
-(pretty-print (run* (q) (infd q '(2 3 4)) (distincto `(a 3 ,q))))
+    (run* (q) (distincto answers)))
+  '(_.0))
+
+(test-check "infd/Distinct 1"
+  (run* (q) (infd q '(2 3 4)) (distincto `(a 3 ,q)))
+  '(2 4))
+
