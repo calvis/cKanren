@@ -3,27 +3,21 @@
   (export == unify)
   (import (rnrs) (ck))
 
-(define == (lambda (u v) (goal-construct (==-c u v))))
-
-(define ==-c
-  (lambda (u v)
-    (lambdam@ (a : s c)
-      (cond
-        ((unify `((,u . ,v)) s)
-         => (lambda (s^)
-              ((let loop ((s^ s^))
-                 (cond
-                   ((eq? s s^) identitym)
-                   (else
-                     (composem
-                       (update-s (caar s^) (cdar s^))
-                       (loop (cdr s^))))))
-               a)))
-        (else #f)))))
+;; ---UNIFICATION--------------------------------------------------
 
 (define ext-s
   (lambda (x v s)
     (cons `(,x . ,v) s)))
+
+(define occurs-check
+  (lambda (x v s)
+    (let ((v (walk v s)))
+      (cond
+        ((var? v) (eq? v x))
+        ((pair? v) 
+         (or (occurs-check x (car v) s)
+             (occurs-check x (cdr v) s)))
+        (else #f)))))
 
 (define unify
   (lambda (e s)
@@ -46,15 +40,28 @@
              ((equal? u v) (unify e s))
              (else #f))))))))
 
-(define occurs-check
-  (lambda (x v s)
-    (let ((v (walk v s)))
+;; ---GOAL---------------------------------------------------------
+
+(define == (lambda (u v) (goal-construct (==-c u v))))
+
+(define ==-c
+  (lambda (u v)
+    (lambdam@ (a : s c)
       (cond
-        ((var? v) (eq? v x))
-        ((pair? v) 
-         (or (occurs-check x (car v) s)
-             (occurs-check x (cdr v) s)))
+        ((unify `((,u . ,v)) s)
+         => (lambda (s^)
+              ((update-prefix s s^) a)))
         (else #f)))))
+
+(define update-prefix
+  (lambda (s s^)
+    (let loop ((s^ s^))
+      (cond
+        ((eq? s s^) identitym)
+        (else
+          (composem
+            (update-s (caar s^) (cdar s^))
+            (loop (cdr s^))))))))
 
 )
 
