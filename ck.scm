@@ -179,12 +179,12 @@
 
 (define enforce-constraints
   (lambda (x)
-    (let loop ((fns (map cdr (enforce-fns))))
+    (let loop ((fns (enforce-fns)))
       (cond
         ((null? fns) unitg)
         (else
           (fresh ()
-            ((car fns) x)
+            ((cdar fns) x)
             (loop (cdr fns))))))))
 
 ;; ---REIFICATION--------------------------------------------------
@@ -227,10 +227,10 @@
 
 (define run-reify-fns
   (lambda (v r c)
-    (let loop ((fns (map cdr (reify-fns))) (c c))
+    (let loop ((fns (reify-fns)) (c c))
       (cond
         ((null? fns) c)
-        (else (loop (cdr fns) ((car fns) v r c)))))))
+        (else (loop (cdr fns) ((cdar fns) v r c)))))))
 
 ;; ---MACROS-------------------------------------------------------
 
