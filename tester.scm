@@ -33,7 +33,7 @@
   (syntax-rules ()
     ((_ title tested-expression)
      (begin
-       (cout "Testing ~s (engine with ~s ticks fuel)\n" title max-ticks)
+       (printf "Testing ~s (engine with ~s ticks fuel)\n" title max-ticks)
        (let ((eng (make-engine (lambda () tested-expression))))
          (eng max-ticks
            (lambda (t v)
