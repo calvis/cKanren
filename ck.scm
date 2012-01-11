@@ -75,7 +75,7 @@
       ((run-constraints (if (var? v) `(,x ,v) `(,x)) c)
        (make-a (ext-s x v s) c)))))
 
-(define update-s update-s-check)
+(define update-s update-s-nocheck)
 
 ;; ---CONSTRAINT-STORE---------------------------------------------
 
