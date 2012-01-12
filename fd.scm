@@ -354,14 +354,17 @@
 (define verify-all-bound
   (lambda (s c bound-x*)
     (unless (null? c)
-      (cond
-        ((find (lambda (x) (not (memq x bound-x*)))
-           (filter var? (oc->rands (car c))))
-         => (lambda (x)
-              (unless (value-dom? (walk x s))
-                (error 'verify-all-bound
-                  "Constrained variable ~s without domain" x))))
-        (else (verify-all-bound s (cdr c) bound-x*))))))
+      (let ((oc (car c)))
+        (if (memq (oc->rator oc)
+              '(=/=fd-c distinctfd-c distinct/fd-c <=fd-c =fd-c))
+            (cond
+              ((find (lambda (x) (not (memq x bound-x*)))
+                 (filter var? (oc->rands oc)))
+               => (lambda (x)
+                    (unless (value-dom? (walk x s))
+                      (error 'verify-all-bound
+                        "Constrained variable ~s without domain" x))))))
+        (verify-all-bound s (cdr c) bound-x*)))))
 
 ;;; goals
 
