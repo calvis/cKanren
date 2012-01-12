@@ -3,12 +3,6 @@
   (export test-check test-divergence)
   (import (chezscheme))
 
-(define (cout . args)
-  (for-each
-    (lambda (x)
-      (if (procedure? x) (x) (display x)))
-    args))
-
 (define test-error
   (lambda (tag . args)
     (printf "Failed: ~s: ~%" tag)
@@ -19,7 +13,7 @@
   (syntax-rules ()
     ((_ title tested-expression expected-result)
      (begin
-       (cout "Testing " title (string #\newline))
+       (printf "Testing ~a\n" title)
        (let* ((expected expected-result)
               (produced tested-expression))
          (or (equal? expected produced)
