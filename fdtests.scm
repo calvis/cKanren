@@ -185,6 +185,13 @@
       (== q `(,a ,b ,c))))
   '((3 1 2) (3 2 1)))
 
+(test-check "16"
+  (run* (q)
+    (fresh (x y z)
+      (infd x y z '(1 2))
+      (distinctfd `(,x ,y ,z))))
+  '())
+
 (define add-digitso
   (lambda (augend addend carry-in carry digit)
     (fresh (partial-sum sum)
