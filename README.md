@@ -36,53 +36,53 @@ that cKanren be in your current directory, or alternative in your
 libdirs path (if your implementation supports such a feature). For
 instance, with Chez Scheme:
 
-`mv cKanren /usr/lib/scheme/
-scheme --libdirs ".:/usr/lib/scheme" --program my-minikanren-program.ss`
+`mv cKanren /usr/lib/scheme/`
+`scheme --libdirs ".:/usr/lib/scheme" --program my-minikanren-program.ss`
 
 ### OR
 
-`mv cKanren /usr/lib/scheme/
-export CHEZSCHEMELIBDIRS="$CHEZSCHEMELIBDIRS:/usr/lib/scheme"
-scheme --program my-minikanren-program.ss`
+`mv cKanren /usr/lib/scheme/`
+`export CHEZSCHEMELIBDIRS="$CHEZSCHEMELIBDIRS:/usr/lib/scheme"`
+`scheme --program my-minikanren-program.ss`
 
-`(library (foo)
-  (export bar)
-  (import 
-    (cKanren miniKanren)
-    (cKanren mk)
-    (cKanren tree-unify))
-  
-  ;; your miniKanren code)`
+    (library (foo)
+      (export bar)
+      (import 
+        (cKanren miniKanren)
+        (cKanren mk)
+        (cKanren tree-unify))
+      
+      ;; your miniKanren code)
 
-`(library (baz)
-  (export bar)
-  (import 
-    (cKanren ck)
-    (cKanren miniKanren)
-    (cKanren mk)
-    (cKanren tree-unify))
-  
-  ;; your cKanren code)`
+    (library (baz)
+      (export bar)
+      (import 
+        (cKanren ck)
+        (cKanren miniKanren)
+        (cKanren mk)
+        (cKanren tree-unify))
+      
+      ;; your cKanren code)
 
 As long as you're using an R6RS scheme, you should also be able to use
 load. However, using load has seen numerous problems in several users
 experiences. A few examples that seems to work are below:
 
-`;; Presumes cKanren is in your current directory.
-(cd "cKanren")
-(load "ck.scm")
-(load "miniKanren.scm")
-(load "mk.scm")
-(load "tree-unify.scm")
-(cd "..")
-;; your code`
+    ;; Presumes cKanren is in your current directory.
+    (cd "cKanren")
+    (load "ck.scm")
+    (load "miniKanren.scm")
+    (load "mk.scm")
+    (load "tree-unify.scm")
+    (cd "..")
+    ;; your code
 
 ### OR 
 
-`;; the files must be in or symlinked in your current directory
-(load "ck.scm")
-(load "miniKanren.scm")
-(load "mk.scm")
-(load "tree-unify.scm")
-;; your code`
+    ;; the files must be in or symlinked in your current directory
+    (load "ck.scm")
+    (load "miniKanren.scm")
+    (load "mk.scm")
+    (load "tree-unify.scm")
+    ;; your code
 
