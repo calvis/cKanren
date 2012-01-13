@@ -36,14 +36,16 @@ that cKanren be in your current directory, or alternative in your
 libdirs path (if your implementation supports such a feature). For
 instance, with Chez Scheme:
 
-`mv cKanren /usr/lib/scheme/`
-`scheme --libdirs ".:/usr/lib/scheme" --program my-minikanren-program.ss`
+    mv cKanren /usr/lib/scheme/
+    scheme --libdirs ".:/usr/lib/scheme" --program my-minikanren-program.ss
 
-### OR
+Or:
 
-`mv cKanren /usr/lib/scheme/`
-`export CHEZSCHEMELIBDIRS="$CHEZSCHEMELIBDIRS:/usr/lib/scheme"`
-`scheme --program my-minikanren-program.ss`
+    mv cKanren /usr/lib/scheme/
+    export CHEZSCHEMELIBDIRS="$CHEZSCHEMELIBDIRS:/usr/lib/scheme"
+    scheme --program my-minikanren-program.ss
+
+Here are some exmaples of importing:
 
     (library (foo)
       (export bar)
@@ -53,6 +55,8 @@ instance, with Chez Scheme:
         (cKanren tree-unify))
       
       ;; your miniKanren code)
+
+And another:
 
     (library (baz)
       (export bar)
@@ -77,7 +81,7 @@ experiences. A few examples that seems to work are below:
     (cd "..")
     ;; your code
 
-### OR 
+Or:
 
     ;; the files must be in or symlinked in your current directory
     (load "ck.scm")
