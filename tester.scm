@@ -1,5 +1,5 @@
 (library
-  (tester)
+  (cKanren tester)
   (export test-check test-divergence)
   (import (chezscheme))
 
@@ -38,5 +38,4 @@
 
 )
 
-(import (tester))
-
+(import (cKanren tester))

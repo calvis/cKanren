@@ -1,8 +1,217 @@
-(load "tester.scm")
-(load "ck.scm")
-(load "fd.scm")
-(load "tree-unify.scm")
+(library 
+  (cKanren fdtests)
+  (export
+    add-digitso
+    send-more-moneyo
+    diagonalso
+    diago
+    n-queenso
+    fd-test-all)
+  (import 
+    (chezscheme)
+    (cKanren tester)
+    (cKanren mk)
+    (cKanren ck)
+    (cKanren fd)
+    (cKanren tree-unify))
 
+(define fd-test-all
+  (lambda ()
+           
+    (test-check "1^^"
+      (run* (x)
+        (infd x '(1 2)))
+      '(1 2))
+
+    (test-check "1^"
+      (run* (x)
+        (infd x '(1 2))
+        (=/=fd x 1))
+      `(2))
+
+    (test-check "1"
+      (run* (q)
+        (fresh (x)
+          (infd x q '(1 2))
+          (=/=fd x 1)
+          (=fd x q)))
+      `(2))
+
+    (test-check "2"
+      (run* (q)
+        (fresh (x y z)
+          (infd x '(1 2 3))
+          (infd y '(3 4 5))
+          (=fd x y)
+          (infd z '(1 3 5 7 8))
+          (infd z '(5 6))
+          (=fd z 5)
+          (== q `(,x ,y ,z))))
+      `((3 3 5)))
+
+    (test-check "3"
+      (run* (q)
+        (fresh (x y z)
+          (infd x '(1 2 3))
+          (infd y '(3 4 5))
+          (=fd x y)
+          (infd z '(1 3 5 7 8))
+          (infd z '(5 6))
+          (=fd z x)
+          (== q `(,x ,y ,z))))
+      '())
+
+    (test-check "4"
+      (run* (q)
+        (fresh (x y z) 
+          (infd x '(1 2))
+          (infd y '(2 3))
+          (infd z q '(2 4))
+          (=fd x y)
+          (=/=fd x z)
+          (=fd q z)))
+      `(4))
+
+    (test-check "4.1"
+      (run* (q)
+        (fresh (x y z) 
+          (=fd x y)
+          (infd y '(2 3))
+          (=/=fd x z)
+          (infd z q '(2 4))
+          (=fd q z)
+          (infd x '(1 2))))
+      `(4))
+
+    (test-check "5"
+      (run* (q)
+        (fresh (x y)
+          (infd x '(1 2 3))
+          (infd y '(0 1 2 3 4))
+          (<fd x y)
+          (=/=fd x 1)
+          (=fd y 3)
+          (== q `(,x ,y))))
+      `((2 3)))
+
+    (test-check "6"
+      (run* (q)
+        (fresh (x y)
+          (infd x '(1 2))
+          (infd y '(2 3))
+          (=fd x y)
+          (== q `(,x ,y))))
+      `((2 2)))
+
+    (test-check "7"
+      (run* (q)
+        (fresh (x y z)
+          (infd x y z '(1 2))
+          (=/=fd x y)
+          (=/=fd x z)
+          (=/=fd y z))
+        (infd q '(5)))
+      `())
+
+    (test-check "8"
+      (run* (q)
+        (fresh (x) (infd x '(1 2)))
+        (infd q '(5)))
+      `(5))
+
+    (test-check "9"
+      (run* (q)
+        (== q #t))
+      `(#t))
+
+    (test-check "10"
+      (run* (q)
+        (infd q '(1 2))
+        (== q #t))
+      `())
+
+    (test-check "11"
+      (run* (q)
+        (== q #t)
+        (infd q '(1 2)))
+      `())
+
+    (test-check "12"
+      (run* (q)
+        (fresh (x)
+          (<=fd x 5)
+          (infd x q (range 0 10))
+          (=fd q x)))
+      `(0 1 2 3 4 5))
+
+    (test-check "13"
+      (run* (q)
+        (fresh (x y z)
+          (infd x y z q (range 0 9))
+          (=/=fd x y)
+          (=/=fd y z)
+          (=/=fd x z)
+          (=fd x 2)
+          (=fd q 3)
+          (plusfd y 3 z)))
+      `(3))
+
+    (test-check "14"
+      (run* (q)
+        (fresh (x y z)
+          (infd x y z (range 0 2))
+          (distinctfd `(,x ,y ,z))
+          (== q `(,x ,y ,z))))
+      `((0 1 2) (0 2 1) (1 0 2) (2 0 1) (1 2 0) (2 1 0)))
+
+    (test-check "15"
+      (run* (q)
+        (fresh (a b c x)
+          (infd a b c (range 1 3))
+          (distinctfd `(,a ,b ,c))
+          (=/=fd c x)
+          (<=fd b 2)
+          (== x 3)
+          (== q `(,a ,b ,c))))
+      '((3 1 2) (3 2 1)))
+
+    (test-check "16"
+      (run* (q)
+        (fresh (x y z)
+          (infd x y z '(1 2))
+          (distinctfd `(,x ,y ,z))))
+      '())
+
+    ;;; 34 + 89
+
+    (test-check "long-addition-step"
+      (run* (q)
+        (fresh (digit1 digit2 carry0 carry1)
+          (infd carry0 carry1 (range 0 1))
+          (infd digit1 digit2 (range 0 9))
+          (add-digitso 4 9 0 carry0 digit1)
+          (add-digitso 3 8 carry0 carry1 digit2)
+          (== q `(,carry1 ,digit2 ,digit1))))
+      '((1 2 3)))
+
+    ;;; ((1 2 3))
+              
+    (printf "~s\n" (time (run* (q) (send-more-moneyo q))))
+    (printf "~s\n" (time (run 1 (q) (n-queenso q 8))))
+    (printf "~s\n" (time (length (run* (q) (n-queenso q 8)))))
+    
+    ))
+
+    (define add-digitso
+      (lambda (augend addend carry-in carry digit)
+        (fresh (partial-sum sum)
+          (infd partial-sum (range 0 18))
+          (infd sum (range 0 19))
+          (plusfd augend addend partial-sum)
+          (plusfd partial-sum carry-in sum)
+          (conde
+            ((<fd 9 sum) (=fd carry 1) (plusfd digit 10 sum))
+            ((<=fd sum 9) (=fd carry 0) (=fd digit sum))))))
 ;; (test-check "-1"
 ;;   (run* (q)
 ;;     (fresh (w x y z)
@@ -28,194 +237,6 @@
 ;;       (<=fd c 5)))
 ;;  '((1 2 3)))
 
-(test-check "1^^"
-  (run* (x)
-    (infd x '(1 2)))
-  '(1 2))
-
-(test-check "1^"
-  (run* (x)
-    (infd x '(1 2))
-    (=/=fd x 1))
-  `(2))
-
-(test-check "1"
-  (run* (q)
-    (fresh (x)
-      (infd x q '(1 2))
-      (=/=fd x 1)
-      (=fd x q)))
-  `(2))
-
-(test-check "2"
-  (run* (q)
-    (fresh (x y z)
-      (infd x '(1 2 3))
-      (infd y '(3 4 5))
-      (=fd x y)
-      (infd z '(1 3 5 7 8))
-      (infd z '(5 6))
-      (=fd z 5)
-      (== q `(,x ,y ,z))))
-  `((3 3 5)))
-
-(test-check "3"
-  (run* (q)
-    (fresh (x y z)
-      (infd x '(1 2 3))
-      (infd y '(3 4 5))
-      (=fd x y)
-      (infd z '(1 3 5 7 8))
-      (infd z '(5 6))
-      (=fd z x)
-      (== q `(,x ,y ,z))))
-  '())
-
-(test-check "4"
-  (run* (q)
-    (fresh (x y z) 
-      (infd x '(1 2))
-      (infd y '(2 3))
-      (infd z q '(2 4))
-      (=fd x y)
-      (=/=fd x z)
-      (=fd q z)))
-  `(4))
-
-(test-check "4.1"
-  (run* (q)
-    (fresh (x y z) 
-      (=fd x y)
-      (infd y '(2 3))
-      (=/=fd x z)
-      (infd z q '(2 4))
-      (=fd q z)
-      (infd x '(1 2))))
-  `(4))
-
-(test-check "5"
-  (run* (q)
-    (fresh (x y)
-      (infd x '(1 2 3))
-      (infd y '(0 1 2 3 4))
-      (<fd x y)
-      (=/=fd x 1)
-      (=fd y 3)
-      (== q `(,x ,y))))
-  `((2 3)))
-
-(test-check "6"
-  (run* (q)
-    (fresh (x y)
-      (infd x '(1 2))
-      (infd y '(2 3))
-      (=fd x y)
-      (== q `(,x ,y))))
-  `((2 2)))
-
-(test-check "7"
-  (run* (q)
-    (fresh (x y z)
-      (infd x y z '(1 2))
-      (=/=fd x y)
-      (=/=fd x z)
-      (=/=fd y z))
-    (infd q '(5)))
-  `())
-
-(test-check "8"
-  (run* (q)
-    (fresh (x) (infd x '(1 2)))
-    (infd q '(5)))
-  `(5))
-
-(test-check "9"
-  (run* (q)
-    (== q #t))
-  `(#t))
-
-(test-check "10"
-  (run* (q)
-    (infd q '(1 2))
-    (== q #t))
-  `())
-
-(test-check "11"
-  (run* (q)
-    (== q #t)
-    (infd q '(1 2)))
-  `())
-
-(test-check "12"
-  (run* (q)
-    (fresh (x)
-      (<=fd x 5)
-      (infd x q (range 0 10))
-      (=fd q x)))
-  `(0 1 2 3 4 5))
-
-(test-check "13"
-  (run* (q)
-    (fresh (x y z)
-      (infd x y z q (range 0 9))
-      (=/=fd x y)
-      (=/=fd y z)
-      (=/=fd x z)
-      (=fd x 2)
-      (=fd q 3)
-      (plusfd y 3 z)))
-  `(3))
-
-(test-check "14"
-  (run* (q)
-    (fresh (x y z)
-      (infd x y z (range 0 2))
-      (distinctfd `(,x ,y ,z))
-      (== q `(,x ,y ,z))))
-  `((0 1 2) (0 2 1) (1 0 2) (2 0 1) (1 2 0) (2 1 0)))
-
-(test-check "15"
-  (run* (q)
-    (fresh (a b c x)
-      (infd a b c (range 1 3))
-      (distinctfd `(,a ,b ,c))
-      (=/=fd c x)
-      (<=fd b 2)
-      (== x 3)
-      (== q `(,a ,b ,c))))
-  '((3 1 2) (3 2 1)))
-
-(test-check "16"
-  (run* (q)
-    (fresh (x y z)
-      (infd x y z '(1 2))
-      (distinctfd `(,x ,y ,z))))
-  '())
-
-(define add-digitso
-  (lambda (augend addend carry-in carry digit)
-    (fresh (partial-sum sum)
-      (infd partial-sum (range 0 18))
-      (infd sum (range 0 19))
-      (plusfd augend addend partial-sum)
-      (plusfd partial-sum carry-in sum)
-      (conde
-        ((<fd 9 sum) (=fd carry 1) (plusfd digit 10 sum))
-        ((<=fd sum 9) (=fd carry 0) (=fd digit sum))))))
-
-;;; 34 + 89
-
-(test-check "long-addition-step"
-  (run* (q)
-    (fresh (digit1 digit2 carry0 carry1)
-      (infd carry0 carry1 (range 0 1))
-      (infd digit1 digit2 (range 0 9))
-      (add-digitso 4 9 0 carry0 digit1)
-      (add-digitso 3 8 carry0 carry1 digit2)
-      (== q `(,carry1 ,digit2 ,digit1))))
-  '((1 2 3)))
-
-;;; ((1 2 3))
   
 (define send-more-moneyo
   (lambda (letters)
@@ -230,7 +251,7 @@
       (add-digitso e o carry1 carry2 n)
       (add-digitso s m carry2 m o))))
 
-(define send-more-moneyo
+(define send-more-moneyo^
   (lambda (letters)
     (fresh (s e n d m o r y carry0 carry1 carry2)
       (== letters `(,s ,e ,n ,d ,m ,o ,r ,y))
@@ -277,6 +298,6 @@
                 (infd x (range 1 n))
                 (loop (sub1 i) (cons x l))))))))
 
-(printf "~s\n" (time (run* (q) (send-more-moneyo q))))
-(printf "~s\n" (time (run 1 (q) (n-queenso q 8))))
-(printf "~s\n" (time (length (run* (q) (n-queenso q 8)))))
+)
+
+(import (cKanren fdtests))

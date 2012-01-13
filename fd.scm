@@ -1,9 +1,9 @@
 (library
-  (fd)
+  (cKanren fd)
   (export
     infd domfd =fd =/=fd <=fd <fd
     plusfd distinctfd range)
-  (import (rnrs) (ck))
+  (import (rnrs) (cKanren ck))
 
 ;;; helpers
 
@@ -411,5 +411,5 @@
 
 )
 
-(import (fd))
+(import (cKanren fd))
 

@@ -5,12 +5,11 @@
     fresh* 
     matche
     mpat0  
-    mpat 
-    lambdae
-    fresh* 
-    matche
-    mpat0  
     mpat)
+  (import 
+    (cKanren mk)
+    (only (cKanren tree-unify) ==)
+    (rnrs))
   
 
 ;; Example:

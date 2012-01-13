@@ -1,6 +1,38 @@
-(load "ck.scm")
-(load "fd.scm")
-(load "neq.scm")
+(library 
+  (cKanren comptests)
+  (export
+    n-queenso
+    diagonalso
+    diago
+    distincto
+    comp-test-all)
+  (import 
+    (chezscheme)
+    (cKanren tree-unify)
+    (cKanren mk)
+    (cKanren ck)
+    (cKanren tester)
+    (cKanren fd)
+    (cKanren neq))
+
+(define comp-test-all
+  (lambda ()
+    (test-check "Distinct Queens 1"
+      (run* (q)
+        (fresh (x)
+          (n-queenso x 8)
+          (distincto x)))
+      '(_.0))
+
+    (test-check "Distinct Queens 2"
+      (let ((answers (run* (q) (n-queenso q 4))))
+        (run* (q) (distincto answers)))
+      '(_.0))
+
+    (test-check "infd/Distinct 1"
+      (run* (q) (infd q '(2 3 4)) (distincto `(a 3 ,q)))
+      '(2 4))
+    ))
 
 (define n-queenso
   (lambda (q n)
@@ -48,19 +80,6 @@
          (distincto `(,a . ,dd))
          (distincto `(,ad . ,dd)))))))
 
-(test-check "Distinct Queens 1"
-  (run* (q)
-    (fresh (x)
-      (n-queenso x 8)
-      (distincto x)))
-  '(_.0))
+)
 
-(test-check "Distinct Queens 2"
-  (let ((answers (run* (q) (n-queenso q 4))))
-    (run* (q) (distincto answers)))
-  '(_.0))
-
-(test-check "infd/Distinct 1"
-  (run* (q) (infd q '(2 3 4)) (distincto `(a 3 ,q)))
-  '(2 4))
-
+(import (cKanren comptests))

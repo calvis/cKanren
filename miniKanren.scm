@@ -1,8 +1,6 @@
 ;; In order to use "basic" miniKanren
 
 (library (cKanren miniKanren)
-  (import (cKanren ck)
-          (cKanren tree-unify))
   (export
     run1
     run2
@@ -80,6 +78,10 @@
     repeated-mul
     expo
     prnt)
+  (import (cKanren ck)
+          (cKanren mk)
+          (cKanren tree-unify)
+          (chezscheme))
 
 (define-syntax run1 (syntax-rules () ((_ (x) g0 g ...) (run 1 (x) g0 g ...))))
 (define-syntax run2 (syntax-rules () ((_ (x) g0 g ...) (run 2 (x) g0 g ...))))

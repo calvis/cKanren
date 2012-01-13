@@ -12,7 +12,7 @@
     lhs rhs walk walk* var? lambdag@ mzerog unitg onceo
     conde conda condu ifa ifu project fresh :)
   
-  (import (rnrs) (mk)
+  (import (rnrs) (cKanren mk)
     (only (chezscheme) make-parameter))
 
 ;; ---HELPERS------------------------------------------------------
@@ -251,4 +251,4 @@
 
 )
 
-(import (ck))
+(import (cKanren ck))
