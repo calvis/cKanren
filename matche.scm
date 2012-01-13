@@ -1,3 +1,18 @@
+(library 
+  (cKanren matche)
+  (export
+    lambdae
+    fresh* 
+    matche
+    mpat0  
+    mpat 
+    lambdae
+    fresh* 
+    matche
+    mpat0  
+    mpat)
+  
+
 ;; Example:
 ;; (print-gensym #f)
 ;; (pretty-print (expand '(matche '(1 2 3) ((,a ,b ,c) 1) ((,x d ,y) 2) (5) (,w) ((a b c)))))
@@ -47,17 +62,5 @@
                                                                       ;;; turn g to clause.
     
     ((_ ignore (top stack ...) body un* done*) (mpat top (stack ...) body un* done*)))) ; pop
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+)
+(import (cKanren matche))

@@ -1,5 +1,5 @@
 (library 
-  (ck)
+  (cKanren ck)
 
   (export
     ;; framework
