@@ -1,7 +1,87 @@
 ;; In order to use "basic" miniKanren
 
-(load "ck.scm")
-(load "tree-unify.scm")
+(library (cKanren miniKanren)
+  (export
+    run1
+    run2
+    run3
+    run4
+    run5
+    run6
+    run7
+    run8
+    run9
+    run10
+    run11
+    run12
+    run13
+    run14
+    run15
+    run16
+    run17
+    run18
+    run19
+    run20
+    run21
+    run22
+    run23
+    run24
+    run25
+    run26
+    run27
+    run28
+    run29
+    run30
+    run31
+    run32
+    run33
+    run34
+    run35
+    run36
+    run37
+    run38
+    run39
+    run40
+    caro    
+    cdro
+    conso
+    nullo
+    eqo
+    pairo
+    membero
+    rembero
+    appendo
+    flatteno
+    anyo
+    nevero 
+    alwayso 
+    build-num
+    poso
+    >1o
+    full-addero
+    addero
+    gen-addero
+    pluso
+    minuso
+    *o
+    odd-*o
+    bound-*o
+    =lo
+    <lo
+    <=lo
+    <o
+    <=o
+    /o
+    splito
+    logo
+    exp2
+    repeated-mul
+    expo
+    prnt)
+  (import (cKanren ck)
+          (cKanren mk)
+          (cKanren tree-unify)
+          (chezscheme))
 
 (define-syntax run1 (syntax-rules () ((_ (x) g0 g ...) (run 1 (x) g0 g ...))))
 (define-syntax run2 (syntax-rules () ((_ (x) g0 g ...) (run 2 (x) g0 g ...))))
@@ -425,3 +505,5 @@
                       vars))
           (newline)
           (succeed s))))))
+)
+(import (cKanren miniKanren))

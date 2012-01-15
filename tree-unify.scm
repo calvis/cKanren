@@ -1,7 +1,7 @@
 (library
-  (tree-unify)
+  (cKanren tree-unify)
   (export == unify)
-  (import (rnrs) (ck))
+  (import (rnrs) (cKanren ck))
 
 ;; ---UNIFICATION--------------------------------------------------
 
@@ -65,5 +65,5 @@
 
 )
 
-(import (tree-unify))
+(import (cKanren tree-unify))
 

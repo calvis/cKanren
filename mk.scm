@@ -1,5 +1,5 @@
 (library
-  (mk)
+  (cKanren mk)
 
   (export
     var var? rhs lhs lambdag@ walk walk* mzerog unitg
@@ -190,4 +190,4 @@
 
 )
 
-(import (mk))
+(import (cKanren mk))
