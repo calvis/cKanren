@@ -1,7 +1,7 @@
 (library
-  (never-true)
+  (cKanren never-true)
   (export never-true never-pairo)
-  (import (rnrs) (ck))
+  (import (rnrs) (cKanren ck))
 
 (define never-true-c
   (lambda (pred? x)
@@ -21,4 +21,4 @@
 
 )
 
-(import (never-true))
+(import (cKanren never-true))
