@@ -17,7 +17,7 @@
 
 (define never-pairo
   (lambda (x)
-    (never-true pair? x)))
+    (never-trueo pair? x)))
 
 (define requiredo
   (lambda (pred? x)
@@ -41,7 +41,7 @@
          a)))
 
 (define allowedo
-  (lambda (u v)
+  (lambda (pred? x)
     (goal-construct (allowed-c pred? x))))
 
 (define allowed-c
@@ -52,7 +52,14 @@
           ((pred? x) a)
           (else ((update-c (build-oc allowed-c pred? x)) a)))))))
 
+(define reified-allowed
+  (lambda (v r c)
+    (let ((c (filter (lambda (oc) (eq? (oc->rator oc) 'allowed-c)) c)))
+      (let ((c (walk* (map cddr c) r)))
+        `((allowed . ,c))))))
+
 (extend-enforce-fns 'required required-enforce)
+(extend-reify-fns 'allowed reified-allowed)
 
 )
 
