@@ -1,6 +1,6 @@
 (library
   (never-true)
-  (export never-true never-pairo required allowed)
+  (export never-trueo never-pairo requiredo allowedo)
   (import (rnrs) (ck))
 
 (define never-true-c
@@ -11,7 +11,7 @@
           ((pred? x) #f)
           (else ((update-c (build-oc never-true-c pred? x)) a)))))))
 
-(define never-true
+(define never-trueo
   (lambda (pred? x)
     (goal-construct (never-true-c pred? x))))
 
@@ -19,7 +19,7 @@
   (lambda (x)
     (never-true pair? x)))
 
-(define required
+(define requiredo
   (lambda (pred? x)
     (goal-construct (required-c pred? x))))
 
@@ -40,7 +40,7 @@
     (and (not (find (lambda (oc) (eq? 'required-c (oc->rator oc))) c))
          a)))
 
-(define allowed
+(define allowedo
   (lambda (u v)
     (goal-construct (allowed-c pred? x))))
 
