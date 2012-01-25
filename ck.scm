@@ -13,7 +13,7 @@
     conde conda condu ifa ifu project fresh :)
   
   (import (rnrs) (mk)
-    (only (chezscheme) make-parameter))
+          (compat))
 
 ;; ---HELPERS------------------------------------------------------
 

@@ -6,7 +6,7 @@
     choiceg lambdaf@ : take empty-f conde conda ifa
     condu ifu fresh project onceo succeed fail prt)
 
-  (import (rnrs) (only (chezscheme) pretty-print))
+  (import (rnrs) (compat))
 
 (define var
   (lambda (x)
