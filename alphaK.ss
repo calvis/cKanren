@@ -1,6 +1,6 @@
 (library (alphaK)
   (export run run* == ==-check fresh make-nom nom? project
-          fresh-nom hash (rename (make-tie tie))) 
+    fresh-nom hash (rename (make-tie tie))) 
 
   (import
     (rnrs)
@@ -29,18 +29,18 @@
     (lambdag@ (a)
       (let ([a^ (unify-s u v a)])
         (and a^
-          (letcc f
-            (let ([c (verify-c a^ f)])
-              (make-pkg (pkg-s a^) c))))))))
+             (letcc f
+               (let ([c (verify-c a^ f)])
+                 (make-pkg (pkg-s a^) c))))))))
 
 (define ==-check
   (lambda (u v)
     (lambdag@ (a)
       (let ([a^ (unify-s-check u v a)])
         (and a^
-          (letcc f
-            (let ([c (verify-c a^ f)])
-              (make-pkg (pkg-s a^) c))))))))
+             (letcc f
+               (let ([c (verify-c a^ f)])
+                 (make-pkg (pkg-s a^) c))))))))
 
 (define hash
   (lambda (b t)
@@ -67,7 +67,7 @@
 
 (define-syntax letcc
   (syntax-rules ()
-   [(_ k b0 b ...) (call/cc (lambda (k) b0 b ...))]))
+    [(_ k b0 b ...) (call/cc (lambda (k) b0 b ...))]))
 
 (define-syntax make-pkg-f
   (syntax-rules ()
@@ -87,8 +87,7 @@
 
 (define empty-s '())
 (define empty-c '())
-(define empty-pkg
-  (make-pkg empty-s empty-c))
+(define empty-pkg (make-pkg empty-s empty-c))
 
 (define-record-type sus (fields pi (mutable v)))
 (define-record-type var
@@ -108,7 +107,7 @@
   (lambda (a v c)
     (let ([h (cons a v)])
       (if (member h c) c
-        (cons h c)))))
+          (cons h c)))))
 
 (define s-size length)
 
@@ -120,7 +119,7 @@
                    [(null? ds) c]
                    [else 
                      (loop (cdr ds)
-                           (ext-c (car ds) v c))])))])
+                       (ext-c (car ds) v c))])))])
     (lambda (u v a)
       (let ([s (pkg-s a)])
         (let ([u (walk u s)] [v (walk v s)])
@@ -129,9 +128,9 @@
             [(and (sus? u) (sus? v)
                   (eq? (sus-v u) (sus-v v)))
              (let ([c (ds-ext-c
-                         (pi-ds (sus-pi u) (sus-pi v))
-                         (sus-v u)
-                         (pkg-c a))])
+                        (pi-ds (sus-pi u) (sus-pi v))
+                        (sus-v u)
+                        (pkg-c a))])
                (make-pkg (pkg-s a) c))]
             [(sus? u)
              (ext-s-nocheck
@@ -146,14 +145,14 @@
                (and a (unify-s (cdr u) (cdr v) a)))]
             [(and (tie? u) (tie? v))
              (let ([au (tie-a u)] [av (tie-a v)]
-                                  [tu (tie-t u)] [tv (tie-t v)])
+                   [tu (tie-t u)] [tv (tie-t v)])
                (if (eq? au av) (unify-s tu tv a)
-                 (letcc f
-                   (let ([c (hash-check
-                               au tv s (pkg-c a) f)])
-                     (unify-s
-                       tu (apply-pi `((,au . ,av)) tv)
-                       (make-pkg (pkg-s a) c))))))]
+                   (letcc f
+                     (let ([c (hash-check
+                                au tv s (pkg-c a) f)])
+                       (unify-s
+                         tu (apply-pi `((,au . ,av)) tv)
+                         (make-pkg (pkg-s a) c))))))]
             [(or (nom? u) (nom? v)) #f]
             [(equal? u v) a]
             [else #f]))))))
@@ -166,7 +165,7 @@
                    [(null? ds) c]
                    [else 
                      (loop (cdr ds)
-                           (ext-c (car ds) v c))])))])
+                       (ext-c (car ds) v c))])))])
     (lambda (u v a)
       (let ([s (pkg-s a)])
         (let ([u (walk u s)] [v (walk v s)])
@@ -175,9 +174,9 @@
             [(and (sus? u) (sus? v)
                   (eq? (sus-v u) (sus-v v)))
              (let ([c (ds-ext-c
-                         (pi-ds (sus-pi u) (sus-pi v))
-                         (sus-v u)
-                         (pkg-c a))])
+                        (pi-ds (sus-pi u) (sus-pi v))
+                        (sus-v u)
+                        (pkg-c a))])
                (make-pkg (pkg-s a) c))]
             [(sus? u)
              (ext-s-check
@@ -192,14 +191,14 @@
                (and a (unify-s-check (cdr u) (cdr v) a)))]
             [(and (tie? u) (tie? v))
              (let ([au (tie-a u)] [av (tie-a v)]
-                                  [tu (tie-t u)] [tv (tie-t v)])
+                   [tu (tie-t u)] [tv (tie-t v)])
                (if (eq? au av) (unify-s-check tu tv a)
-                 (letcc f
-                   (let ([c (hash-check
-                               au tv s (pkg-c a) f)])
-                     (unify-s-check
-                       tu (apply-pi `((,au . ,av)) tv)
-                       (make-pkg (pkg-s a) c))))))]
+                   (letcc f
+                     (let ([c (hash-check
+                                au tv s (pkg-c a) f)])
+                       (unify-s-check
+                         tu (apply-pi `((,au . ,av)) tv)
+                         (make-pkg (pkg-s a) c))))))]
             [(or (nom? u) (nom? v)) #f]
             [(equal? u v) a]
             [else #f]))))))
@@ -267,7 +266,7 @@
           [(and (sus? x) (find (sus-v x)))
            => (lambda (a)
                 (walk (cdr a) 
-                      (compose-pis (sus-pi x) pi)))]
+                  (compose-pis (sus-pi x) pi)))]
           [else (apply-pi pi x)])))))
 
 (define walk*
@@ -284,15 +283,15 @@
 
 (define pi-ds
   (letrec
-    ([get-noms
-       (let ([with (lambda (n s)
-                     (if (memq n s) s (cons n s)))])
-         (lambda (pi s)
-           (cond
-             [(null? pi) s]
-             [else
-               (get-noms (cdr pi)
-                 (with (caar pi) (with (cdar pi) s)))])))])
+      ([get-noms
+         (let ([with (lambda (n s)
+                       (if (memq n s) s (cons n s)))])
+           (lambda (pi s)
+             (cond
+               [(null? pi) s]
+               [else
+                 (get-noms (cdr pi)
+                   (with (caar pi) (with (cdar pi) s)))])))])
     (lambda (pi1 pi2)
       (let loop ([noms (get-noms pi1 (get-noms pi2 '()))]
                  [s '()])
@@ -300,9 +299,9 @@
           [(null? noms) s]
           [else (let ([a (car noms)])
                   (if (eq? (apply-pi pi1 a)
-                           (apply-pi pi2 a))
-                    (loop (cdr noms) s)
-                    (loop (cdr noms) (cons a s))))])))))
+                        (apply-pi pi2 a))
+                      (loop (cdr noms) s)
+                      (loop (cdr noms) (cons a s))))])))))
 
 (define id-pi?
   (lambda (pi) (null? (pi-ds pi '()))))
@@ -327,19 +326,19 @@
                  (sus-v t)
                  (make-sus pi (sus-v t))))]
           [(tie? t) (make-tie (app pi (tie-a t))
-                              (rec (tie-t t)))]
+                      (rec (tie-t t)))]
           [(pair? t) (cons (rec (car t)) (rec (cdr t)))]
           [else t])))))
 
 (define take
   (lambda (n f)
     (if (and n (zero? n))
-      '()
-      (case-inf (f)
-        [() '()]
-        [(f) (take n f)]
-        [(a) (cons a '())]
-        [(a f) (cons a (take (and n (- n 1)) f))]))))
+        '()
+        (case-inf (f)
+          [() '()]
+          [(f) (take n f)]
+          [(a) (cons a '())]
+          [(a f) (cons a (take (and n (- n 1)) f))]))))
 
 (define reify
   (lambda (x a)
@@ -351,9 +350,9 @@
 
 (define reify-vars/noms
   (let
-    ([counter
-       (lambda ()
-         (let ([n -1]) (lambda () (set! n (+ n 1)) n)))])
+      ([counter
+         (lambda ()
+           (let ([n -1]) (lambda () (set! n (+ n 1)) n)))])
     (let ([get (lambda (a s n c)
                  (cond
                    [(assq a s)
@@ -370,10 +369,10 @@
               [(sus? t)
                (let ([pi (sus-pi t)])
                  (let-values
-                   ([(v s) (get (sus-v t) s "_." sc)])
+                     ([(v s) (get (sus-v t) s "_." sc)])
                    (if (null? pi) (values v s)
-                     (let-values ([(pi s) (rec pi s)])
-                       (values `(sus ,pi ,v) s)))))]
+                       (let-values ([(pi s) (rec pi s)])
+                         (values `(sus ,pi ,v) s)))))]
               [(nom? t) (get t s "a." nc)]
               [(tie? t)
                (let-values ([(a s) (rec (tie-a t) s)])
@@ -394,35 +393,35 @@
 (define discard/reify-c
   (lambda (c s)
     (let
-      ([vs->rs
-         (lambda (vs)
-           (let loop ([vs vs] [rs '()])
-             (cond
-               [(null? vs) rs]
-               [else
-                 (let ([r (rwalk (car vs) s)])
-                   (if (sus? r)
-                     (loop (cdr vs) rs)
-                     (loop (cdr vs) `(,r . ,rs))))])))]
-       [collate-vs
-         (let
-           ([remdups
-              (lambda (l)
-                (let loop ([l l] [s '()])
-                  (cond
-                    [(null? l) (reverse s)]
-                    [(memq (car l) s) (loop (cdr l) s)]
-                    [else (loop (cdr l)
-                                (cons (car l) s))])))])
-           (lambda (a c)
-             (let loop ([c c] [vs '()] [r* '()])
+        ([vs->rs
+           (lambda (vs)
+             (let loop ([vs vs] [rs '()])
                (cond
-                 [(null? c) (values (remdups vs) r*)]
-                 [(eq? (caar c) a)
-                  (loop (cdr c) (cons (cdar c) vs) r*)]
+                 [(null? vs) rs]
                  [else
-                   (loop (cdr c) vs
-                         (cons (car c) r*))]))))])
+                   (let ([r (rwalk (car vs) s)])
+                     (if (sus? r)
+                         (loop (cdr vs) rs)
+                         (loop (cdr vs) `(,r . ,rs))))])))]
+         [collate-vs
+           (let
+               ([remdups
+                  (lambda (l)
+                    (let loop ([l l] [s '()])
+                      (cond
+                        [(null? l) (reverse s)]
+                        [(memq (car l) s) (loop (cdr l) s)]
+                        [else (loop (cdr l)
+                                (cons (car l) s))])))])
+             (lambda (a c)
+               (let loop ([c c] [vs '()] [r* '()])
+                 (cond
+                   [(null? c) (values (remdups vs) r*)]
+                   [(eq? (caar c) a)
+                    (loop (cdr c) (cons (cdar c) vs) r*)]
+                   [else
+                     (loop (cdr c) vs
+                       (cons (car c) r*))]))))])
       (let loop ([c c] [r* '()])
         (cond
           [(null? c) r*]
@@ -433,11 +432,11 @@
                   (let ([r (cond [(assq a s) => cdr]
                                  [else (f #f)])])
                     (let-values
-                      ([(vs c) (collate-vs a c)])
+                        ([(vs c) (collate-vs a c)])
                       (let ([rs (vs->rs vs)])
                         (if (null? rs) (f #f)
-                          (loop
-                            c `((,r . ,rs) . ,r*)))))))
+                            (loop
+                              c `((,r . ,rs) . ,r*)))))))
                 (loop (cdr c) r*)))])))))
 
 (define-syntax project
@@ -452,4 +451,6 @@
     [(_ (v) g0 g ...)
      (lambdag@ (a)
        (let ([v a])
-         ((fresh () g0 g ...) a)))])))
+         ((fresh () g0 g ...) a)))]))
+
+)
