@@ -1,6 +1,6 @@
 (library (alphaK)
-  (export run run* == ==-check conde exist make-nom nom? project
-          fresh hash (rename (make-tie tie))) 
+  (export run run* == ==-check conde fresh make-nom nom? project
+          fresh-nom hash (rename (make-tie tie))) 
 
 (import (rnrs) (rnrs records syntactic)
         (only (chezscheme) gensym))
@@ -10,7 +10,7 @@
     [(_ n (q) g0 g ...)
      (take n
        (lambdaf@ ()
-         ((exist (q)
+         ((fresh (q)
             g0 g ...
             (lambdag@ (p)
               (cons (reify q p) '())))
@@ -55,7 +55,7 @@
            (bind* (g0 p) g ...)
            (bind* (g1 p) g^ ...) ...)))]))
 
-(define-syntax exist
+(define-syntax fresh
   (syntax-rules ()
     [(_ (e ...) g0 g ...)
      (lambdag@ (p)
@@ -63,7 +63,7 @@
          (let ([e (make-var 'e (pkg-s p))] ...)
            (bind* (g0 p) g ...))))]))
 
-(define-syntax fresh
+(define-syntax fresh-nom
   (syntax-rules ()
     [(_ (a ...) g0 g ...)
      (lambdag@ (p)
@@ -515,11 +515,11 @@
     [(_ (x ...) g0 g ...)
      (lambdag@ (p)
        (let ([x (walk* x (pkg-s p))] ...)
-         ((exist () g0 g ...) p)))]))
+         ((fresh () g0 g ...) p)))]))
 
 (define-syntax let-pkg
   (syntax-rules ()
     [(_ (v) g0 g ...)
      (lambdag@ (p)
        (let ([v p])
-         ((exist () g0 g ...) p)))])))
+         ((fresh () g0 g ...) p)))])))
