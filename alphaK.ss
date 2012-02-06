@@ -1,9 +1,12 @@
 (library (alphaK)
-  (export run run* == ==-check conde fresh make-nom nom? project
+  (export run run* == ==-check fresh make-nom nom? project
           fresh-nom hash (rename (make-tie tie))) 
 
-(import (rnrs) (rnrs records syntactic)
-        (only (chezscheme) gensym))
+(import
+  (rnrs)
+  (rnrs records syntactic)
+  (only (mk) lambdag@ case-inf choiceg lambdaf@ inc bindg* empty-f)
+  (only (chezscheme) gensym trace-define printf))
 
 (define-syntax run
   (syntax-rules ()
@@ -13,7 +16,7 @@
          ((fresh (q)
             g0 g ...
             (lambdag@ (p)
-              (cons (reify q p) '())))
+              (reify q p)))
           empty-pkg)))]))
 
 (define-syntax run*
@@ -46,22 +49,13 @@
         (let ([h* (hash-check a t (pkg-s p) (pkg-h* p) f)])
           (make-pkg p (h* . ,h*)))))))
 
-(define-syntax conde
-  (syntax-rules ()
-    [(_ (g0 g ...) (g1 g^ ...) ...)
-     (lambdag@ (p)
-       (inc
-         (mplus*
-           (bind* (g0 p) g ...)
-           (bind* (g1 p) g^ ...) ...)))]))
-
 (define-syntax fresh
   (syntax-rules ()
     [(_ (e ...) g0 g ...)
      (lambdag@ (p)
        (inc
          (let ([e (make-var 'e (pkg-s p))] ...)
-           (bind* (g0 p) g ...))))]))
+           (bindg* (g0 p) g ...))))]))
 
 (define-syntax fresh-nom
   (syntax-rules ()
@@ -69,7 +63,7 @@
      (lambdag@ (p)
        (inc
          (let ([a (make-nom 'a)] ...)
-           (bind* (g0 p) g ...))))]))
+           (bindg* (g0 p) g ...))))]))
 
 (define-syntax letcc
   (syntax-rules ()
@@ -342,62 +336,6 @@
           [(pair? t) (cons (rec (car t)) (rec (cdr t)))]
           [else t])))))
 
-(define-syntax lambdag@
-  (syntax-rules ()
-    [(_ (p) e) (lambda (p) e)]))
-
-(define-syntax lambdaf@
-  (syntax-rules ()
-    [(_ () e) (lambda () e)]))
-
-(define-syntax inc
-  (syntax-rules ()
-    [(_ e) (lambdaf@ () e)]))
-
-(define-syntax case-inf
-  (syntax-rules ()
-    [(_ e [() e0] [(f1) e1] [(a2) e2] [(a3 f3) e3])
-     (let ([a-inf e])
-       (cond
-         [(not a-inf) e0]
-         [(procedure? a-inf)
-          (let ([f1 a-inf]) e1)]
-         [(and (pair? a-inf)
-               (procedure? (cdr a-inf)))
-          (let ([a3 (car a-inf)] [f3 (cdr a-inf)]) e3)]
-         [else  (let ([a2 a-inf]) e2)]))]))
-
-(define choice (lambda (a f) (cons a f)))
-(define mplus
-  (lambda (a-inf f)
-    (case-inf a-inf
-      [() (f)]
-      [(f^) (inc (mplus (f) f^))]
-      [(a) (choice a f)]
-      [(a f^) (choice a (lambdaf@ () (mplus (f) f^)))])))
-
-(define-syntax mplus*
-  (syntax-rules ()
-    [(_ e) e]
-    [(_ e0 e ...)
-     (mplus e0 (lambdaf@ () (mplus* e ...)))]))
-
-(define mzero (lambda () #f))
-(define bind
-  (lambda (a-inf g)
-    (case-inf a-inf
-      [() (mzero)]
-      [(f) (inc (bind (f) g))]
-      [(a) (g a)]
-      [(a f) (mplus (g a) (lambdaf@ () (bind (f) g)))])))
-
-(define-syntax bind*
-  (syntax-rules ()
-    [(_ e) e]
-    [(_ e g0 g ...)
-     (let ([a-inf e])
-       (and a-inf (bind* (bind a-inf g0) g ...)))]))
-
 (define take
   (lambda (n f)
     (if (and n (zero? n))
@@ -405,9 +343,8 @@
       (case-inf (f)
         [() '()]
         [(f) (take n f)]
-        [(a) a]
-        [(a f) (cons (car a)
-                 (take (and n (- n 1)) f))]))))
+        [(a) (cons a '())]
+        [(a f) (cons a (take (and n (- n 1)) f))]))))
 
 (define reify
   (lambda (x p)
@@ -415,9 +352,7 @@
       (let ([x (walk* x s)])
         (let-values ([(x s) (reify-vars/noms x)])
           (let ([h* (discard/reify-h* (pkg-h* p) s)])
-            (if (null? h*)
-              x
-              `(,x : ,h*))))))))
+            (choiceg (if (null? h*) x `(,x : ,h*)) empty-f)))))))
 
 (define reify-vars/noms
   (let

@@ -2,9 +2,9 @@
   (mk)
 
   (export
-    var var? rhs lhs lambdag@ walk walk* mzerog unitg
-    choiceg lambdaf@ : take empty-f conde conda ifa
-    condu ifu fresh project onceo succeed fail prt)
+    var var? rhs lhs lambdag@ walk walk* mzerog unitg bindg*
+    choiceg lambdaf@ : take empty-f conde conda ifa inc
+    condu ifu fresh project onceo succeed fail prt case-inf)
 
   (import (rnrs) (only (chezscheme) pretty-print))
 
@@ -122,8 +122,7 @@
   (syntax-rules ()
     ((_ e) e)
     ((_ e0 e ...)
-     (mplusg e0 
-       (lambdaf@ () (mplusg* e ...))))))
+     (mplusg e0 (lambdaf@ () (mplusg* e ...))))))
 
 (define mplusg
   (lambda (a-inf f)
