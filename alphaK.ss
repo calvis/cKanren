@@ -2,11 +2,11 @@
   (export run run* == ==-check fresh make-nom nom? project
           fresh-nom hash (rename (make-tie tie))) 
 
-(import
-  (rnrs)
-  (rnrs records syntactic)
-  (only (mk) lambdag@ case-inf choiceg lambdaf@ inc bindg* empty-f)
-  (only (chezscheme) gensym trace-define printf))
+  (import
+    (rnrs)
+    (rnrs records syntactic)
+    (only (mk) lambdag@ case-inf choiceg lambdaf@ inc bindg* empty-f)
+    (only (chezscheme) gensym trace-define printf))
 
 (define-syntax run
   (syntax-rules ()
@@ -30,8 +30,8 @@
       (let ([a^ (unify-s u v a)])
         (and a^
           (letcc f
-            (let ([h* (verify-h* a^ f)])
-              (make-pkg a^ (h* . ,h*)))))))))
+            (let ([c (verify-c a^ f)])
+              (make-pkg (pkg-s a^) c))))))))
 
 (define ==-check
   (lambda (u v)
@@ -39,15 +39,15 @@
       (let ([a^ (unify-s-check u v a)])
         (and a^
           (letcc f
-            (let ([h* (verify-h* a^ f)])
-              (make-pkg a^ (h* . ,h*)))))))))
+            (let ([c (verify-c a^ f)])
+              (make-pkg (pkg-s a^) c))))))))
 
 (define hash
   (lambda (b t)
     (lambdag@ (a)
       (letcc f
-        (let ([h* (hash-check b t (pkg-s a) (pkg-h* a) f)])
-          (make-pkg a (h* . ,h*)))))))
+        (let ([c (hash-check b t (pkg-s a) (pkg-c a) f)])
+          (make-pkg (pkg-s a) c))))))
 
 (define-syntax fresh
   (syntax-rules ()
@@ -69,31 +69,26 @@
   (syntax-rules ()
    [(_ k b0 b ...) (call/cc (lambda (k) b0 b ...))]))
 
-(define-record-type (pkg make-pkg-f pkg?)
-  (fields s h*)
-  (protocol
-    (lambda (make-pkg)
-      (lambda (pkg . fields)
-        (letrec-syntax
-          ([with-fields
-             (syntax-rules ()
-               [(_ (s0 ...) (f0 ...) body)
-                (let ([s0 (cond
-                            [(assq 's0 fields) => cdr]
-                            [else (f0 pkg)])]
-                      ...)
-                  body)])])
-          (with-fields (s h*) (pkg-s pkg-h*)
-            (make-pkg s h*)))))))
+(define-syntax make-pkg-f
+  (syntax-rules ()
+    ((_ s c) (cons s c))))
+
+(define-syntax pkg-s
+  (syntax-rules ()
+    ((_ a) (car a))))
+
+(define-syntax pkg-c
+  (syntax-rules ()
+    ((_ a) (cdr a))))
 
 (define-syntax make-pkg
-  (syntax-rules (h*)
-    [(_ pkg (a . d) ...)
-     (make-pkg-f pkg `(a . d) ...)]))
+  (syntax-rules ()
+    [(_ s c) (make-pkg-f s c)]))
 
 (define empty-s '())
+(define empty-c '())
 (define empty-pkg
-  (make-pkg #f (s . ,empty-s) (h* . ())))
+  (make-pkg empty-s empty-c))
 
 (define-record-type sus (fields pi (mutable v)))
 (define-record-type var
@@ -109,23 +104,23 @@
   (lambda (t)
     (if (tie? t) (tie-t* (tie-t t)) t)))
 
-(define ext-h*
-  (lambda (a v h*)
+(define ext-c
+  (lambda (a v c)
     (let ([h (cons a v)])
-      (if (member h h*) h*
-        (cons h h*)))))
+      (if (member h c) c
+        (cons h c)))))
 
 (define s-size length)
 
 (define unify-s
-  (letrec ([ds-ext-h*
-             (lambda (ds v h*)
-               (let loop ([ds ds] [h* h*])
+  (letrec ([ds-ext-c
+             (lambda (ds v c)
+               (let loop ([ds ds] [c c])
                  (cond
-                   [(null? ds) h*]
+                   [(null? ds) c]
                    [else 
                      (loop (cdr ds)
-                           (ext-h* (car ds) v h*))])))])
+                           (ext-c (car ds) v c))])))])
     (lambda (u v a)
       (let ([s (pkg-s a)])
         (let ([u (walk u s)] [v (walk v s)])
@@ -133,11 +128,11 @@
             [(eq? u v) a]
             [(and (sus? u) (sus? v)
                   (eq? (sus-v u) (sus-v v)))
-             (let ([h* (ds-ext-h*
+             (let ([c (ds-ext-c
                          (pi-ds (sus-pi u) (sus-pi v))
                          (sus-v u)
-                         (pkg-h* a))])
-               (make-pkg a (h* . ,h*)))]
+                         (pkg-c a))])
+               (make-pkg (pkg-s a) c))]
             [(sus? u)
              (ext-s-nocheck
                ;; does this pi need to be reversed, or
@@ -154,24 +149,24 @@
                                   [tu (tie-t u)] [tv (tie-t v)])
                (if (eq? au av) (unify-s tu tv a)
                  (letcc f
-                   (let ([h* (hash-check
-                               au tv s (pkg-h* a) f)])
+                   (let ([c (hash-check
+                               au tv s (pkg-c a) f)])
                      (unify-s
                        tu (apply-pi `((,au . ,av)) tv)
-                       (make-pkg a (h* . ,h*)))))))]
+                       (make-pkg (pkg-s a) c))))))]
             [(or (nom? u) (nom? v)) #f]
             [(equal? u v) a]
             [else #f]))))))
 
 (define unify-s-check
-  (letrec ([ds-ext-h*
-             (lambda (ds v h*)
-               (let loop ([ds ds] [h* h*])
+  (letrec ([ds-ext-c
+             (lambda (ds v c)
+               (let loop ([ds ds] [c c])
                  (cond
-                   [(null? ds) h*]
+                   [(null? ds) c]
                    [else 
                      (loop (cdr ds)
-                           (ext-h* (car ds) v h*))])))])
+                           (ext-c (car ds) v c))])))])
     (lambda (u v a)
       (let ([s (pkg-s a)])
         (let ([u (walk u s)] [v (walk v s)])
@@ -179,11 +174,11 @@
             [(eq? u v) a]
             [(and (sus? u) (sus? v)
                   (eq? (sus-v u) (sus-v v)))
-             (let ([h* (ds-ext-h*
+             (let ([c (ds-ext-c
                          (pi-ds (sus-pi u) (sus-pi v))
                          (sus-v u)
-                         (pkg-h* a))])
-               (make-pkg a (h* . ,h*)))]
+                         (pkg-c a))])
+               (make-pkg (pkg-s a) c))]
             [(sus? u)
              (ext-s-check
                ;; does this pi need to be reversed, or
@@ -200,11 +195,11 @@
                                   [tu (tie-t u)] [tv (tie-t v)])
                (if (eq? au av) (unify-s-check tu tv a)
                  (letcc f
-                   (let ([h* (hash-check
-                               au tv s (pkg-h* a) f)])
+                   (let ([c (hash-check
+                               au tv s (pkg-c a) f)])
                      (unify-s-check
                        tu (apply-pi `((,au . ,av)) tv)
-                       (make-pkg a (h* . ,h*)))))))]
+                       (make-pkg (pkg-s a) c))))))]
             [(or (nom? u) (nom? v)) #f]
             [(equal? u v) a]
             [else #f]))))))
@@ -218,13 +213,13 @@
     (let ([s (pkg-s a)])
       (and (occurs-check x t s)
            (let ([s (ext-s x t s)])
-             (make-pkg a (s . ,s)))))))
+             (make-pkg s (pkg-c a)))))))
 
 (define ext-s-nocheck
   (lambda (x t a)
     (let ([s (pkg-s a)])
       (let ([s (ext-s x t s)])
-        (make-pkg a (s . ,s))))))
+        (make-pkg s (pkg-c a))))))
 
 (define occurs-check
   (lambda (x t s)
@@ -235,29 +230,29 @@
           [(pair? t) (and (rec (car t)) (rec (cdr t)))]
           [else #t])))))
 
-(define verify-h*
+(define verify-c
   (lambda (a f)
-    (let loop ([h* (pkg-h* a)] [a* '()])
+    (let loop ([c (pkg-c a)] [a* '()])
       (cond
-        [(null? h*) a*]
+        [(null? c) a*]
         [else
-          (loop (cdr h*)
+          (loop (cdr c)
             (hash-check
-              (caar h*) (cdar h*) (pkg-s a) a* f))]))))
+              (caar c) (cdar c) (pkg-s a) a* f))]))))
 
 (define hash-check
-  (lambda (a t s h* f)
-    (let rec ([t t] [h* h*])
+  (lambda (a t s c f)
+    (let rec ([t t] [c c])
       (let ([t (walk t s)])
         (cond
           [(eq? a t) (f #f)]
           [(sus? t)
-           (ext-h* (apply-pi (sus-pi t) a) (sus-v t) h*)]
+           (ext-c (apply-pi (sus-pi t) a) (sus-v t) c)]
           [(and (tie? t) (not (eq? a (tie-a t))))
-           (rec (tie-t t) h*)]
+           (rec (tie-t t) c)]
           [(pair? t)
-           (rec (cdr t) (rec (car t) h*))]
-          [else h*])))))
+           (rec (cdr t) (rec (car t) c))]
+          [else c])))))
 
 (define walk
   (lambda (x s)
@@ -351,8 +346,8 @@
     (let ([s (pkg-s a)])
       (let ([x (walk* x s)])
         (let-values ([(x s) (reify-vars/noms x)])
-          (let ([h* (discard/reify-h* (pkg-h* a) s)])
-            (choiceg (if (null? h*) x `(,x : ,h*)) empty-f)))))))
+          (let ([c (discard/reify-c (pkg-c a) s)])
+            (choiceg (if (null? c) x `(,x : ,c)) empty-f)))))))
 
 (define reify-vars/noms
   (let
@@ -396,8 +391,8 @@
       [(assq t s) => cdr]
       [else t])))
 
-(define discard/reify-h*
-  (lambda (h* s)
+(define discard/reify-c
+  (lambda (c s)
     (let
       ([vs->rs
          (lambda (vs)
@@ -419,31 +414,31 @@
                     [(memq (car l) s) (loop (cdr l) s)]
                     [else (loop (cdr l)
                                 (cons (car l) s))])))])
-           (lambda (a h*)
-             (let loop ([h* h*] [vs '()] [r* '()])
+           (lambda (a c)
+             (let loop ([c c] [vs '()] [r* '()])
                (cond
-                 [(null? h*) (values (remdups vs) r*)]
-                 [(eq? (caar h*) a)
-                  (loop (cdr h*) (cons (cdar h*) vs) r*)]
+                 [(null? c) (values (remdups vs) r*)]
+                 [(eq? (caar c) a)
+                  (loop (cdr c) (cons (cdar c) vs) r*)]
                  [else
-                   (loop (cdr h*) vs
-                         (cons (car h*) r*))]))))])
-      (let loop ([h* h*] [r* '()])
+                   (loop (cdr c) vs
+                         (cons (car c) r*))]))))])
+      (let loop ([c c] [r* '()])
         (cond
-          [(null? h*) r*]
+          [(null? c) r*]
           [else
-            (let ([a (caar h*)])
+            (let ([a (caar c)])
               (or
                 (letcc f
                   (let ([r (cond [(assq a s) => cdr]
                                  [else (f #f)])])
                     (let-values
-                      ([(vs h*) (collate-vs a h*)])
+                      ([(vs c) (collate-vs a c)])
                       (let ([rs (vs->rs vs)])
                         (if (null? rs) (f #f)
                           (loop
-                            h* `((,r . ,rs) . ,r*)))))))
-                (loop (cdr h*) r*)))])))))
+                            c `((,r . ,rs) . ,r*)))))))
+                (loop (cdr c) r*)))])))))
 
 (define-syntax project
   (syntax-rules ()
