@@ -1,12 +1,13 @@
 ;;; And now the tests from the old alphamk.scm
 
+(load "alphaK.ss")
+(import (alphaK))
+
 (define-syntax testit
   (syntax-rules ()
     ((_ exp val)
      (begin
        (display "testing: ")
-       (write 'exp)
-       (display "...")
        (tester 'exp exp val)))))
 
 (define tester
