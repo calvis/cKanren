@@ -1,11 +1,12 @@
 (library (alphaK)
-  (export run run* == ==-check fresh make-nom nom? project
+  (export run run* nom== #;nom==-check fresh-var make-nom nom? project
     fresh-nom hash (rename (make-tie tie))) 
 
   (import
     (rnrs)
     (rnrs records syntactic)
     (only (mk) lambdag@ case-inf choiceg lambdaf@ inc bindg* empty-f)
+    (only (ck) empty-a)
     (only (chezscheme) gensym trace-define printf))
 
 (define-syntax run
@@ -13,18 +14,18 @@
     [(_ n (q) g0 g ...)
      (take n
        (lambdaf@ ()
-         ((fresh (q)
+         ((fresh-var (q)
             g0 g ...
             (lambdag@ (p)
               (reify q p)))
-          empty-pkg)))]))
+          empty-a)))]))
 
 (define-syntax run*
   (syntax-rules ()
     ((_ (x) g0 g ...)
      (run #f (x) g0 g ...))))
 
-(define ==
+(define nom==
   (lambda (u v)
     (lambdag@ (a)
       (let ([a^ (unify-s u v a)])
@@ -33,14 +34,14 @@
                (let ([c (verify-c a^ f)])
                  (make-pkg (pkg-s a^) c))))))))
 
-(define ==-check
-  (lambda (u v)
-    (lambdag@ (a)
-      (let ([a^ (unify-s-check u v a)])
-        (and a^
-             (letcc f
-               (let ([c (verify-c a^ f)])
-                 (make-pkg (pkg-s a^) c))))))))
+;; (define nom==-check
+;;   (lambda (u v)
+;;     (lambdag@ (a)
+;;       (let ([a^ (unify-s-check u v a)])
+;;         (and a^
+;;              (letcc f
+;;                (let ([c (verify-c a^ f)])
+;;                  (make-pkg (pkg-s a^) c))))))))
 
 (define hash
   (lambda (b t)
@@ -49,12 +50,12 @@
         (let ([c (hash-check b t (pkg-s a) (pkg-c a) f)])
           (make-pkg (pkg-s a) c))))))
 
-(define-syntax fresh
+(define-syntax fresh-var
   (syntax-rules ()
     [(_ (e ...) g0 g ...)
      (lambdag@ (a)
        (inc
-         (let ([e (make-var 'e (pkg-s a))] ...)
+         (let ([e (make-var 'e)] ...)
            (bindg* (g0 a) g ...))))]))
 
 (define-syntax fresh-nom
@@ -85,16 +86,39 @@
   (syntax-rules ()
     [(_ s c) (make-pkg-f s c)]))
 
-(define empty-s '())
-(define empty-c '())
-(define empty-pkg (make-pkg empty-s empty-c))
+;; (define (make-var sym) (vector sym))
+;; (define (var? sym) (vector? sym))
+
+(define (var->sus var)
+  (make-sus var '()))
+
+;; (define (sus-constrained? x oc)
+;;   (and (eq? (oc->rator oc) 'sus)
+;;        (eq? (sus-v oc) x)))
+
+;; (define (sus? x c)
+;;   (and (find (lambda (oc) (sus-constrained? x oc)) c) #t))
+
+;; (define (get-sus x c)
+;;   (let ((oc (find (lambda (oc) (sus-constrainted? x oc)) c)))
+;;     (and oc (sus-pi oc))))
+
+;; (define (sus-v oc) (car (oc->rands oc)))
+;; (define (sus-pi oc) (cadr (oc->rands oc)))
+
+;; (define (make-sus v pi)
+;;   `(sus ,v ,pi))
+
+;; (define (tie? x) (and (pair? x) (eq? (car x) 'tie)))
+;; (define (tie-a t) (cadr t))
+;; (define (tie-v t) (caddr t))
 
 (define-record-type sus (fields pi (mutable v)))
 (define-record-type var
-  (parent sus) (fields name s)
+  (parent sus) (fields name)
   (protocol (lambda (make-sus)
-              (lambda (name s)
-                (let ([var ((make-sus '() #f) name s)])
+              (lambda (name)
+                (let ([var ((make-sus '() #f) name)])
                   (sus-v-set! var var) var)))))
 (define-record-type nom (fields name))
 (define-record-type tie (fields a t))
@@ -106,113 +130,123 @@
 (define ext-c
   (lambda (a v c)
     (let ([h (cons a v)])
-      (if (member h c) c
-          (cons h c)))))
+      (if (member h c) c (cons h c)))))
 
 (define s-size length)
 
-(define unify-s
-  (letrec ([ds-ext-c
-             (lambda (ds v c)
-               (let loop ([ds ds] [c c])
-                 (cond
-                   [(null? ds) c]
-                   [else 
-                     (loop (cdr ds)
-                       (ext-c (car ds) v c))])))])
-    (lambda (u v a)
-      (let ([s (pkg-s a)])
-        (let ([u (walk u s)] [v (walk v s)])
-          (cond
-            [(eq? u v) a]
-            [(and (sus? u) (sus? v)
-                  (eq? (sus-v u) (sus-v v)))
-             (let ([c (ds-ext-c
-                        (pi-ds (sus-pi u) (sus-pi v))
-                        (sus-v u)
-                        (pkg-c a))])
-               (make-pkg (pkg-s a) c))]
-            [(sus? u)
-             (ext-s-nocheck
-               ;; does this pi need to be reversed, or
-               ;; does that happen automatically?
-               (sus-v u) (apply-pi (sus-pi u) v) a)]
-            [(sus? v)
-             (ext-s-nocheck
-               (sus-v v) (apply-pi (sus-pi v) u) a)]
-            [(and (pair? u) (pair? v))
-             (let ([a (unify-s (car u) (car v) a)])
-               (and a (unify-s (cdr u) (cdr v) a)))]
-            [(and (tie? u) (tie? v))
-             (let ([au (tie-a u)] [av (tie-a v)]
-                   [tu (tie-t u)] [tv (tie-t v)])
-               (if (eq? au av) (unify-s tu tv a)
-                   (letcc f
-                     (let ([c (hash-check
-                                au tv s (pkg-c a) f)])
-                       (unify-s
-                         tu (apply-pi `((,au . ,av)) tv)
-                         (make-pkg (pkg-s a) c))))))]
-            [(or (nom? u) (nom? v)) #f]
-            [(equal? u v) a]
-            [else #f]))))))
+(define ds-ext-c
+  (lambda (ds v c)
+    (fold-left (lambda (c x) (ext-c x v c)) c ds)))
 
-(define unify-s-check
-  (letrec ([ds-ext-c
-             (lambda (ds v c)
-               (let loop ([ds ds] [c c])
-                 (cond
-                   [(null? ds) c]
-                   [else 
-                     (loop (cdr ds)
-                       (ext-c (car ds) v c))])))])
-    (lambda (u v a)
-      (let ([s (pkg-s a)])
-        (let ([u (walk u s)] [v (walk v s)])
-          (cond
-            [(eq? u v) a]
-            [(and (sus? u) (sus? v)
-                  (eq? (sus-v u) (sus-v v)))
-             (let ([c (ds-ext-c
-                        (pi-ds (sus-pi u) (sus-pi v))
-                        (sus-v u)
-                        (pkg-c a))])
-               (make-pkg (pkg-s a) c))]
-            [(sus? u)
-             (ext-s-check
-               ;; does this pi need to be reversed, or
-               ;; does that happen automatically?
-               (sus-v u) (apply-pi (sus-pi u) v) a)]
-            [(sus? v)
-             (ext-s-check
-               (sus-v v) (apply-pi (sus-pi v) u) a)]
-            [(and (pair? u) (pair? v))
-             (let ([a (unify-s-check (car u) (car v) a)])
-               (and a (unify-s-check (cdr u) (cdr v) a)))]
-            [(and (tie? u) (tie? v))
-             (let ([au (tie-a u)] [av (tie-a v)]
-                   [tu (tie-t u)] [tv (tie-t v)])
-               (if (eq? au av) (unify-s-check tu tv a)
-                   (letcc f
-                     (let ([c (hash-check
-                                au tv s (pkg-c a) f)])
-                       (unify-s-check
-                         tu (apply-pi `((,au . ,av)) tv)
-                         (make-pkg (pkg-s a) c))))))]
-            [(or (nom? u) (nom? v)) #f]
-            [(equal? u v) a]
-            [else #f]))))))
+(define unify-s
+  (lambda (u v a)
+    (let ([s (pkg-s a)] [c (pkg-c a)])
+      (let ([u (walk u s)] [v (walk v s)])
+        (cond
+          [(eq? u v) a]
+
+          ;; if they're both variables, and the symbol they represent
+          ;; is the same, then do some stuff
+          [(and (sus? u) (sus? v)
+                (eq? (sus-v u) (sus-v v)))
+           (printf "Here\n")
+           (let ([c (ds-ext-c
+                      (pi-ds (sus-pi u) (sus-pi v))
+                      (sus-v u)
+                      c)])
+             (make-pkg (pkg-s a) c))]
+
+          ;; if the first is a variable, or the second is a variable,
+          ;; extend the substitution
+          ;; [(get-sus u)
+          ;;  => (lambda (sus-c) (ext-s-nocheck u (apply-pi (sus-pi sus-c) v) a))]
+          ;; [(get-sus v)
+          ;;  => (lambda (sus-c) (ext-s-nocheck v (apply-pi (sus-pi sus-c) u) a))]
+
+          [(sus? u)
+           (cond
+             ;; ((var? v)
+             ;;  (let ((c (cons (var->sus v) c)))
+             ;;    (unify-s u v (make-pkg s c))))
+             (else (ext-s-nocheck (sus-v u) (apply-pi (sus-pi u) v) a)))]
+
+          [(sus? v)
+           (cond
+             ;; ((var? u)
+             ;;  (let ((c (cons (var->sus u) c)))
+             ;;    (unify-s v u (make-pkg s c))))
+             (else (ext-s-nocheck (sus-v v) (apply-pi (sus-pi v) u) a)))]
+
+          ;; if they're both ties, check to see if the a's are the
+          ;; same -- if they are, just unify the t's.  if not, run
+          ;; hash-check on the first a and the second t. get a new
+          ;; constraint store back, and try to unify some things.
+          [(and (tie? u) (tie? v))
+           (let ([au (tie-a u)] [av (tie-a v)]
+                 [tu (tie-t u)] [tv (tie-t v)])
+             (if (eq? au av)
+                 (unify-s tu tv a)
+                 (letcc f
+                   (let ([c (hash-check au tv s c f)])
+                     (unify-s
+                       tu (apply-pi `((,au . ,av)) tv)
+                       (make-pkg s c))))))]
+
+          [(and (pair? u) (pair? v))
+           (let ([a (unify-s (car u) (car v) a)])
+             (and a (unify-s (cdr u) (cdr v) a)))]
+          [(or (nom? u) (nom? v)) #f]
+          [(equal? u v) a]
+          [else #f])))))
+
+;; (define unify-s-check
+;;   (lambda (u v a)
+;;     (let ([s (pkg-s a)])
+;;       (let ([u (walk u s)] [v (walk v s)])
+;;         (cond
+;;           [(eq? u v) a]
+;;           [(and (sus? u) (sus? v)
+;;                 (eq? (sus-v u) (sus-v v)))
+;;            (let ([c (ds-ext-c
+;;                       (pi-ds (sus-pi u) (sus-pi v))
+;;                       (sus-v u)
+;;                       (pkg-c a))])
+;;              (make-pkg (pkg-s a) c))]
+;;           [(sus? u)
+;;            (ext-s-check
+;;              ;; does this pi need to be reversed, or
+;;              ;; does that happen automatically?
+;;              (sus-v u) (apply-pi (sus-pi u) v) a)]
+;;           [(sus? v)
+;;            (ext-s-check
+;;              (sus-v v) (apply-pi (sus-pi v) u) a)]
+;;           [(and (pair? u) (pair? v))
+;;            (let ([a (unify-s-check (car u) (car v) a)])
+;;              (and a (unify-s-check (cdr u) (cdr v) a)))]
+;;           [(and (tie? u) (tie? v))
+;;            (let ([au (tie-a u)] [av (tie-a v)]
+;;                  [tu (tie-t u)] [tv (tie-t v)])
+;;              (if (eq? au av) (unify-s-check tu tv a)
+;;                  (letcc f
+;;                    (let ([c (hash-check
+;;                               au tv s (pkg-c a) f)])
+;;                      (unify-s-check
+;;                        tu (apply-pi `((,au . ,av)) tv)
+;;                        (make-pkg (pkg-s a) c))))))]
+;;           [(or (nom? u) (nom? v)) #f]
+;;           [(equal? u v) a]
+;;           [else #f])))))
 
 (define ext-s
   (lambda (u v s)
     (cons `(,u . ,v) s)))
 
-(define ext-s-check
-  (lambda (x t a)
-    (let ([s (pkg-s a)])
-      (and (occurs-check x t s)
-           (let ([s (ext-s x t s)])
-             (make-pkg s (pkg-c a)))))))
+;; (define ext-s-check
+;;   (lambda (x t a)
+;;     (let ([s (pkg-s a)])
+;;       (and (occurs-check x t s)
+;;            (let ([s (ext-s x t s)])
+;;              (make-pkg s (pkg-c a)))))))
 
 (define ext-s-nocheck
   (lambda (x t a)
@@ -220,24 +254,22 @@
       (let ([s (ext-s x t s)])
         (make-pkg s (pkg-c a))))))
 
-(define occurs-check
-  (lambda (x t s)
-    (let rec ([t t])
-      (let ([t (walk (tie-t* t) s)])
-        (cond
-          [(sus? t) (not (eq? x (sus-v t)))]
-          [(pair? t) (and (rec (car t)) (rec (cdr t)))]
-          [else #t])))))
+;; (define occurs-check
+;;   (lambda (x t s)
+;;     (let rec ([t t])
+;;       (let ([t (walk (tie-t* t) s)])
+;;         (cond
+;;           [(sus? t) (not (eq? x (sus-v t)))]
+;;           [(pair? t) (and (rec (car t)) (rec (cdr t)))]
+;;           [else #t])))))
 
 (define verify-c
   (lambda (a f)
-    (let loop ([c (pkg-c a)] [a* '()])
-      (cond
-        [(null? c) a*]
-        [else
-          (loop (cdr c)
-            (hash-check
-              (caar c) (cdar c) (pkg-s a) a* f))]))))
+    (let ((s (pkg-s a)))
+      (fold-left
+        (lambda (c^ x) (hash-check (car x) (cdr x) s c^ f))
+        '()
+        (pkg-c a)))))
 
 (define hash-check
   (lambda (a t s c f)
@@ -258,7 +290,7 @@
     (let ([find (lambda (v)
                   (let loop ([s s])
                     (cond
-                      [(eq? (var-s v) s) #f]
+                      [(null? s) #f]
                       [(eq? v (caar s)) (car s)]
                       [else (loop (cdr s))])))])
       (let walk ([x x] [pi '()])
@@ -306,29 +338,31 @@
 (define id-pi?
   (lambda (pi) (null? (pi-ds pi '()))))
 
+(define app
+  (lambda (pi a)
+    (let ([pi (reverse pi)])
+      (cond
+        [(null? pi) a]
+        [(eq? (caar pi) a)
+         (app (cdr pi) (cdar pi))]
+        [(eq? (cdar pi) a)
+         (app (cdr pi) (caar pi))]
+        [else (app (cdr pi) a)]))))
+
 (define apply-pi
   (lambda (pi t)
-    (letrec ([app (lambda (pi a)
-                    (let ([pi (reverse pi)])
-                      (cond
-                        [(null? pi) a]
-                        [(eq? (caar pi) a)
-                         (app (cdr pi) (cdar pi))]
-                        [(eq? (cdar pi) a)
-                         (app (cdr pi) (caar pi))]
-                        [else (app (cdr pi) a)])))])
-      (let rec ([t t])
-        (cond
-          [(nom? t) (app pi t)]
-          [(sus? t)
-           (let ([pi (compose-pis pi (sus-pi t))])
-             (if (id-pi? pi)
-                 (sus-v t)
-                 (make-sus pi (sus-v t))))]
-          [(tie? t) (make-tie (app pi (tie-a t))
-                      (rec (tie-t t)))]
-          [(pair? t) (cons (rec (car t)) (rec (cdr t)))]
-          [else t])))))
+    (let rec ([t t])
+      (cond
+        [(nom? t) (app pi t)]
+        [(sus? t)
+         (let ([pi (compose-pis pi (sus-pi t))])
+           (if (id-pi? pi)
+               (sus-v t)
+               (make-sus pi (sus-v t))))]
+        [(tie? t) (make-tie (app pi (tie-a t))
+                    (rec (tie-t t)))]
+        [(pair? t) (cons (rec (car t)) (rec (cdr t)))]
+        [else t]))))
 
 (define take
   (lambda (n f)
@@ -444,13 +478,13 @@
     [(_ (x ...) g0 g ...)
      (lambdag@ (a)
        (let ([x (walk* x (pkg-s a))] ...)
-         ((fresh () g0 g ...) a)))]))
+         ((fresh-var () g0 g ...) a)))]))
 
 (define-syntax let-pkg
   (syntax-rules ()
     [(_ (v) g0 g ...)
      (lambdag@ (a)
        (let ([v a])
-         ((fresh () g0 g ...) a)))]))
+         ((fresh-var () g0 g ...) a)))]))
 
 )

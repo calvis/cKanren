@@ -19,46 +19,46 @@
                (format "exp: ~s\nexpected: ~s\ncomputed: ~s" exp val v))))))
 
 (testit
- (run 1 (q) (fresh (x y z) (== x z) (== 3 y)))
+ (run 1 (q) (fresh-var (x y z) (nom== x z) (nom== 3 y)))
  '(_.0))
 
 (testit
- (run 1 (q) (fresh (x y) (== x q) (== 3 y)))
+ (run 1 (q) (fresh-var (x y) (nom== x q) (nom== 3 y)))
  '(_.0))
 
 (testit
   (run 1 (y)
-    (fresh (x z) 
-      (== x z)
-      (== 3 y)))
+    (fresh-var (x z) 
+      (nom== x z)
+      (nom== 3 y)))
  '(3))
 
 (testit
  (run 1 (q)
-  (fresh (x z)
-    (== x z)
-    (== 3 z)
-    (== q x)))
+  (fresh-var (x z)
+    (nom== x z)
+    (nom== 3 z)
+    (nom== q x)))
  '(3))
 
 (testit
   (run 1 (y)
-   (fresh (x y)
-     (== 4 x)
-     (== x y))
-   (== 3 y))
+   (fresh-var (x y)
+     (nom== 4 x)
+     (nom== x y))
+   (nom== 3 y))
   '(3))
 
 (testit
-  (run 1 (x) (== 4 3))
+  (run 1 (x) (nom== 4 3))
   '())
 
 (testit
  (run 2 (q)
-  (fresh (x y z)
+  (fresh-var (x y z)
     (conde
-      ((== `(,x ,y ,z ,x) q))
-      ((== `(,z ,y ,x ,z) q)))))
+      ((nom== `(,x ,y ,z ,x) q))
+      ((nom== `(,z ,y ,x ,z) q)))))
  '((_.0 _.1 _.2 _.0)
    (_.0 _.1 _.2 _.0)))
 
@@ -66,8 +66,8 @@
  (run 5 (q)
   (let loop ()
     (conde
-      ((== #f q))
-      ((== #t q))
+      ((nom== #f q))
+      ((nom== #t q))
       ((loop)))))
  '(#f #t #f #t #f))
 
@@ -80,91 +80,91 @@
 (testit
  (run 5 (q)
   (conde
-    ((anyo (== #f q)))
-    ((== #t q))))
+    ((anyo (nom== #f q)))
+    ((nom== #t q))))
  '(#t #f #f #f #f))
 
 (testit
  (run 10 (q)
    (anyo 
     (conde
-      ((== 1 q))
-      ((== 2 q))
-      ((== 3 q)))))
+      ((nom== 1 q))
+      ((nom== 2 q))
+      ((nom== 3 q)))))
  '(1 2 3 1 2 3 1 2 3 1))
 
 (testit
  (run 3 (q)
-  (let ((nevero (anyo (== #f #t))))
+  (let ((nevero (anyo (nom== #f #t))))
     (conde
-      ((== 1 q))
+      ((nom== 1 q))
       (nevero)
       ((conde
-         ((== 2 q))
+         ((nom== 2 q))
          (nevero)
-         ((== 3 q)))))))
+         ((nom== 3 q)))))))
  '(1 2 3))
 
 (testit
-  (run* (q) (fresh-nom (a) (== a a)))
+  (run* (q) (fresh-nom (a) (nom== a a)))
   '(_.0))
 
 (testit
- (run* (q) (fresh-nom (a) (== a 5)))
+ (run* (q) (fresh-nom (a) (nom== a 5)))
  '())
 
 (testit
-  (run* (q) (fresh-nom (a b) (== a b)))
+  (run* (q) (fresh-nom (a b) (nom== a b)))
   '())
 
 (testit
-  (run* (q) (fresh-nom (a b) (== b q)))
+  (run* (q) (fresh-nom (a b) (nom== b q)))
   '(a.0))
 
 (testit
  (run* (q)
-  (fresh (x y z)
+  (fresh-var (x y z)
     (fresh-nom (a)
-      (== x a)
+      (nom== x a)
       (fresh-nom (a b)
-        (== y a)
-        (== `(,x ,y ,z ,a ,b) q)))))
+        (nom== y a)
+        (nom== `(,x ,y ,z ,a ,b) q)))))
   '((a.0 a.1 _.0 a.1 a.2)))
 
 (testit
  (run* (q)
   (fresh-nom (a b)
-    (== (tie a `(foo ,a 3 ,b)) q)))
+    (nom== (tie a `(foo ,a 3 ,b)) q)))
  '((tie a.0 (foo a.0 3 a.1))))
 
 (testit
-  (run* (q) (fresh-nom (a b) (== `(foo ,a ,a) `(foo ,b ,b))))
+  (run* (q) (fresh-nom (a b) (nom== `(foo ,a ,a) `(foo ,b ,b))))
   '())
 
 (testit
-  (run* (q) (fresh-nom (a b) (== (tie a a) (tie b b))))
+  (run* (q) (fresh-nom (a b) (nom== (tie a a) (tie b b))))
   '(_.0))
 
 (testit
- (run* (q) (fresh-nom (a b) (== (tie a q) (tie b b))))
+ (run* (q) (fresh-nom (a b) (nom== (tie a q) (tie b b))))
  '(a.0))
 
 (testit
  (run* (q)
-  (fresh (t u)
+  (fresh-var (t u)
     (fresh-nom (a b c d)
-      (== `(lam ,(tie a `(lam ,(tie b `(var ,a))))) t)
-      (== `(lam ,(tie c `(lam ,(tie d `(var ,c))))) u)
-      (== t u))))
+      (nom== `(lam ,(tie a `(lam ,(tie b `(var ,a))))) t)
+      (nom== `(lam ,(tie c `(lam ,(tie d `(var ,c))))) u)
+      (nom== t u))))
  '(_.0))
 
 (testit
  (run* (q)
-  (fresh (t u)
+  (fresh-var (t u)
     (fresh-nom (a b c d)
-      (== `(lam ,(tie a `(lam ,(tie b `(var ,a))))) t)
-      (== `(lam ,(tie c `(lam ,(tie d `(var ,d))))) u)
-      (== t u))))
+      (nom== `(lam ,(tie a `(lam ,(tie b `(var ,a))))) t)
+      (nom== `(lam ,(tie c `(lam ,(tie d `(var ,d))))) u)
+      (nom== t u))))
  '())
 
 (testit
@@ -185,49 +185,49 @@
 
 (testit
  (run* (k)
-  (fresh (t)
+  (fresh-var (t)
     (fresh-nom (a)
       (hash a k) 
-      (== `(5 ,(tie a a) ,t) k))))
+      (nom== `(5 ,(tie a a) ,t) k))))
  '(((5 (tie a.0 a.0) _.0) : ((a.0 _.0)))))
 
 (testit
  (run* (k)
-  (fresh (t)
+  (fresh-var (t)
     (fresh-nom (a)
       (hash a k) 
-      (== `(5 ,(tie a a) ,t) k)
-      (== `(foo ,a 7) t))))
+      (nom== `(5 ,(tie a a) ,t) k)
+      (nom== `(foo ,a 7) t))))
  '())
 
 (testit
  (run* (k)
-  (fresh (t)
+  (fresh-var (t)
     (fresh-nom (a b)
-      (== (tie a (tie b t)) k) 
+      (nom== (tie a (tie b t)) k) 
       (hash a t)
-      (== `((,a ,b) ,b) t))))
+      (nom== `((,a ,b) ,b) t))))
  '())
 
 (testit
  (run* (k)
-  (fresh (t)
+  (fresh-var (t)
     (fresh-nom (a b)
-      (== (tie a (tie b t)) k) 
+      (nom== (tie a (tie b t)) k) 
       (hash a t)
-      (== `(,b ,(tie a `(,a (,b ,b)))) t))))
+      (nom== `(,b ,(tie a `(,a (,b ,b)))) t))))
  '((tie a.0 (tie a.1 (a.1 (tie a.0 (a.0 (a.1 a.1))))))))
 
 (testit
  (run* (q)
-  (fresh (k1 k2 t u)
+  (fresh-var (k1 k2 t u)
     (fresh-nom (a b c d)
-      (== (tie a (tie b t)) k1) 
+      (nom== (tie a (tie b t)) k1) 
       (hash a t)
-      (== (tie c (tie d u)) k2)
+      (nom== (tie c (tie d u)) k2)
       (hash c u)
-      (== k1 k2)
-      (== `(,k1 ,k2) q))))
+      (nom== k1 k2)
+      (nom== `(,k1 ,k2) q))))
  '((((tie a.0 (tie a.1 (sus ((a.1 . a.2) (a.0 . a.3)) _.0)))
      (tie a.3 (tie a.2 _.0)))
     :
@@ -235,37 +235,37 @@
 
 (testit
  (run* (q)
-  (fresh (k1 k2 t u)
+  (fresh-var (k1 k2 t u)
     (fresh-nom (a b c d)
-      (== (tie a (tie b t)) k1) 
+      (nom== (tie a (tie b t)) k1) 
       (hash a t)
-      (== `(,b ,b) t)
-      (== (tie c (tie d u)) k2)
+      (nom== `(,b ,b) t)
+      (nom== (tie c (tie d u)) k2)
       (hash c u)
-      (== `(,d ,d) u)
-      (== k1 k2)
-      (== `(,k1 ,k2) q))))
+      (nom== `(,d ,d) u)
+      (nom== k1 k2)
+      (nom== `(,k1 ,k2) q))))
  '(((tie a.0 (tie a.1 (a.1 a.1)))
     (tie a.2 (tie a.3 (a.3 a.3))))))
 
 (testit
  (run* (q)
    (fresh-nom (a b)
-     (fresh (x y)
-       (== (tie a (tie a x)) (tie a (tie b y)))
-       (== `(,x ,y) q))))
+     (fresh-var (x y)
+       (nom== (tie a (tie a x)) (tie a (tie b y)))
+       (nom== `(,x ,y) q))))
  '((((sus ((a.0 . a.1)) _.0) _.0) : ((a.0 _.0)))))
 
 (testit 
  (run* (q)
   (fresh-nom (a b)
-    (fresh (x y)
+    (fresh-var (x y)
       (conde
-        ((== (tie a (tie b `(,x ,b))) (tie b (tie a `(,a ,x)))))
-        ((== (tie a (tie b `(,y ,b))) (tie b (tie a `(,a ,x)))))
-        ((== (tie a (tie b `(,b ,y))) (tie b (tie a `(,a ,x)))))
-        ((== (tie a (tie b `(,b ,y))) (tie a (tie a `(,a ,x))))))
-      (== `(,x ,y) q))))
+        ((nom== (tie a (tie b `(,x ,b))) (tie b (tie a `(,a ,x)))))
+        ((nom== (tie a (tie b `(,y ,b))) (tie b (tie a `(,a ,x)))))
+        ((nom== (tie a (tie b `(,b ,y))) (tie b (tie a `(,a ,x)))))
+        ((nom== (tie a (tie b `(,b ,y))) (tie a (tie a `(,a ,x))))))
+      (nom== `(,x ,y) q))))
  '((a.0 a.1)
    (_.0 (sus ((a.0 . a.1)) _.0))
    ((_.0 (sus ((a.0 . a.1)) _.0)) : ((a.0 _.0)))))
@@ -273,20 +273,20 @@
 (define substo  
   (lambda (e new a out)
     (conde
-      ((== `(var ,a) e) (== new out))
-      ((fresh (y)
-         (== `(var ,y) e)
-         (== `(var ,y) out)
+      ((nom== `(var ,a) e) (nom== new out))
+      ((fresh-var (y)
+         (nom== `(var ,y) e)
+         (nom== `(var ,y) out)
          (hash a y)))
-      ((fresh (rator ratorres rand randres)
-         (== `(app ,rator ,rand) e)
-         (== `(app ,ratorres ,randres) out)
+      ((fresh-var (rator ratorres rand randres)
+         (nom== `(app ,rator ,rand) e)
+         (nom== `(app ,ratorres ,randres) out)
          (substo rator new a ratorres)
          (substo rand new a randres)))
-      ((fresh (body bodyres)
+      ((fresh-var (body bodyres)
          (fresh-nom (c)
-           (== `(lam ,(tie c body)) e)
-           (== `(lam ,(tie c bodyres)) out)
+           (nom== `(lam ,(tie c body)) e)
+           (nom== `(lam ,(tie c bodyres)) out)
            (hash c a)
            (hash c new)
            (substo body new a bodyres)))))))
@@ -308,40 +308,40 @@
 (define typo
   (lambda (g e te)
     (conde
-      ((fresh (x)
-         (== `(var ,x) e)
+      ((fresh-var (x)
+         (nom== `(var ,x) e)
          (lookupo x te g)))
-      ((fresh (rator trator rand trand)
-         (== `(app ,rator ,rand) e)
-         (== `(-> ,trand ,te) trator)
+      ((fresh-var (rator trator rand trand)
+         (nom== `(app ,rator ,rand) e)
+         (nom== `(-> ,trand ,te) trator)
          (typo g rator trator)
          (typo g rand trand)))
-      ((fresh (e^ te^ trand g^)
+      ((fresh-var (e^ te^ trand g^)
          (fresh-nom (b)
-           (== `(lam ,(tie b e^)) e)
-           (== `(-> ,trand ,te^) te)
+           (nom== `(lam ,(tie b e^)) e)
+           (nom== `(-> ,trand ,te^) te)
            (hash b g)
-           (== `((,b . ,trand) . ,g) g^)
+           (nom== `((,b . ,trand) . ,g) g^)
            (typo g^ e^ te^))))
-      ((fresh (rator t-val)
-         (== `(C ,rator) e)
+      ((fresh-var (rator t-val)
+         (nom== `(C ,rator) e)
          (typo g rator `(-> (-> ,te ,t-val) ,t-val)))))))
 
 (define !-c
   (lambda (gamma exp type)
-    (fresh (m a b)
-      (== `(c ,m) exp)
-      (== a type)
+    (fresh-var (m a b)
+      (nom== `(c ,m) exp)
+      (nom== a type)
       (!- gamma m `(-> (-> ,a ,b) ,b)))))
 
 (define lookupo
   (lambda (x tx g)
-    (fresh (a d)
-      (== `(,a . ,d) g)
+    (fresh-var (a d)
+      (nom== `(,a . ,d) g)
       (conde
-        ((== `(,x . ,tx) a))
-        ((fresh (x^ tx^)
-           (== `(,x^ . ,tx^) a)
+        ((nom== `(,x . ,tx) a))
+        ((fresh-var (x^ tx^)
+           (nom== `(,x^ . ,tx^) a)
            (hash x x^)
            (lookupo x tx d)))))))
 
@@ -376,9 +376,9 @@
 
 (testit
  (run* (q)
-  (fresh (x y z)
+  (fresh-var (x y z)
     (fresh-nom (a)      
       (hash a x)
-      (== `(,y ,z) x)
-      (== `(,x ,a) q))))
+      (nom== `(,y ,z) x)
+      (nom== `(,x ,a) q))))
  '((((_.0 _.1) a.0) : ((a.0 _.0 _.1)))))

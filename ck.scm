@@ -6,7 +6,7 @@
     update-s update-c make-a any/var? prefix-s
     lambdam@ identitym composem goal-construct ext-c
     build-oc oc->proc oc->rands oc->rator run run* prt
-    extend-enforce-fns extend-reify-fns
+    extend-enforce-fns extend-reify-fns empty-a
 
     ;; mk
     lhs rhs walk walk* var? lambdag@ mzerog unitg onceo
