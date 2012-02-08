@@ -34,16 +34,8 @@
                (let ([c (verify-c a^ f)])
                  (make-pkg (pkg-s a^) c))))))))
 
-;; (define nom==-check
-;;   (lambda (u v)
-;;     (lambdag@ (a)
-;;       (let ([a^ (unify-s-check u v a)])
-;;         (and a^
-;;              (letcc f
-;;                (let ([c (verify-c a^ f)])
-;;                  (make-pkg (pkg-s a^) c))))))))
-
-;; OK
+;; OK - sus? removed
+;; OK - pkg used correctly
 (define hash
   (lambda (b t)
     (lambdag@ (a)
@@ -51,7 +43,8 @@
         (let ([c (hash-check b t (pkg-s a) (pkg-c a) f)])
           (make-pkg (pkg-s a) c))))))
 
-;; OK
+;; OK - sus? removed
+;; OK - pkg used correctly
 (define-syntax fresh-var
   (syntax-rules ()
     [(_ (e ...) g0 g ...)
@@ -60,7 +53,8 @@
          (let ([e (make-var 'e)] ...)
            (bindg* (g0 a) g ...))))]))
 
-;; OK
+;; OK - sus? removed
+;; OK - pkg used correctly
 (define-syntax fresh-nom
   (syntax-rules ()
     [(_ (n ...) g0 g ...)
@@ -69,27 +63,32 @@
          (let ([n (make-nom 'n)] ...)
            (bindg* (g0 a) g ...))))]))
 
-;; OK
+;; OK - sus? removed
+;; OK - pkg used correctly
 (define-syntax letcc
   (syntax-rules ()
     [(_ k b0 b ...) (call/cc (lambda (k) b0 b ...))]))
 
-;; OK
+;; OK - sus? removed
+;; OK - pkg used correctly
 (define-syntax make-pkg-f
   (syntax-rules ()
     ((_ s c) (cons s c))))
 
-;; OK
+;; OK - sus? removed
+;; OK - pkg used correctly
 (define-syntax pkg-s
   (syntax-rules ()
     ((_ a) (car a))))
 
-;; OK
+;; OK - sus? removed
+;; OK - pkg used correctly
 (define-syntax pkg-c
   (syntax-rules ()
     ((_ a) (cdr a))))
 
-;; OK
+;; OK - sus? removed
+;; OK - pkg used correctly
 (define-syntax make-pkg
   (syntax-rules ()
     [(_ s c) (make-pkg-f s c)]))
@@ -111,7 +110,6 @@
 ;;   (let ((oc (find (lambda (oc) (sus-constrainted? x oc)) c)))
 ;;     (and oc (sus-pi oc))))
 
-;; (define (sus-v oc) (car (oc->rands oc)))
 ;; (define (sus-pi oc) (cadr (oc->rands oc)))
 
 ;; (define (make-sus v pi)
@@ -130,29 +128,34 @@
                 (let ([var ((make-sus '() #f) name)])
                   (sus-v-set! var var) var)))))
 
-;; OK
+;; OK - sus? removed
+;; OK - pkg used correctly
 (define-record-type nom (fields name))
 
 ;; GONE
 (define-record-type tie (fields a t))
 
-;; OK
+;; OK - sus? removed
+;; OK - pkg used correctly
 (define tie-t*
   (lambda (t)
     (if (tie? t) (tie-t* (tie-t t)) t)))
 
-;; OK
+;; OK - sus? removed
+;; OK - pkg used correctly
 (define ext-c
   (lambda (a v c)
     (let ([h (cons a v)])
       (if (member h c) c (cons h c)))))
 
-;; OK
+;; OK - sus? removed
+;; OK - pkg used correctly
 (define ds-ext-c
   (lambda (ds v c)
     (fold-left (lambda (c x) (ext-c x v c)) c ds)))
 
-;; OK
+;; OK - sus? removed
+;; OK - pkg used correctly
 (define unify-s
   (lambda (u v a)
     (let ([s (pkg-s a)] [c (pkg-c a)])
@@ -169,17 +172,25 @@
                       (pi-ds (sus-pi u) (sus-pi v))
                       (sus-v u)
                       c)])
-             (make-pkg (pkg-s a) c))]
+             (make-pkg s c))]
 
           ;; if the first is a variable, or the second is a variable,
           ;; extend the substitution
           ;; [(get-sus u)
-          ;;  => (lambda (sus-c)
+          ;;  => (lambda (usus-c)
           ;;       (cond
+          ;;         ((let ((vsus-c (sus v)))
+          ;;            (and (equal? u v) vsus-c))
+          ;;          => (lambda (vsus-c)
+          ;;               (let ([c (ds-ext-c
+          ;;                          (pi-ds (sus-pi usus-c) (sus-pi vsus-c))
+          ;;                          (sus-v u)
+          ;;                          c)])
+          ;;                 (make-pkg s c))))
           ;;         ((var? v)
           ;;          (let ((c (cons (var->sus v) c)))
           ;;            (unify-s u v (make-pkg s c))))
-          ;;         (else (ext-s-nocheck u (apply-pi (sus-pi sus-c) v) a))))]
+          ;;         (else (ext-s-nocheck u (apply-pi (sus-pi usus-c) v) a))))]
           ;; [(get-sus v)
           ;;  => (lambda (sus-c)
           ;;       (cond
@@ -216,19 +227,22 @@
           [(equal? u v) a]
           [else #f])))))
 
-;; OK
+;; OK - sus? removed
+;; OK - pkg used correctly
 (define ext-s
   (lambda (u v s)
     (cons `(,u . ,v) s)))
 
-;; OK
+;; OK - sus? removed
+;; OK - pkg used correctly
 (define ext-s-nocheck
   (lambda (x t a)
     (let ([s (pkg-s a)])
       (let ([s (ext-s x t s)])
         (make-pkg s (pkg-c a))))))
 
-;; OK
+;; OK - sus? removed
+;; OK - pkg used correctly
 (define verify-c
   (lambda (a f)
     (let ((s (pkg-s a)))
@@ -237,7 +251,8 @@
         '()
         (pkg-c a)))))
 
-;; OK
+;; OK - sus? removed
+;; OK - pkg used correctly
 (define hash-check
   (lambda (a t s c f)
     (let rec ([t t] [c c])
@@ -257,7 +272,8 @@
            (rec (cdr t) (rec (car t) c))]
           [else c])))))
 
-;; OK
+;; OK - sus? removed
+;; OK - pkg used correctly
 (define walk-sym
   (lambda (v s)
     (let loop ([s s])
@@ -266,7 +282,8 @@
         [(eq? v (caar s)) (car s)]
         [else (loop (cdr s))]))))
 
-;; OK
+;; OK - sus? removed
+;; OK - pkg used correctly
 (define walk
   (lambda (x s)
     (let walk ([x x] [pi '()])
@@ -285,7 +302,8 @@
         ;;         (else (apply-pi pi x))))]
         [else (apply-pi pi x)]))))
 
-;; OK
+;; OK - sus? removed
+;; OK - pkg used correctly
 (define walk*
   (lambda (t s)
     (let ([t (walk t s)])
@@ -296,10 +314,12 @@
          (cons (walk* (car t) s) (walk* (cdr t) s))]
         [else t]))))
 
-;; OK
+;; OK - sus? removed
+;; OK - pkg used correctly
 (define compose-pis append)
 
-;; OK
+;; OK - sus? removed
+;; OK - pkg used correctly
 (define get-noms
   (let ([with (lambda (n s) (if (memq n s) s (cons n s)))])
     (lambda (pi s)
@@ -309,7 +329,8 @@
           (get-noms (cdr pi)
             (with (caar pi) (with (cdar pi) s)))]))))
 
-;; OK
+;; OK - sus? removed
+;; OK - pkg used correctly
 (define pi-ds
   (lambda (pi1 pi2)
     (fold-left
@@ -320,11 +341,13 @@
       '()
       (get-noms pi1 (get-noms pi2 '())))))
 
-;; OK
+;; OK - sus? removed
+;; OK - pkg used correctly
 (define id-pi?
   (lambda (pi) (null? (pi-ds pi '()))))
 
-;; OK
+;; OK - sus? removed
+;; OK - pkg used correctly
 (define app
   (lambda (pi a)
     (let ([pi (reverse pi)])
@@ -336,7 +359,8 @@
          (app (cdr pi) (caar pi))]
         [else (app (cdr pi) a)]))))
 
-;; OK
+;; OK - sus? removed
+;; OK - pkg used correctly
 (define apply-pi
   (lambda (pi t)
     (let rec ([t t])
@@ -356,6 +380,8 @@
         [(pair? t) (cons (rec (car t)) (rec (cdr t)))]
         [else t]))))
 
+;; OK - sus? removed
+;; OK - pkg used correctly
 (define take
   (lambda (n f)
     (if (and n (zero? n))
@@ -366,6 +392,8 @@
           [(a) (cons a '())]
           [(a f) (cons a (take (and n (- n 1)) f))]))))
 
+;; OK - sus? removed
+;; OK - pkg used correctly
 (define reify
   (lambda (x a)
     (let ([s (pkg-s a)])
@@ -374,6 +402,8 @@
           (let ([c (discard/reify-c (pkg-c a) s)])
             (choiceg (if (null? c) x `(,x : ,c)) empty-f)))))))
 
+;; OK - sus? removed
+;; OK - pkg used correctly
 (define get
   (lambda (a s n c)
     (cond
@@ -385,6 +415,8 @@
                      n (number->string (c))))])
           (values r (cons (cons a r) s)))])))
 
+;; OK - sus? removed
+;; OK - pkg used correctly
 (define reify-vars/noms
   (let
       ([counter
@@ -424,12 +456,16 @@
                  (values (cons a d) s)))]
             [else (values t s)]))))))
 
+;; OK - sus? removed
+;; OK - pkg used correctly
 (define rwalk
   (lambda (t s)
     (cond
       [(assq t s) => cdr]
       [else t])))
 
+;; OK - sus? removed
+;; OK - pkg used correctly
 (define discard/reify-c
   (lambda (c s)
     (let
@@ -440,6 +476,9 @@
                  [(null? vs) rs]
                  [else
                    (let ([r (rwalk (car vs) s)])
+                     ;; (if (sus r)
+                     ;;     (loop (cdr vs) rs)
+                     ;;     (loop (cdr vs) `(,r . ,rs)))
                      (if (sus? r)
                          (loop (cdr vs) rs)
                          (loop (cdr vs) `(,r . ,rs))))])))]
@@ -474,7 +513,8 @@
                     (let-values
                         ([(vs c) (collate-vs a c)])
                       (let ([rs (vs->rs vs)])
-                        (if (null? rs) (f #f)
+                        (if (null? rs)
+                            (f #f)
                             (loop
                               c `((,r . ,rs) . ,r*)))))))
                 (loop (cdr c) r*)))])))))
