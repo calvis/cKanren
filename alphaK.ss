@@ -394,6 +394,7 @@
       (let ([sc (counter)] [nc (counter)])
         (let rec ([t t] [s '()])
           (cond
+
             [(sus? t)
              (let ([pi (sus-pi t)])
                (let-values
@@ -401,6 +402,17 @@
                  (if (null? pi) (values v s)
                      (let-values ([(pi s) (rec pi s)])
                        (values `(sus ,pi ,v) s)))))]
+            
+            ;; [(sus t)
+            ;;  => (lambda (sus-c)
+            ;;       (let ([pi (sus-pi sus-c)])
+            ;;         (let-values
+            ;;             ([(v s) (get t s "_." sc)])
+            ;;           (if (null? pi)
+            ;;               (values v s)
+            ;;               (let-values ([(pi s) (rec pi s)])
+            ;;                 (values `(sus ,pi ,v) s))))))]
+
             [(nom? t) (get t s "a." nc)]
             [(tie? t)
              (let-values ([(a s) (rec (tie-a t) s)])
