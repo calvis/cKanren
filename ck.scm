@@ -3,7 +3,7 @@
 
   (export
     ;; framework
-    update-s update-c make-a any/var? prefix-s
+    update-s update-c make-a any/var? prefix-s size-s
     lambdam@ identitym composem goal-construct ext-c
     build-oc oc->proc oc->rands oc->rator run run* prt
     extend-enforce-fns extend-reify-fns empty-a

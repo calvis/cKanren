@@ -6,7 +6,7 @@
     (except (rnrs) find)
     (rnrs records syntactic)
     (only (mk) lambdag@ case-inf choiceg lambdaf@ inc bindg* empty-f project)
-    (only (ck) empty-a)
+    (only (ck) empty-a size-s)
     (only (chezscheme) gensym trace-define printf))
 
 (define-syntax run
@@ -43,6 +43,7 @@
 ;;                (let ([c (verify-c a^ f)])
 ;;                  (make-pkg (pkg-s a^) c))))))))
 
+;; OK
 (define hash
   (lambda (b t)
     (lambdag@ (a)
@@ -50,6 +51,7 @@
         (let ([c (hash-check b t (pkg-s a) (pkg-c a) f)])
           (make-pkg (pkg-s a) c))))))
 
+;; OK
 (define-syntax fresh-var
   (syntax-rules ()
     [(_ (e ...) g0 g ...)
@@ -58,6 +60,7 @@
          (let ([e (make-var 'e)] ...)
            (bindg* (g0 a) g ...))))]))
 
+;; OK
 (define-syntax fresh-nom
   (syntax-rules ()
     [(_ (n ...) g0 g ...)
@@ -66,22 +69,27 @@
          (let ([n (make-nom 'n)] ...)
            (bindg* (g0 a) g ...))))]))
 
+;; OK
 (define-syntax letcc
   (syntax-rules ()
     [(_ k b0 b ...) (call/cc (lambda (k) b0 b ...))]))
 
+;; OK
 (define-syntax make-pkg-f
   (syntax-rules ()
     ((_ s c) (cons s c))))
 
+;; OK
 (define-syntax pkg-s
   (syntax-rules ()
     ((_ a) (car a))))
 
+;; OK
 (define-syntax pkg-c
   (syntax-rules ()
     ((_ a) (cdr a))))
 
+;; OK
 (define-syntax make-pkg
   (syntax-rules ()
     [(_ s c) (make-pkg-f s c)]))
@@ -89,8 +97,8 @@
 ;; (define (make-var sym) (vector sym))
 ;; (define (var? sym) (vector? sym))
 
-(define (var->sus var)
-  (make-sus var '()))
+;; (define (var->sus var)
+;;   (make-sus var '()))
 
 ;; (define (sus-constrained? x oc)
 ;;   (and (eq? (oc->rator oc) 'sus)
@@ -113,6 +121,7 @@
 ;; (define (tie-a t) (cadr t))
 ;; (define (tie-v t) (caddr t))
 
+;; GONE
 (define-record-type sus (fields pi (mutable v)))
 (define-record-type var
   (parent sus) (fields name)
@@ -120,24 +129,30 @@
               (lambda (name)
                 (let ([var ((make-sus '() #f) name)])
                   (sus-v-set! var var) var)))))
+
+;; OK
 (define-record-type nom (fields name))
+
+;; GONE
 (define-record-type tie (fields a t))
 
+;; OK
 (define tie-t*
   (lambda (t)
     (if (tie? t) (tie-t* (tie-t t)) t)))
 
+;; OK
 (define ext-c
   (lambda (a v c)
     (let ([h (cons a v)])
       (if (member h c) c (cons h c)))))
 
-(define s-size length)
-
+;; OK
 (define ds-ext-c
   (lambda (ds v c)
     (fold-left (lambda (c x) (ext-c x v c)) c ds)))
 
+;; OK
 (define unify-s
   (lambda (u v a)
     (let ([s (pkg-s a)] [c (pkg-c a)])
@@ -201,16 +216,19 @@
           [(equal? u v) a]
           [else #f])))))
 
+;; OK
 (define ext-s
   (lambda (u v s)
     (cons `(,u . ,v) s)))
 
+;; OK
 (define ext-s-nocheck
   (lambda (x t a)
     (let ([s (pkg-s a)])
       (let ([s (ext-s x t s)])
         (make-pkg s (pkg-c a))))))
 
+;; OK
 (define verify-c
   (lambda (a f)
     (let ((s (pkg-s a)))
@@ -219,6 +237,7 @@
         '()
         (pkg-c a)))))
 
+;; OK
 (define hash-check
   (lambda (a t s c f)
     (let rec ([t t] [c c])
@@ -238,6 +257,7 @@
            (rec (cdr t) (rec (car t) c))]
           [else c])))))
 
+;; OK
 (define walk-sym
   (lambda (v s)
     (let loop ([s s])
@@ -245,7 +265,8 @@
         [(null? s) #f]
         [(eq? v (caar s)) (car s)]
         [else (loop (cdr s))]))))
-  
+
+;; OK
 (define walk
   (lambda (x s)
     (let walk ([x x] [pi '()])
@@ -264,6 +285,7 @@
         ;;         (else (apply-pi pi x))))]
         [else (apply-pi pi x)]))))
 
+;; OK
 (define walk*
   (lambda (t s)
     (let ([t (walk t s)])
@@ -274,8 +296,10 @@
          (cons (walk* (car t) s) (walk* (cdr t) s))]
         [else t]))))
 
+;; OK
 (define compose-pis append)
 
+;; OK
 (define get-noms
   (let ([with (lambda (n s) (if (memq n s) s (cons n s)))])
     (lambda (pi s)
@@ -285,6 +309,7 @@
           (get-noms (cdr pi)
             (with (caar pi) (with (cdar pi) s)))]))))
 
+;; OK
 (define pi-ds
   (lambda (pi1 pi2)
     (fold-left
@@ -295,9 +320,11 @@
       '()
       (get-noms pi1 (get-noms pi2 '())))))
 
+;; OK
 (define id-pi?
   (lambda (pi) (null? (pi-ds pi '()))))
 
+;; OK
 (define app
   (lambda (pi a)
     (let ([pi (reverse pi)])
@@ -309,6 +336,7 @@
          (app (cdr pi) (caar pi))]
         [else (app (cdr pi) a)]))))
 
+;; OK
 (define apply-pi
   (lambda (pi t)
     (let rec ([t t])
@@ -319,6 +347,10 @@
            (if (id-pi? pi)
                (sus-v t)
                (make-sus pi (sus-v t))))]
+        ;; [(sus t c)
+        ;;  => (lambda (sus-c)
+        ;;       (let ([pi (compose-pis pi (sus-pi sus-c))])
+        ;;         (if (id-pi? pi) t (make-sus t pi))))]
         [(tie? t) (make-tie (app pi (tie-a t))
                     (rec (tie-t t)))]
         [(pair? t) (cons (rec (car t)) (rec (cdr t)))]
@@ -342,41 +374,43 @@
           (let ([c (discard/reify-c (pkg-c a) s)])
             (choiceg (if (null? c) x `(,x : ,c)) empty-f)))))))
 
+(define get
+  (lambda (a s n c)
+    (cond
+      [(assq a s)
+       => (lambda (a) (values (cdr a) s))]
+      [else
+        (let ([r (string->symbol 
+                   (string-append 
+                     n (number->string (c))))])
+          (values r (cons (cons a r) s)))])))
+
 (define reify-vars/noms
   (let
       ([counter
          (lambda ()
            (let ([n -1]) (lambda () (set! n (+ n 1)) n)))])
-    (let ([get (lambda (a s n c)
-                 (cond
-                   [(assq a s)
-                    => (lambda (a) (values (cdr a) s))]
-                   [else
-                     (let ([r (string->symbol 
-                                (string-append 
-                                  n (number->string (c))))])
-                       (values r (cons (cons a r) s)))]))])
-      (lambda (t)
-        (let ([sc (counter)] [nc (counter)])
-          (let rec ([t t] [s '()])
-            (cond
-              [(sus? t)
-               (let ([pi (sus-pi t)])
-                 (let-values
-                     ([(v s) (get (sus-v t) s "_." sc)])
-                   (if (null? pi) (values v s)
-                       (let-values ([(pi s) (rec pi s)])
-                         (values `(sus ,pi ,v) s)))))]
-              [(nom? t) (get t s "a." nc)]
-              [(tie? t)
-               (let-values ([(a s) (rec (tie-a t) s)])
-                 (let-values ([(t s) (rec (tie-t t) s)])
-                   (values `(tie ,a ,t) s)))]
-              [(pair? t)
-               (let-values ([(a s) (rec (car t) s)])
-                 (let-values ([(d s) (rec (cdr t) s)])
-                   (values (cons a d) s)))]
-              [else (values t s)])))))))
+    (lambda (t)
+      (let ([sc (counter)] [nc (counter)])
+        (let rec ([t t] [s '()])
+          (cond
+            [(sus? t)
+             (let ([pi (sus-pi t)])
+               (let-values
+                   ([(v s) (get (sus-v t) s "_." sc)])
+                 (if (null? pi) (values v s)
+                     (let-values ([(pi s) (rec pi s)])
+                       (values `(sus ,pi ,v) s)))))]
+            [(nom? t) (get t s "a." nc)]
+            [(tie? t)
+             (let-values ([(a s) (rec (tie-a t) s)])
+               (let-values ([(t s) (rec (tie-t t) s)])
+                 (values `(tie ,a ,t) s)))]
+            [(pair? t)
+             (let-values ([(a s) (rec (car t) s)])
+               (let-values ([(d s) (rec (cdr t) s)])
+                 (values (cons a d) s)))]
+            [else (values t s)]))))))
 
 (define rwalk
   (lambda (t s)
