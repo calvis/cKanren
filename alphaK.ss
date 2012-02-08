@@ -289,18 +289,11 @@
   (lambda (pi1 pi2)
     (fold-left
       (lambda (s nom)
-        (if (eq? (apply-pi pi1 nom) (apply-pi pi2 nom))
-            (loop (cdr noms) s)
-            (loop (cdr noms) (cons nom s))))
+        (cond
+          ((eq? (apply-pi pi1 nom) (apply-pi pi2 nom)) s)
+          (else (cons nom s))))
       '()
-      (get-noms pi1 (get-noms pi2 '())))
-    #;
-    (let loop ([noms (get-noms pi1 (get-noms pi2 '()))]
-               [s '()])
-      (cond
-        [(null? noms) s]
-        [else (let ([a (car noms)])
-                )]))))
+      (get-noms pi1 (get-noms pi2 '())))))
 
 (define id-pi?
   (lambda (pi) (null? (pi-ds pi '()))))
