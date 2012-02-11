@@ -7,13 +7,14 @@
     lambdam@ identitym composem goal-construct ext-c
     build-oc oc->proc oc->rands oc->rator run run* prt
     extend-enforce-fns extend-reify-fns empty-a
+    update-c-nocheck reify
 
     ;; mk
     lhs rhs walk walk* var? lambdag@ mzerog unitg onceo
     conde conda condu ifa ifu project fresh :)
   
   (import (rnrs) (mk)
-    (only (chezscheme) make-parameter))
+    (only (chezscheme) make-parameter trace-define printf))
 
 ;; ---HELPERS------------------------------------------------------
 
@@ -92,6 +93,11 @@
         ((any/var? (oc->rands oc))
          (make-a s (ext-c oc c)))
         (else a)))))
+
+(define update-c-nocheck
+  (lambda (oc)
+    (lambdam@ (a : s c)
+      (make-a s (ext-c oc c)))))
 
 ;; ---PACKAGE------------------------------------------------------
 
@@ -208,7 +214,8 @@
       (let* ((v (walk* x s))
              (r (reify-s v empty-s)))
         (cond
-          ((null? r) (choiceg v empty-f))
+          ((null? r)
+           (choiceg v empty-f))
           (else
             (let ((v (walk* v r)))
               (reify-constraints v r c))))))))
@@ -219,18 +226,24 @@
       (cond
         ((null? c) v)
         (else
-          (let ((c^ (run-reify-fns v r c)))
+          (let-values (((v^ c^)
+                        (run-reify-fns v r c)))
             (cond
+              (v^ v^)
               ((null? c^) v)
               (else `(,v : . ,c^))))))
       empty-f)))
 
 (define run-reify-fns
   (lambda (v r c)
-    (let loop ((fns (reify-fns)) (c c))
+    (let loop ((fns (reify-fns)) (c^ '()))
       (cond
-        ((null? fns) c)
-        (else (loop (cdr fns) ((cdar fns) v r c)))))))
+        ((null? fns) (values #f c^))
+        (else
+          (let-values (((v^ reified-c) ((cdar fns) v r c)))
+            (cond
+              ((not v^) (loop (cdr fns) (append reified-c c^)))
+              (else (values v^ c^)))))))))
 
 ;; ---MACROS-------------------------------------------------------
 
