@@ -1,5 +1,5 @@
 (library (alphaK)
-  (export run run* == fresh-var nom? project var->sus
+  (export run run* == nom? project var->sus
     fresh-nom hash (rename (make-tie tie)) unify-s walk get-sus)
 
   (import
@@ -9,24 +9,10 @@
       lambdag@ case-inf choiceg
       lambdaf@ inc bindg* empty-f project)
     (only (ck) empty-a size-s oc->rator oc->rands build-oc
-      extend-reify-fns any/var?
+      extend-reify-fns any/var? run run* fresh
       update-s update-c lambdam@ : composem goal-construct reify)
-    (only (chezscheme) gensym trace-define printf trace-let))
-
-(define-syntax run
-  (syntax-rules ()
-    ((_ n (q) g0 g ...)
-     (take n
-       (lambdaf@ ()
-         ((fresh-var (q)
-            g0 g ...
-            (reify q))
-          empty-a))))))
-
-(define-syntax run*
-  (syntax-rules ()
-    ((_ (x) g0 g ...)
-     (run #f (x) g0 g ...))))
+    (rename (only (ck) walk*) (walk* ck:walk*))
+    (only (chezscheme) gensym trace-define trace-define-syntax printf trace-let))
 
 (define ==
   (lambda (u v)
@@ -38,7 +24,7 @@
 
 (define hash-c
   (lambda (b t)
-    (let rec ((t t))
+    (trace-let rec ((t t))
       (lambdam@ (a : s c)
         (let ((t (walk t s c)))
           (cond
@@ -47,57 +33,34 @@
              => (lambda (sus-c)
                   (let ((lhs (apply-pi (sus-pi sus-c) b c)))
                     ((update-c (build-oc hash-c lhs t)) a))))
-            ((and (tie? t)
-                  (not (eq? b (tie-a t))))
-             (rec (tie-t t)))
+            ((tie? t)
+             (if (eq? b (tie-a t)) a ((rec (tie-t t)) a)))
             ((pair? t)
-             (composem (rec (car t)) (rec (cdr t))))
+             ((composem (rec (car t)) (rec (cdr t))) a))
             (else a)))))))
 
-;; OK - sus? removed
-;; OK - pkg used correctly
-(define-syntax fresh-var
-  (syntax-rules ()
-    ((_ (e ...) g0 g ...)
-     (lambdag@ (a)
-       (inc
-         (let ((e (make-var 'e)) ...)
-           (bindg* (g0 a) g ...)))))))
-
-;; OK - sus? removed
-;; OK - pkg used correctly
 (define-syntax fresh-nom
   (syntax-rules ()
     ((_ (n ...) g0 g ...)
-     (fresh-var (n ...)
+     (fresh (n ...)
        (nom n) ... g0 g ...))))
 
-;; OK - sus? removed
-;; OK - pkg used correctly
 (define-syntax letcc
   (syntax-rules ()
     ((_ k b0 b ...) (call/cc (lambda (k) b0 b ...)))))
 
-;; OK - sus? removed
-;; OK - pkg used correctly
 (define-syntax make-pkg-f
   (syntax-rules ()
     ((_ s c) (cons s c))))
 
-;; OK - sus? removed
-;; OK - pkg used correctly
 (define-syntax pkg-s
   (syntax-rules ()
     ((_ a) (car a))))
 
-;; OK - sus? removed
-;; OK - pkg used correctly
 (define-syntax pkg-c
   (syntax-rules ()
     ((_ a) (cdr a))))
 
-;; OK - sus? removed
-;; OK - pkg used correctly
 (define-syntax make-pkg
   (syntax-rules ()
     ((_ s c) (make-pkg-f s c))))
@@ -165,14 +128,10 @@
 ;; GONE
 ;; (define-record-type tie (fields a t))
 
-;; OK - sus? removed
-;; OK - pkg used correctly
 (define tie-t*
   (lambda (t)
     (if (tie? t) (tie-t* (tie-t t)) t)))
 
-;; OK - sus? removed
-;; OK - pkg used correctly
 (define ext-h*
   (lambda (a v c)
     (let ((h (cons a v)))
@@ -182,14 +141,10 @@
   (lambda (oc c)
     (cons oc c)))
 
-;; OK - sus? removed
-;; OK - pkg used correctly
 ;; (define ds-ext-c
 ;;   (lambda (ds v c)
 ;;     (fold-left (lambda (c x) (ext-c x v c)) c ds)))
 
-;; OK - sus? removed
-;; OK - pkg used correctly
 (define unify-s
   (lambda (u v)
     (lambdam@ (a : s c)
@@ -236,33 +191,30 @@
                     (hash-c au tv)
                     (unify-s tu
                       (apply-pi `((,au . ,av)) tv c)))
-                  (make-pkg s c)))))
+                  a))))
           
           ((and (pair? u) (pair? v))
            ((composem
               (unify-s (car u) (car v))
               (unify-s (cdr u) (cdr v)))
             a))
-          ((or (nom? u c) (nom? v c)) #f)
-          ((var? u)
+          
+          ((and (var? u) (not (nom? u c)))
            (let ((c (cons (var->sus u) c)))
              ((unify-s v u) (make-pkg s c))))
-
-          ((var? v)
+          ((and (var? v) (not (nom? v c)))
            (let ((c (cons (var->sus v) c)))
              ((unify-s u v) (make-pkg s c))))
+          
+          ((or (nom? u c) (nom? v c)) #f)
           
           ((equal? u v) a)
           (else #f))))))
 
-;; OK - sus? removed
-;; OK - pkg used correctly
 (define ext-s
   (lambda (u v s)
     (cons `(,u . ,v) s)))
 
-;; OK - sus? removed
-;; OK - pkg used correctly
 (define ext-s-nocheck
   (lambda (x t)
     (lambdam@ (a : s c)
@@ -274,12 +226,6 @@
      => (lambda (oc) (cdr (oc->rands oc))))
     (else `())))
 
-;; OK - sus? removed
-;; OK - pkg used correctly
-
-
-;; OK - sus? removed
-;; OK - pkg used correctly
 (define walk-sym
   (lambda (v s)
     (let loop ((s s))
@@ -288,8 +234,6 @@
         ((eq? v (caar s)) (car s))
         (else (loop (cdr s)))))))
 
-;; OK - sus? removed
-;; OK - pkg used correctly
 (define walk
   (lambda (x s c)
     (let f ((x x) (pi '()))
@@ -308,8 +252,6 @@
                 (else (apply-pi pi x c)))))
         (else (apply-pi pi x c))))))
 
-;; OK - sus? removed
-;; OK - pkg used correctly
 (define walk*
   (lambda (t s c)
     (let ((t (walk t s c)))
@@ -320,12 +262,8 @@
          (cons (walk* (car t) s c) (walk* (cdr t) s c)))
         (else t)))))
 
-;; OK - sus? removed
-;; OK - pkg used correctly
 (define compose-pis append)
 
-;; OK - sus? removed
-;; OK - pkg used correctly
 (define get-noms
   (let ((with (lambda (n s) (if (memq n s) s (cons n s)))))
     (lambda (pi s)
@@ -335,8 +273,6 @@
           (get-noms (cdr pi)
             (with (caar pi) (with (cdar pi) s))))))))
 
-;; OK - sus? removed
-;; OK - pkg used correctly
 (define pi-ds
   (lambda (pi1 pi2 c)
     (fold-left
@@ -347,13 +283,9 @@
       '()
       (get-noms pi1 (get-noms pi2 '())))))
 
-;; OK - sus? removed
-;; OK - pkg used correctly
 (define id-pi?
   (lambda (pi c) (null? (pi-ds pi '() c))))
 
-;; OK - sus? removed
-;; OK - pkg used correctly
 (define app
   (lambda (pi a)
     (let ((pi (reverse pi)))
@@ -365,8 +297,6 @@
          (app (cdr pi) (caar pi)))
         (else (app (cdr pi) a))))))
 
-;; OK - sus? removed
-;; OK - pkg used correctly
 (define apply-pi
   (lambda (pi t c)
     (let rec ((t t))
@@ -386,8 +316,6 @@
         ((pair? t) (cons (rec (car t)) (rec (cdr t))))
         (else t)))))
 
-;; OK - sus? removed
-;; OK - pkg used correctly
 (define take
   (lambda (n f)
     (if (and n (zero? n))
@@ -398,18 +326,15 @@
           ((a) (cons a '()))
           ((a f) (cons a (take (and n (- n 1)) f)))))))
 
-;; OK - sus? removed
-;; OK - pkg used correctly
 (define reify-constraints-alpha
   (lambda (v r c)
     (let ((c (filter (lambda (oc) (case (oc->rator oc) ((sus-c nom-c hash-c) #t) (else #f))) c)))
-      (let ((c (walk* c r c)))
-        (let ((c (remp any/var? c)))
-          (let-values (((v^ s) (reify-vars/noms v c)))
-            (let ((c (discard/reify-c c s)))
-              (values
-                (if (eq? v v^) #f v^)
-                (if (null? c) c `(alpha : ,c))))))))))
+      (let ((c (ck:walk* c r)))
+        (let-values (((v^ s) (reify-vars/noms v r c)))
+          (let ((c (discard/reify-c c s)))
+            (values
+              (if (eq? v v^) #f v^)
+              (if (null? c) c `(alpha : ,c)))))))))
 
 (define get
   (lambda (a s n c)
@@ -427,9 +352,9 @@
       ((counter
          (lambda ()
            (let ((n -1)) (lambda () (set! n (+ n 1)) n)))))
-    (lambda (t c)
+    (lambda (t s c)
       (let ((sc (counter)) (nc (counter)))
-        (let rec ((t t) (s '()))
+        (let rec ((t t) (s s))
           (cond
 
             ;; ((sus? t)
@@ -464,16 +389,12 @@
                (values v s)))
             (else (values t s))))))))
 
-;; OK - sus? removed
-;; OK - pkg used correctly
 (define rwalk
   (lambda (t s)
     (cond
       ((assq t s) => cdr)
       (else t))))
 
-;; OK - sus? removed
-;; OK - pkg used correctly
 (define discard/reify-c
   (lambda (c s)
     (let
