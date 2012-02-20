@@ -7,7 +7,7 @@
     lambdam@ identitym composem goal-construct ext-c
     build-oc oc->proc oc->rands oc->rator run run* prt
     extend-enforce-fns extend-reify-fns empty-a
-    update-c-nocheck reify
+    update-c-nocheck reify constrained-var constrained-var?
 
     ;; mk
     lhs rhs walk walk* var? lambdag@ mzerog unitg onceo
@@ -17,6 +17,11 @@
     (only (chezscheme) make-parameter trace-define printf))
 
 ;; ---HELPERS------------------------------------------------------
+
+(define constrained-var (lambda (x disp) (vector x disp)))
+(define constrained-var?
+  (lambda (x)
+    (and (var? x) (not (= (vector-length x) 1)))))
 
 (define any/var?
   (lambda (p)
@@ -76,7 +81,7 @@
       ((run-constraints (if (var? v) `(,x ,v) `(,x)) c)
        (make-a (ext-s x v s) c)))))
 
-(define update-s update-s-nocheck)
+(define update-s update-s-check)
 
 ;; ---CONSTRAINT-STORE---------------------------------------------
 
@@ -199,14 +204,16 @@
   (lambda (v s)
     (let ((v (walk v s)))
       (cond
-        ((var? v) `((,v . ,(reify-n (size-s s))) . ,s))
+        ((constrained-var? v)
+         `((,v . ,(reify-n (symbol->string (vector-ref v 1)) (size-s s))) . ,s))
+        ((var? v) `((,v . ,(reify-n "_" (size-s s))) . ,s))
         ((pair? v) (reify-s (cdr v) (reify-s (car v) s)))
         (else s)))))
 
 (define reify-n
-  (lambda (n)
+  (lambda (str n)
     (string->symbol
-      (string-append "_" "." (number->string n)))))
+      (string-append str "." (number->string n)))))
 
 (define reify
   (lambda (x)
@@ -217,7 +224,8 @@
           ((null? r)
            (choiceg v empty-f))
           (else
-            (let ((v (walk* v r)))
+            (let ((v (walk* v r))
+                  (c (walk* c r)))
               (reify-constraints v r c))))))))
 
 (define reify-constraints
@@ -226,24 +234,18 @@
       (cond
         ((null? c) v)
         (else
-          (let-values (((v^ c^)
-                        (run-reify-fns v r c)))
+          (let ((c (run-reify-fns v r c)))
             (cond
-              (v^ v^)
-              ((null? c^) v)
-              (else `(,v : . ,c^))))))
+              ((null? c) v)
+              (else `(,v : . ,c))))))
       empty-f)))
 
 (define run-reify-fns
   (lambda (v r c)
     (let loop ((fns (reify-fns)) (c^ '()))
       (cond
-        ((null? fns) (values #f c^))
-        (else
-          (let-values (((v^ reified-c) ((cdar fns) v r c)))
-            (cond
-              ((not v^) (loop (cdr fns) (append reified-c c^)))
-              (else (values v^ c^)))))))))
+        ((null? fns) c^)
+        (else (loop (cdr fns) ((cdar fns) v r c)))))))
 
 ;; ---MACROS-------------------------------------------------------
 

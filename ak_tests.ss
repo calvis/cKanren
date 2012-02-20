@@ -18,7 +18,13 @@
       ((equal? v val) (display " okay") (newline))
       (else
         (error 'testit
-          (format "exp: ~s\nexpected: ~s\ncomputed: ~s" exp val v))))))
+          (format "\nexp: \n~a\nexpected: \n~a\ncomputed: \n~a"
+            (with-output-to-string
+              (lambda () (pretty-print exp)))
+            (with-output-to-string
+              (lambda () (pretty-print val)))
+            (with-output-to-string
+              (lambda () (pretty-print v)))))))))
 
 (testit 1
   (run 1 (q) (== 3 3))
@@ -147,7 +153,7 @@
         (fresh-nom (a b)
           (== y a)
           (== `(,x ,y ,z ,a ,b) q)))))
-  '((a.0 a.1 _.2 a.1 a.2)))
+  '((a.0 a.1 _.2 a.1 a.3)))
 
 (testit 21
   (run* (q)
@@ -205,9 +211,9 @@
   (run* (k)
     (fresh (t)
       (fresh-nom (a)
-        (hash a k) 
+        (hash a k)
         (== `(5 ,(tie a a) ,t) k))))
-  '(((5 (tie a.0 a.0) _.0) : ((a.0 _.0)))))
+  '(((5 (tie a.0 a.0) _.1) : (alpha (hash (a.0 _.1))))))
 
 (testit 32
   (run* (k)
@@ -240,16 +246,20 @@
   (run* (q)
     (fresh (k1 k2 t u)
       (fresh-nom (a b c d)
-        (== (tie a (tie b t)) k1) 
+        (== (tie a (tie b t)) k1)
         (hash a t)
         (== (tie c (tie d u)) k2)
         (hash c u)
         (== k1 k2)
         (== `(,k1 ,k2) q))))
-  '((((tie a.0 (tie a.1 (sus ((a.1 . a.2) (a.0 . a.3)) _.0)))
-      (tie a.3 (tie a.2 _.0)))
+  
+  '((((tie a.0 (tie a.1 (sus _.2 ((a.1 . a.3) (a.0 . a.4)))))
+      (tie a.4 (tie a.3 _.2)))
      :
-     ((a.0 _.0) (a.3 _.0) (a.1 _.0)))))
+     (alpha
+       (hash (a.0 _.2)) 
+       (hash (a.1 _.2)) 
+       (hash (a.4 _.2))))))
 
 (testit 36
   (run* (q)
@@ -272,9 +282,17 @@
       (fresh (x y)
         (== (tie a (tie a x)) (tie a (tie b y)))
         (== `(,x ,y) q))))
-  '((((sus ((a.0 . a.1)) _.0) _.0) : ((a.0 _.0)))))
+  '(((_.0 (sus _.0 ((a.1 . a.2))))
+     :
+     (alpha (hash (a.2 _.0))))))
 
-(testit 38
+(testit 38.0
+  (run* (q)
+    (fresh-nom (a b)
+      (== (tie a (tie b `(,q ,b))) (tie b (tie a `(,a ,q))))))
+  '())
+
+(testit 38.1
   (run* (q)
     (fresh-nom (a b)
       (fresh (x y)
@@ -285,8 +303,8 @@
           ((== (tie a (tie b `(,b ,y))) (tie a (tie a `(,a ,x))))))
         (== `(,x ,y) q))))
   '((a.0 a.1)
-    (_.0 (sus ((a.0 . a.1)) _.0))
-    ((_.0 (sus ((a.0 . a.1)) _.0)) : ((a.0 _.0)))))
+    ((sus _.0 ((a.1 . a.2))) _.0)
+    (((sus _.0 ((a.1 . a.2))) _.0) : (alpha (hash (a.2 _.0))))))
 
 (define substo  
   (lambda (e new a out)
@@ -309,11 +327,18 @@
            (hash c new)
            (substo body new a bodyres)))))))
 
-(testit 39
+(testit 39.0
   (run* (x)
     (fresh-nom (a b)
       (substo `(lam ,(tie a `(var ,b))) `(var ,a) b x)))
   '((lam (tie a.0 (var a.1)))))
+
+(testit 39.1
+  (run* (q)
+    (fresh-nom (a)
+      (substo
+        `(lam ,(tie a `(var ,a))) 5 a q)))
+  '((lam (tie a.0 (var a.0)))))
 
 (testit 40
   (run* (q)
@@ -399,4 +424,7 @@
         (hash a x)
         (== `(,y ,z) x)
         (== `(,x ,a) q))))
-  '((((_.0 _.1) a.0) : ((a.0 _.0 _.1)))))
+  '((((_.0 _.1) a.2) : (alpha (hash (a.2 _.0)) (hash (a.2 _.1))))))
+
+
+

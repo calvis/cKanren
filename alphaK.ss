@@ -1,5 +1,5 @@
 (library (alphaK)
-  (export run run* == nom? project var->sus
+  (export run run* == nom? project
     fresh-nom hash (rename (make-tie tie)) unify-s walk get-sus)
 
   (import
@@ -10,9 +10,11 @@
       lambdaf@ inc bindg* empty-f project)
     (only (ck) empty-a size-s oc->rator oc->rands build-oc
       extend-reify-fns any/var? run run* fresh
-      update-s update-c lambdam@ : composem goal-construct reify)
-    (rename (only (ck) walk*) (walk* ck:walk*))
-    (only (chezscheme) gensym trace-define trace-define-syntax printf trace-let))
+      update-s update-c lambdam@ : composem goal-construct reify
+      constrained-var constrained-var?)
+    (only (chezscheme)
+      trace-lambda
+      gensym trace-define trace-define-syntax printf trace-let))
 
 (define ==
   (lambda (u v)
@@ -24,11 +26,14 @@
 
 (define hash-c
   (lambda (b t)
-    (trace-let rec ((t t))
+    (let rec ((t t))
       (lambdam@ (a : s c)
         (let ((t (walk t s c)))
           (cond
             ((eq? b t) #f)
+            ((and (pair? t) (eq? (car t) 'sus))
+             (let ((lhs (apply-pi (caddr t) b c)))
+               ((update-c (build-oc hash-c lhs t)) a)))
             ((get-sus t c)
              => (lambda (sus-c)
                   (let ((lhs (apply-pi (sus-pi sus-c) b c)))
@@ -37,13 +42,15 @@
              (if (eq? b (tie-a t)) a ((rec (tie-t t)) a)))
             ((pair? t)
              ((composem (rec (car t)) (rec (cdr t))) a))
+            ((and (var? t) (not (nom? t c)))
+             ((composem (sus t `()) (rec t)) a))
             (else a)))))))
 
 (define-syntax fresh-nom
   (syntax-rules ()
     ((_ (n ...) g0 g ...)
-     (fresh (n ...)
-       (nom n) ... g0 g ...))))
+     (let ((n (constrained-var 'n 'a)) ...)
+       (fresh () (nom n) ... g0 g ...)))))
 
 (define-syntax letcc
   (syntax-rules ()
@@ -68,9 +75,6 @@
 (define (make-var sym) (vector sym))
 (define (var? sym) (vector? sym))
 
-(define (var->sus var)
-  (make-sus var '()))
-
 (define (sus-constrained? x oc)
   (and (eq? (oc->rator oc) 'sus-c)
        (eq? (sus-v oc) x)))
@@ -90,15 +94,13 @@
       (let ((v (walk v s c)))
         ((update-c (build-oc sus-c v pi)) a)))))
 
-(define (make-sus v pi)
-  `(,(lambda (x) x) sus-c ,v ,pi))
-
 (define (make-tie a t) `(tie ,a ,t))
 (define (tie? x) (and (pair? x) (eq? (car x) 'tie)))
 (define (tie-a t) (cadr t))
 (define (tie-t t) (caddr t))
 
 (define (nom x) (goal-construct (nom-c x)))
+(define (sus x pi) (goal-construct (sus-c x pi)))
 
 (define (nom? x c)
   (and (find (lambda (oc) (nom-constrained? x oc)) c) #t))
@@ -111,39 +113,15 @@
 
 (define (nom-c x)
   (lambdam@ (a : s c)
-    (let ((x (walk x s c)))
-      ((update-c (build-oc nom-c x)) a))))
-
-;; GONE
-;; (define-record-type sus (fields pi (mutable v)))
-;; (define-record-type var
-;;   (parent sus) (fields name)
-;;   (protocol (lambda (make-sus)
-;;               (lambda (name)
-;;                 (let ((var ((make-sus '() #f) name)))
-;;                   (sus-v-set! var var) var)))))
-
-;; (define-record-type nom (fields name))
-
-;; GONE
-;; (define-record-type tie (fields a t))
-
-(define tie-t*
-  (lambda (t)
-    (if (tie? t) (tie-t* (tie-t t)) t)))
-
-(define ext-h*
-  (lambda (a v c)
-    (let ((h (cons a v)))
-      (if (member h c) c (cons h c)))))
+    (let ((y (assq x s))) ;; hack
+      (cond
+        ((and y (nom? (cdr y) c))
+         #f)
+        (else ((update-c (build-oc nom-c x)) a))))))
 
 (define ext-c
   (lambda (oc c)
     (cons oc c)))
-
-;; (define ds-ext-c
-;;   (lambda (ds v c)
-;;     (fold-left (lambda (c x) (ext-c x v c)) c ds)))
 
 (define unify-s
   (lambda (u v)
@@ -151,37 +129,18 @@
       (let ((u (walk u s c)) (v (walk v s c)))
         (cond
           ((eq? u v) a)
-
-          ;; if they're both variables, and the symbol they represent
-          ;; is the same, then do some stuff
-          ;; ((and (sus? u) (sus? v)
-          ;;       (eq? (sus-v u) (sus-v v)))
-          ;;  (printf "Here\n")
-          ;;  (let ((c (ds-ext-c
-          ;;             (pi-ds (sus-pi u) (sus-pi v))
-          ;;             (sus-v u)
-          ;;             c)))
-          ;;    (make-pkg s c)))
-
-          ;; if the first is a variable, or the second is a variable,
-          ;; extend the substitution
+          ((and (pair? u)
+                (eq? (car u) 'sus))
+           ((ext-s-nocheck (cadr u) (apply-pi (caddr u) v c)) a))
           ((get-sus u c)
-           => (lambda (usus-c)
-                ((ext-s-nocheck u (apply-pi (sus-pi usus-c) v c)) a)))
+           => (lambda (oc)
+                ((ext-s-nocheck u (apply-pi (sus-pi oc) v c)) a)))
+          ((and (pair? v)
+                (eq? (car v) 'sus))
+           ((ext-s-nocheck (cadr v) (apply-pi (caddr v) u c)) a))
           ((get-sus v c)
-           => (lambda (sus-c)
-                ((ext-s-nocheck v (apply-pi (sus-pi sus-c) u c)) a)))
-
-          ;; ((sus? u)
-          ;;  (ext-s-nocheck (sus-v u) (apply-pi (sus-pi u) v) a))
-
-          ;; ((sus? v)
-          ;;  (ext-s-nocheck (sus-v v) (apply-pi (sus-pi v) u) a))
-
-          ;; if they're both ties, check to see if the a's are the
-          ;; same -- if they are, just unify the t's.  if not, run
-          ;; hash-check on the first a and the second t. get a new
-          ;; constraint store back, and try to unify some things.
+           => (lambda (oc)
+                ((ext-s-nocheck v (apply-pi (sus-pi oc) u c)) a)))
           ((and (tie? u) (tie? v))
            (let ((au (tie-a u)) (av (tie-a v))
                  (tu (tie-t u)) (tv (tie-t v)))
@@ -189,25 +148,24 @@
                  ((unify-s tu tv) a)
                  ((composem
                     (hash-c au tv)
-                    (unify-s tu
-                      (apply-pi `((,au . ,av)) tv c)))
+                    (unify-s tu (apply-pi `((,au . ,av)) tv c)))
                   a))))
-          
           ((and (pair? u) (pair? v))
            ((composem
               (unify-s (car u) (car v))
               (unify-s (cdr u) (cdr v)))
             a))
-          
           ((and (var? u) (not (nom? u c)))
-           (let ((c (cons (var->sus u) c)))
-             ((unify-s v u) (make-pkg s c))))
+           ((composem
+              (sus u `())
+              (ext-s-nocheck u (apply-pi `() v c)))
+            a))
           ((and (var? v) (not (nom? v c)))
-           (let ((c (cons (var->sus v) c)))
-             ((unify-s u v) (make-pkg s c))))
-          
-          ((or (nom? u c) (nom? v c)) #f)
-          
+           ((composem
+              (sus v `())
+              (ext-s-nocheck v (apply-pi `() u c)))
+            a))          
+          ((or (nom? u c) (nom? v c)) #f)          
           ((equal? u v) a)
           (else #f))))))
 
@@ -217,14 +175,7 @@
 
 (define ext-s-nocheck
   (lambda (x t)
-    (lambdam@ (a : s c)
-      ((update-s x t) a))))
-
-(define (get-h* c)
-  (cond
-    ((find (lambda (oc) (eq? (oc->rator oc) 'verify-h*)) c)
-     => (lambda (oc) (cdr (oc->rands oc))))
-    (else `())))
+    (update-s x t)))
 
 (define walk-sym
   (lambda (v s)
@@ -238,10 +189,6 @@
   (lambda (x s c)
     (let f ((x x) (pi '()))
       (cond
-        ;; ((and (sus? x) (walk-sym (sus-v x) s))
-        ;;  => (lambda (a)
-        ;;       (walk (cdr a) 
-        ;;         (compose-pis (sus-pi x) pi))))
         ((get-sus x c)
          => (lambda (sus-c)
               (cond
@@ -302,17 +249,19 @@
     (let rec ((t t))
       (cond
         ((nom? t c) (app pi t))
-        ;; ((sus? t)
-        ;;  (let ((pi (compose-pis pi (sus-pi t))))
-        ;;    (if (id-pi? pi)
-        ;;        (sus-v t)
-        ;;        (make-sus pi (sus-v t)))))
+        ((and (pair? t)
+              (eq? (car t) 'sus))
+         (let ((pi (compose-pis pi (caddr t))))
+           (if (id-pi? pi c) t `(sus ,(cadr t) ,pi))))
         ((get-sus t c)
          => (lambda (sus-c)
               (let ((pi (compose-pis pi (sus-pi sus-c))))
-                (if (id-pi? pi c) t (make-sus t pi)))))
-        ((tie? t) (make-tie (app pi (tie-a t))
-                    (rec (tie-t t))))
+                (if (id-pi? pi c) t `(sus ,t ,pi)))))
+        ((var? t)
+         (if (id-pi? pi c) t `(sus ,t ,pi)))
+        ((tie? t) 
+         (make-tie (app pi (tie-a t))
+           (rec (tie-t t))))
         ((pair? t) (cons (rec (car t)) (rec (cdr t))))
         (else t)))))
 
@@ -329,12 +278,15 @@
 (define reify-constraints-alpha
   (lambda (v r c)
     (let ((c (filter (lambda (oc) (case (oc->rator oc) ((sus-c nom-c hash-c) #t) (else #f))) c)))
-      (let ((c (ck:walk* c r)))
-        (let-values (((v^ s) (reify-vars/noms v r c)))
-          (let ((c (discard/reify-c c s)))
-            (values
-              (if (eq? v v^) #f v^)
-              (if (null? c) c `(alpha : ,c)))))))))
+      (let ((c (remp any/var? c)))
+        (let ((c (fold-left (lambda (c oc)
+                              (cond
+                                ((reify-alpha-oc oc)
+                                 => (lambda (oc^)
+                                      (if (member oc^ c) c (cons oc^ c))))
+                                (else c)))
+                   '() c)))
+          (if (null? c) c `((alpha . ,c))))))))
 
 (define get
   (lambda (a s n c)
@@ -347,103 +299,22 @@
                      n (number->string (c))))))
           (values r (cons (cons a r) s)))))))
 
-(define reify-vars/noms
-  (let
-      ((counter
-         (lambda ()
-           (let ((n -1)) (lambda () (set! n (+ n 1)) n)))))
-    (lambda (t s c)
-      (let ((sc (counter)) (nc (counter)))
-        (let rec ((t t) (s s))
-          (cond
-
-            ;; ((sus? t)
-            ;;  (let ((pi (sus-pi t)))
-            ;;    (let-values
-            ;;        (((v s) (get (sus-v t) s "_." sc)))
-            ;;      (if (null? pi) (values v s)
-            ;;          (let-values (((pi s) (rec pi s)))
-            ;;            (values `(sus ,pi ,v) s))))))
-            
-            ((get-sus t c)
-             => (lambda (sus-c)
-                  (let ((pi (sus-pi sus-c)))
-                    (let-values
-                        (((v s) (get t s "_." sc)))
-                      (if (null? pi)
-                          (values v s)
-                          (let-values (((pi s) (rec pi s)))
-                            (values `(sus ,pi ,v) s)))))))
-
-            ((nom? t c) (get t s "a." nc))
-            ((tie? t)
-             (let-values (((a s) (rec (tie-a t) s)))
-               (let-values (((t s) (rec (tie-t t) s)))
-                 (values `(tie ,a ,t) s))))
-            ((pair? t)
-             (let-values (((a s) (rec (car t) s)))
-               (let-values (((d s) (rec (cdr t) s)))
-                 (values (cons a d) s))))
-            ((var? t)
-             (let-values (((v s) (get t s "_." sc)))
-               (values v s)))
-            (else (values t s))))))))
+(define reify-alpha-oc
+  (lambda (oc)
+    (case (oc->rator oc)
+      ((hash-c)
+       (let ((lhs (car (oc->rands oc)))
+             (rhs (cadr (oc->rands oc))))
+         (let ((rhs (if (and (pair? rhs) (eq? (car rhs) 'sus)) (cadr rhs) rhs)))
+           `(hash (,lhs ,rhs)))))
+      ((sus-c)  (and (not (null? (sus-pi oc))) `(sus ,(sus-v oc) ,(sus-pi oc))))
+      (else #f))))
 
 (define rwalk
   (lambda (t s)
     (cond
       ((assq t s) => cdr)
       (else t))))
-
-(define discard/reify-c
-  (lambda (c s)
-    (let
-        ((vs->rs
-           (lambda (vs)
-             (let loop ((vs vs) (rs '()))
-               (cond
-                 ((null? vs) rs)
-                 (else
-                   (let ((r (rwalk (car vs) s)))
-                     (if (get-sus r c)
-                         (loop (cdr vs) rs)
-                         (loop (cdr vs) `(,r . ,rs)))))))))
-         (collate-vs
-           (let
-               ((remdups
-                  (lambda (l)
-                    (let loop ((l l) (s '()))
-                      (cond
-                        ((null? l) (reverse s))
-                        ((memq (car l) s) (loop (cdr l) s))
-                        (else (loop (cdr l)
-                                (cons (car l) s))))))))
-             (lambda (a c)
-               (let loop ((c c) (vs '()) (r* '()))
-                 (cond
-                   ((null? c) (values (remdups vs) r*))
-                   ((eq? (caar c) a)
-                    (loop (cdr c) (cons (cdar c) vs) r*))
-                   (else
-                     (loop (cdr c) vs
-                       (cons (car c) r*)))))))))
-      (let loop ((c c) (r* '()))
-        (cond
-          ((null? c) r*)
-          (else
-            (let ((a (caar c)))
-              (or
-                (letcc f
-                  (let ((r (cond ((assq a s) => cdr)
-                                 (else (f #f)))))
-                    (let-values
-                        (((vs c) (collate-vs a c)))
-                      (let ((rs (vs->rs vs)))
-                        (if (null? rs)
-                            (f #f)
-                            (loop
-                              c `((,r . ,rs) . ,r*)))))))
-                (loop (cdr c) r*)))))))))
 
 (define-syntax let-pkg
   (syntax-rules ()
