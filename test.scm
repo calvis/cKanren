@@ -2,7 +2,12 @@
 (load "nnf.scm")
 (load "alphaleantap.scm")
 
-(import (alphaleantap) (nnf) (alphaK))
+(import (alphaleantap) (nnf))
+
+(define switch (make-parameter #t))
+
+(import (alphaK))
+;; (import (alphaK-records))
 
 (print-gensym 'pretty/suffix)
 
@@ -88,34 +93,40 @@
   `(<=> (=> (and p (=> q r)) s)
      (and (or (not p) (or q s)) (or (not p) (or (not r) s)))))
 
-;; (pp 18 '() `,(E y ,(A x (=> (f ,y) (f ,x)))))
+(if (switch)
+    (testit 18
+      (run 1 (q)
+        (fresh-nom (y)
+          (proveo
+            `(forall ,(tie y
+                        `(and (lit (pos (app f (var ,y))))
+                              (lit (neg (app f (app g0.6 (var ,y))))))))
+            `() `() `() q)))
+      `((univ conj savefml savefml univ conj close)))
+    (pp 18 '() `,(E y ,(A x (=> (f ,y) (f ,x))))))
 
-(testit 18
-  (run 1 (q)
-    (fresh-nom (y)
-      (proveo
-        `(forall ,(tie y
-                    `(and (lit (pos (app f (var ,y))))
-                          (lit (neg (app f (app g0.6 (var ,y))))))))
-        `() `() `() q)))
-  `((univ conj savefml savefml univ conj close)))
-
-;; (pp 19 '()
-;;   `,(E x ,(A y ,(A z (=>
-;;                        (=> (p ,y) (q ,z))
-;;                        (=> (p ,x) (q ,x)))))))
-
-;; (testit 19
-;;   (run 1 (q)
-;;     (fresh-nom (x)
-;;       (proveo
-;;         `(forall ,(tie x
-;;                     `(and (or (lit (neg (app p (app g0.6 (var ,x)))))
-;;                               (lit (pos (app q (app g1.7 (var ,x))))))
-;;                           (and (lit (pos (app p (var ,x))))
-;;                                (lit (neg (app q (var ,x))))))))
-;;         `() `() `() q)))
-;;   `(nofail))
+(if (switch)
+    (testit 19
+      (run 1 (q)
+        (fresh-nom (x)
+          (proveo
+            `(forall ,(tie x
+                        `(and (or (lit (neg (app p (app g0.6 (var ,x)))))
+                                  (lit (pos (app q (app g1.7 (var ,x))))))
+                              (and (lit (pos (app p (var ,x))))
+                                   (lit (neg (app q (var ,x))))))))
+            `() `() `() q)))
+      `((univ
+          conj
+          split
+          (savefml conj savefml savefml univ conj split (savefml conj close)
+            (savefml conj close))
+          (savefml conj savefml savefml univ conj split (savefml conj savefml close)
+            (savefml conj savefml close)))))
+    (pp 19 '()
+      `,(E x ,(A y ,(A z (=>
+                           (=> (p ,y) (q ,z))
+                           (=> (p ,x) (q ,x))))))))
 
 ;; (pp 20 '() 
 ;;   `,(A x ,(A y ,(E z ,(A w 
@@ -131,163 +142,167 @@
 ;; 21 - 30
 ;; Micah Linnemeier
 
-;; (pp 21
-;;   `(,(E x (=> p (f ,x))) ,(E x (=> (f ,x) p)))
-;;   `,(E x (<=> p (f ,x))))
+(if (switch)
+    (testit 21
+      (run 1 (q)
+        (fresh-nom (x)
+          (proveo
+            `(and (forall
+                    ,(tie x
+                       `(or (and (lit (neg (sym p)))
+                                 (lit (pos (app f (var ,x)))))
+                            (and (lit (pos (sym p)))
+                                 (lit (neg (app f (var ,x))))))))
+                  (and (or (lit (neg (sym p)))
+                           (lit (pos (app f (app g2.8)))))
+                       (or (lit (neg (app f (app g3.9))))
+                           (lit (pos (sym p))))))
+            `() `() `() q)))
+      `((conj univ split
+          (conj savefml savefml conj split (savefml split (close) (close))
+            (savefml split (close) (close)))
+          (conj savefml savefml conj split (close)
+            (savefml
+              split
+              (savefml univ split (conj close) (conj savefml close))
+              (savefml univ split (conj close) (conj savefml close)))))))
+    (pp 21
+      `(,(E x (=> p (f ,x))) ,(E x (=> (f ,x) p)))
+      `,(E x (<=> p (f ,x)))))
 
-(testit 21
-  (run 1 (q)
-    (fresh-nom (x)
-      (proveo
-        `(and (forall ,(tie x `(or (and (lit (neg (sym p)))
-                                        (lit (pos (app f (var ,x)))))
-                                   (and (lit (pos (sym p)))
-                                        (lit (neg (app f (var ,x))))))))
-              (and (or (lit (neg (sym p)))
-                       (lit (pos (app f (app g2.8)))))
-                   (or (lit (neg (app f (app g3.9))))
-                       (lit (pos (sym p))))))
-        `() `() `() q)))
-  `((conj
-      univ
-      split
-      (conj savefml savefml conj split
-        (savefml split (close) (close))
-        (savefml split (close) (close)))
-      (conj savefml savefml conj split (close)
-        (savefml
+(if (switch)
+    (testit 22
+      (run 1 (q)
+        (fresh-nom (x)
+          (proveo
+            `(and (forall
+                    ,(tie x `(or (and (lit (pos (sym p)))
+                                      (lit (pos (app f (var ,x)))))
+                                 (and (lit (neg (sym p)))
+                                      (lit (neg (app f (var ,x))))))))
+                  (or (and (lit (neg (sym p)))
+                           (forall
+                             ,(tie x `(lit (pos (app f (var ,x)))))))
+                      (and (lit (pos (sym p)))
+                           (lit (neg (app f (app g0.53)))))))
+            `() `() `() q)))
+      `((conj
+          univ
           split
-          (savefml univ split (conj close) (conj savefml close))
-          (savefml univ split (conj close) (conj savefml close)))))))
+          (conj savefml savefml split (conj close)
+            (conj savefml close))
+          (conj savefml savefml split (conj savefml univ close)
+            (conj close)))))
+    (pp 22 '() `(=> ,(A x (<=> p (f ,x))) (<=> p ,(A x (f ,x))))))
 
-;; (pp 22 '() `(=> ,(A x (<=> p (f ,x))) (<=> p ,(A x (f ,x)))))
-(testit 22
-  (run 1 (q)
-    (fresh-nom (x)
-      (proveo
-        `(and (forall
-                ,(tie x `(or (and (lit (pos (sym p)))
-                                  (lit (pos (app f (var ,x)))))
-                             (and (lit (neg (sym p)))
-                                  (lit (neg (app f (var ,x))))))))
-              (or (and (lit (neg (sym p)))
-                       (forall
-                         ,(tie x `(lit (pos (app f (var ,x)))))))
-                  (and (lit (pos (sym p)))
-                       (lit (neg (app f (app g0.53)))))))
-        `() `() `() q)))
-  `((conj
-      univ
-      split
-      (conj savefml savefml split (conj close)
-        (conj savefml close))
-      (conj savefml savefml split (conj savefml univ close)
-        (conj close)))))
+(if (switch)
+    (testit 23
+      (run 1 (q)
+        (fresh-nom (x)
+          (proveo
+            `(or (and (and (lit (neg (sym p)))
+                           (lit (neg (app f (app g1.60)))))
+                      (or (lit (pos (sym p)))
+                          (forall ,(tie x `(lit (pos (app f (var ,x))))))))
+                 (and (forall ,(tie x `(or (lit (pos (sym p)))
+                                           (lit (pos (app f (var ,x)))))))
+                      (and (lit (neg (sym p)))
+                           (lit (neg (app f (app g2.61)))))))
+            `() `() `() q)))
+      `((split
+          (conj conj savefml savefml split (close) (univ close))
+          (conj
+            univ
+            split
+            (savefml conj close)
+            (savefml conj savefml close)))))
+    (pp 23 '() `(<=> ,(A x (or p (f ,x))) (or p ,(A x (f ,x))))))
 
-;; (pp 23 '() `(<=> ,(A x (or p (f ,x))) (or p ,(A x (f ,x)))))
-(testit 23
-  (run 1 (q)
-    (fresh-nom (x)
-      (proveo
-        `(or (and (and (lit (neg (sym p)))
-                       (lit (neg (app f (app g1.60)))))
-                  (or (lit (pos (sym p)))
-                      (forall ,(tie x `(lit (pos (app f (var ,x))))))))
-             (and (forall ,(tie x `(or (lit (pos (sym p)))
-                                       (lit (pos (app f (var ,x)))))))
-                  (and (lit (neg (sym p)))
-                       (lit (neg (app f (app g2.61)))))))
-        `() `() `() q)))
-  `((split
-      (conj conj savefml savefml split (close) (univ close))
-      (conj
-        univ
-        split
-        (savefml conj close)
-        (savefml conj savefml close)))))
+(if (switch)
+    (testit 24
+      (run 1 (q)
+        (fresh-nom (x)
+          (proveo
+            `(and (forall ,(tie x `(or (lit (neg (app p (var ,x))))
+                                       (lit (neg (app r (var ,x)))))))
+                  (and (forall ,(tie x `(or (lit (neg (app s (var ,x))))
+                                            (lit (neg (app q (var ,x)))))))
+                       (and (forall
+                              ,(tie x
+                                 `(or (lit (neg (app p (var ,x))))
+                                      (or (lit (pos (app q (var ,x))))
+                                          (lit (pos (app r (var ,x))))))))
+                            (and
+                              (and
+                                (lit (pos (app p (app g5.73))))
+                                (forall
+                                  ,(tie x `(lit (neg (app q (var ,x)))))))
+                              (forall
+                                ,(tie x
+                                   `(or (and (lit (neg (app q (var ,x))))
+                                             (lit (neg (app r (var ,x)))))
+                                        (lit (pos (app s (var ,x)))))))))))
+            `() `() `() q)))
+      `((conj
+          univ
+          split
+          (savefml conj univ split
+            (savefml conj univ split (savefml conj conj close)
+              (split (savefml conj conj close) (savefml conj conj close)))
+            (savefml conj univ split (savefml conj conj close)
+              (split (close) (savefml conj conj close))))
+          (savefml conj univ split
+            (savefml conj univ split (savefml conj conj close)
+              (split (savefml conj conj savefml univ close) (close)))
+            (savefml conj univ split (savefml conj conj close)
+              (split (close) (close)))))))
 
-;; (pp 24
-;;   `((not ,(E x (and (s ,x) (q ,x))))
-;;     ,(A x (=> (p ,x) (or (q ,x) (r ,x))))
-;;     (not (=> ,(E x (p ,x)) ,(E x (q ,x))))
-;;     ,(A x (=> (or (q ,x) (r ,x)) (s ,x))))
-;;   `,(E x (and (p ,x) (r ,x))))
+    (pp 24
+      `((not ,(E x (and (s ,x) (q ,x))))
+        ,(A x (=> (p ,x) (or (q ,x) (r ,x))))
+        (not (=> ,(E x (p ,x)) ,(E x (q ,x))))
+        ,(A x (=> (or (q ,x) (r ,x)) (s ,x))))
+      `,(E x (and (p ,x) (r ,x)))))
 
-(testit 24
-  (run 1 (q)
-    (fresh-nom (x)
-      (proveo
-        `(and (forall ,(tie x `(or (lit (neg (app p (var ,x))))
-                                   (lit (neg (app r (var ,x)))))))
-              (and (forall ,(tie x `(or (lit (neg (app s (var ,x))))
-                                        (lit (neg (app q (var ,x)))))))
-                   (and (forall
-                          ,(tie x
-                             `(or (lit (neg (app p (var ,x))))
-                                  (or (lit (pos (app q (var ,x))))
-                                      (lit (pos (app r (var ,x))))))))
-                        (and
-                          (and
-                            (lit (pos (app p (app g5.73))))
-                            (forall
-                              ,(tie x `(lit (neg (app q (var ,x)))))))
-                          (forall
-                            ,(tie x
-                               `(or (and (lit (neg (app q (var ,x))))
-                                         (lit (neg (app r (var ,x)))))
-                                    (lit (pos (app s (var ,x)))))))))))
-        `() `() `() q)))
-  `((conj
-      univ
-      split
-      (savefml conj univ split
-        (savefml conj univ split (savefml conj conj close)
-          (split (savefml conj conj close) (savefml conj conj close)))
-        (savefml conj univ split (savefml conj conj close)
-          (split (close) (savefml conj conj close))))
-      (savefml conj univ split
-        (savefml conj univ split (savefml conj conj close)
-          (split (savefml conj conj savefml univ close) (close)))
-        (savefml conj univ split (savefml conj conj close)
-          (split (close) (close)))))))
+(if (switch)
 
-;; (pp 25
-;;   `(,(E x (p ,x))
-;;     ,(A x (=> (f ,x) (and (not (g ,x)) (r ,x))))
-;;     ,(A x (=> (p ,x) (and (g ,x) (f ,x))))
-;;     (or ,(A x (=> (p ,x) (r ,x))) ,(E x (and (p ,x) (r ,x)))))
-;;   `,(E x (and (p ,x) (r ,x))))
-
-(testit 25
-  (run 1 (q)
-    (fresh-nom (x)
-      (proveo
-        `(and (forall ,(tie x `(or (lit (neg (app p (var ,x))))
-                                   (lit (neg (app r (var ,x)))))))
-              (and (lit (pos (app p (app g6.80))))
-                   (and (forall
-                          ,(tie x `(or (lit (neg (app f (var ,x))))
-                                       (and (lit (neg (app g (var ,x))))
-                                            (lit (pos (app r (var ,x))))))))
-                        (and (forall
-                               ,(tie x
-                                  `(or (lit (neg (app p (var ,x))))
-                                       (and (lit (pos (app g (var ,x))))
-                                            (lit (pos (app f (var ,x))))))))
-                             (or (forall
+    (testit 25
+      (run 1 (q)
+        (fresh-nom (x)
+          (proveo
+            `(and (forall ,(tie x `(or (lit (neg (app p (var ,x))))
+                                       (lit (neg (app r (var ,x)))))))
+                  (and (lit (pos (app p (app g6.80))))
+                       (and (forall
+                              ,(tie x `(or (lit (neg (app f (var ,x))))
+                                           (and (lit (neg (app g (var ,x))))
+                                                (lit (pos (app r (var ,x))))))))
+                            (and (forall
                                    ,(tie x
                                       `(or (lit (neg (app p (var ,x))))
-                                           (lit (pos (app r (var ,x)))))))
-                                 (and (lit (pos (app p (app g7.81))))
-                                      (lit (pos (app r (app g7.81))))))))))
-        `() `() `() q)))
-  `((conj
-      univ
-      split
-      (savefml conj close)
-      (savefml conj savefml conj univ split
-        (savefml conj univ split (close) (conj savefml close))
-        (conj savefml close)))))
+                                           (and (lit (pos (app g (var ,x))))
+                                                (lit (pos (app f (var ,x))))))))
+                                 (or (forall
+                                       ,(tie x
+                                          `(or (lit (neg (app p (var ,x))))
+                                               (lit (pos (app r (var ,x)))))))
+                                     (and (lit (pos (app p (app g7.81))))
+                                          (lit (pos (app r (app g7.81))))))))))
+            `() `() `() q)))
+      `((conj
+          univ
+          split
+          (savefml conj close)
+          (savefml conj savefml conj univ split
+            (savefml conj univ split (close) (conj savefml close))
+            (conj savefml close)))))
+
+    (pp 25
+      `(,(E x (p ,x))
+        ,(A x (=> (f ,x) (and (not (g ,x)) (r ,x))))
+        ,(A x (=> (p ,x) (and (g ,x) (f ,x))))
+        (or ,(A x (=> (p ,x) (r ,x))) ,(E x (and (p ,x) (r ,x)))))
+      `,(E x (and (p ,x) (r ,x)))))
 
 ;; Too slow
 ;; (pp 26
@@ -295,81 +310,82 @@
 ;;     ,(A x ,(A y (=> (and (p ,x) (q ,y)) (<=> (r ,x) (s ,y))))))
 ;;   `(<=> ,(A x (=> (p ,x) (r ,x))) ,(A x (=> (q ,x) (s ,x)))))
   
-;; (pp 27
-;;   `(,(E x (and (f ,x) (not (g ,x))))
-;;     ,(A x (=> (f ,x) (h ,x)))
-;;     ,(A x (=> (and (j ,x) (i ,x)) (f ,x)))
-;;     (=> ,(E x (and (h ,x) (not (g ,x))))
-;;       ,(A x (=> (i ,x) (not (h ,x))))))
-;;   `,(A x (=> (j ,x) (not (i ,x)))))
-
-(testit 27
-  (run 1 (q)
-    (fresh-nom (x)
-      (proveo 
-        `(and (and (lit (pos (app j (app g8.88))))
-                   (lit (pos (app i (app g8.88)))))
-              (and (and (lit (pos (app f (app g9.89))))
-                        (lit (neg (app g (app g9.89)))))
-                   (and (forall
-                          ,(tie x `(or (lit (neg (app f (var ,x))))
-                                       (lit (pos (app h (var ,x)))))))
-                        (and
-                          (forall
-                            ,(tie x `(or (or (lit (neg (app j (var ,x))))
-                                             (lit (neg (app i (var ,x)))))
-                                         (lit (pos (app f (var ,x)))))))
-                          (or (forall
-                                ,(tie x `(or (lit (neg (app h (var ,x))))
-                                             (lit (pos (app g (var ,x)))))))
+(if (switch)
+    (testit 27
+      (run 1 (q)
+        (fresh-nom (x)
+          (proveo 
+            `(and (and (lit (pos (app j (app g8.88))))
+                       (lit (pos (app i (app g8.88)))))
+                  (and (and (lit (pos (app f (app g9.89))))
+                            (lit (neg (app g (app g9.89)))))
+                       (and (forall
+                              ,(tie x `(or (lit (neg (app f (var ,x))))
+                                           (lit (pos (app h (var ,x)))))))
+                            (and
                               (forall
-                                ,(tie x
-                                   `(or (lit (neg (app i (var ,x))))
-                                        (lit (neg (app h (var ,x))))))))))))
-        `() `() `() q)))
-  `((conj conj savefml savefml conj conj savefml savefml conj univ
-      split (close)
-      (savefml conj univ split (split (close) (close))
-        (savefml
-          split
-          (univ split (close) (close))
-          (univ
-            split
-            (close)
-            (savefml univ split (close) (close))))))))
+                                ,(tie x `(or (or (lit (neg (app j (var ,x))))
+                                                 (lit (neg (app i (var ,x)))))
+                                             (lit (pos (app f (var ,x)))))))
+                              (or (forall
+                                    ,(tie x `(or (lit (neg (app h (var ,x))))
+                                                 (lit (pos (app g (var ,x)))))))
+                                  (forall
+                                    ,(tie x
+                                       `(or (lit (neg (app i (var ,x))))
+                                            (lit (neg (app h (var ,x))))))))))))
+            `() `() `() q)))
+      `((conj conj savefml savefml conj conj savefml savefml conj univ
+          split (close)
+          (savefml conj univ split (split (close) (close))
+            (savefml
+              split
+              (univ split (close) (close))
+              (univ
+                split
+                (close)
+                (savefml univ split (close) (close))))))))
+    (pp 27
+      `(,(E x (and (f ,x) (not (g ,x))))
+        ,(A x (=> (f ,x) (h ,x)))
+        ,(A x (=> (and (j ,x) (i ,x)) (f ,x)))
+        (=> ,(E x (and (h ,x) (not (g ,x))))
+          ,(A x (=> (i ,x) (not (h ,x))))))
+      `,(A x (=> (j ,x) (not (i ,x))))))
 
-;; (pp 28
-;;   `(,(A x (=> (p ,x) ,(A x (q ,x))))
-;;     (=> ,(A x (or (q ,x) (r ,x))) ,(E x (and (q ,x) (s ,x))))
-;;     (=> ,(E x (s ,x)) ,(A x (=> (f ,x) (g ,x)))))
-;;   `,(A x (=> (and (p ,x) (f ,x)) (g ,x))))
+(if (switch)
+    (testit 28
+      (run 1 (q)
+        (fresh-nom (x)
+          (proveo
+            `(and (and (and (lit (pos (app p (app g10.102))))
+                            (lit (pos (app f (app g10.102)))))
+                       (lit (neg (app g (app g10.102)))))
+                  (and (forall
+                         ,(tie x
+                            `(or (lit (neg (app p (var ,x))))
+                                 (forall
+                                   ,(tie x `(lit (pos (app q (var ,x)))))))))
+                       (and (or (and (lit (neg (app q (app g11.103))))
+                                     (lit (neg (app r (app g11.103)))))
+                                (and (lit (pos (app q (app g12.104))))
+                                     (lit (pos (app s (app g12.104))))))
+                            (or (forall ,(tie x `(lit (neg (app s (var ,x))))))
+                                (forall
+                                  ,(tie x
+                                     `(or (lit (neg (app f (var ,x))))
+                                          (lit (pos (app g (var ,x)))))))))))
+            `() `() `() q)))
+      `((conj conj conj savefml savefml savefml conj univ split (close)
+          (univ savefml conj split (conj close)
+            (conj savefml savefml split (univ close)
+              (univ split (close) (close)))))))
 
-(testit 28
-  (run 1 (q)
-    (fresh-nom (x)
-      (proveo
-        `(and (and (and (lit (pos (app p (app g10.102))))
-                        (lit (pos (app f (app g10.102)))))
-                   (lit (neg (app g (app g10.102)))))
-              (and (forall
-                     ,(tie x
-                        `(or (lit (neg (app p (var ,x))))
-                             (forall
-                               ,(tie x `(lit (pos (app q (var ,x)))))))))
-                   (and (or (and (lit (neg (app q (app g11.103))))
-                                 (lit (neg (app r (app g11.103)))))
-                            (and (lit (pos (app q (app g12.104))))
-                                 (lit (pos (app s (app g12.104))))))
-                        (or (forall ,(tie x `(lit (neg (app s (var ,x))))))
-                            (forall
-                              ,(tie x
-                                 `(or (lit (neg (app f (var ,x))))
-                                      (lit (pos (app g (var ,x)))))))))))
-        `() `() `() q)))
-  `((conj conj conj savefml savefml savefml conj univ split (close)
-      (univ savefml conj split (conj close)
-        (conj savefml savefml split (univ close)
-          (univ split (close) (close)))))))
+    (pp 28
+      `(,(A x (=> (p ,x) ,(A x (q ,x))))
+        (=> ,(A x (or (q ,x) (r ,x))) ,(E x (and (q ,x) (s ,x))))
+        (=> ,(E x (s ,x)) ,(A x (=> (f ,x) (g ,x)))))
+      `,(A x (=> (and (p ,x) (f ,x)) (g ,x)))))
 
 ;; Too slow
 ;; (pp 29
@@ -381,105 +397,112 @@
 ;;      ,(A x ,(A y (=> (and (f ,x) (g ,y)) (and (h ,x) (j ,y)))))))
 
   
-;; (pp 30
-;;   `(,(A x (=> (or (f ,x) (g ,x)) (not (h ,x))))
-;;     ,(A x (=> (=> (g ,x) (not (i ,x))) (and (f ,x) (h ,x)))))
-;;   `,(A x (i ,x)))
 
-(testit 30
-  (run 1 (q)
-    (fresh-nom (x)
-      (proveo
-        `(and (lit (neg (app i (app g13.111))))
-              (and (forall
-                     ,(tie x `(or (and (lit (neg (app f (var ,x))))
-                                       (lit (neg (app g (var ,x)))))
-                                  (lit (neg (app h (var ,x)))))))
-                   (forall
-                     ,(tie x `(or (and (lit (pos (app g (var ,x))))
-                                       (lit (pos (app i (var ,x)))))
-                                  (and (lit (pos (app f (var ,x))))
-                                       (lit (pos (app h (var ,x))))))))))
-        `() `() `() q)))
-  `((conj savefml conj univ split
-      (conj savefml savefml univ split (conj close) (conj close))
-      (savefml
-        univ
-        split
-        (conj savefml close)
-        (conj savefml close)))))
+
+
+(if (switch)
+    (testit 30
+      (run 1 (q)
+        (fresh-nom (x)
+          (proveo
+            `(and (lit (neg (app i (app g13.111))))
+                  (and (forall
+                         ,(tie x `(or (and (lit (neg (app f (var ,x))))
+                                           (lit (neg (app g (var ,x)))))
+                                      (lit (neg (app h (var ,x)))))))
+                       (forall
+                         ,(tie x `(or (and (lit (pos (app g (var ,x))))
+                                           (lit (pos (app i (var ,x)))))
+                                      (and (lit (pos (app f (var ,x))))
+                                           (lit (pos (app h (var ,x))))))))))
+            `() `() `() q)))
+      `((conj savefml conj univ split
+          (conj savefml savefml univ split (conj close) (conj close))
+          (savefml
+            univ
+            split
+            (conj savefml close)
+            (conj savefml close)))))
+
+    (pp 30
+      `(,(A x (=> (or (f ,x) (g ,x)) (not (h ,x))))
+        ,(A x (=> (=> (g ,x) (not (i ,x))) (and (f ,x) (h ,x)))))
+      `,(A x (i ,x))))
 
 ;; 31 - 40
 ;; Adam Hinz
 
-;; (pp 31
-;;   `((not ,(E x (and (f ,x) (or (g ,x) (h ,x)))))
-;;     ,(E x (and (i ,x) (f ,x)))
-;;     ,(A x (=> (not (h ,x)) (j ,x))))
-;;   `,(E x (and (i ,x) (j ,x))))
 
-(testit 31
-  (run 1 (q)
-    (fresh-nom (x)
-      (proveo
-        `(and
-           (forall ,(tie x `(or (lit (neg (app i (var ,x))))
-                                (lit (neg (app j (var ,x)))))))
-           (and (forall
-                  ,(tie x `(or (lit (neg (app f (var ,x))))
-                               (and (lit (neg (app g (var ,x))))
-                                    (lit (neg (app h (var ,x))))))))
-                (and (and (lit (pos (app i (app g14.118))))
-                          (lit (pos (app f (app g14.118)))))
-                     (forall ,(tie x `(or (lit (pos (app h (var ,x))))
-                                          (lit (pos (app j (var ,x))))))))))
-        `() `() `() q)))
-  `((conj
-      univ
-      split
-      (savefml conj univ split (savefml conj conj close)
-        (conj savefml savefml conj conj close))
-      (savefml conj univ split (savefml conj conj savefml close)
-        (conj savefml savefml conj conj savefml savefml univ split
-          (close) (close))))))
 
-;; (pp 32
-;;   `(,(A x (=> (and (f ,x) (or (g ,x) (h ,x))) (i ,x)))
-;;     ,(A x (=> (and (i ,x) (h ,x)) (j ,x)))
-;;     ,(A x (=> (k ,x) (h ,x))))
-;;   `,(A x (=> (and (f ,x) (k ,x)) (j ,x))))
+(if (switch)
+    (testit 31
+      (run 1 (q)
+        (fresh-nom (x)
+          (proveo
+            `(and
+               (forall ,(tie x `(or (lit (neg (app i (var ,x))))
+                                    (lit (neg (app j (var ,x)))))))
+               (and (forall
+                      ,(tie x `(or (lit (neg (app f (var ,x))))
+                                   (and (lit (neg (app g (var ,x))))
+                                        (lit (neg (app h (var ,x))))))))
+                    (and (and (lit (pos (app i (app g14.118))))
+                              (lit (pos (app f (app g14.118)))))
+                         (forall ,(tie x `(or (lit (pos (app h (var ,x))))
+                                              (lit (pos (app j (var ,x))))))))))
+            `() `() `() q)))
+      `((conj
+          univ
+          split
+          (savefml conj univ split (savefml conj conj close)
+            (conj savefml savefml conj conj close))
+          (savefml conj univ split (savefml conj conj savefml close)
+            (conj savefml savefml conj conj savefml savefml univ split
+              (close) (close))))))
+    (pp 31
+      `((not ,(E x (and (f ,x) (or (g ,x) (h ,x)))))
+        ,(E x (and (i ,x) (f ,x)))
+        ,(A x (=> (not (h ,x)) (j ,x))))
+      `,(E x (and (i ,x) (j ,x)))))
 
-(testit 32
-  (run 1 (q)
-    (fresh-nom (x)
-      (proveo
-        `(and (and (and (lit (pos (app f (app g15.131))))
-                        (lit (pos (app k (app g15.131)))))
-                   (lit (neg (app j (app g15.131)))))
-              (and (forall
-                     ,(tie x `(or (or (lit (neg (app f (var ,x))))
-                                      (and (lit (neg (app g (var ,x))))
-                                           (lit (neg (app h (var ,x))))))
-                                  (lit (pos (app i (var ,x)))))))
-                   (and (forall
-                          ,(tie x `(or (or (lit (neg (app i (var ,x))))
-                                           (lit (neg (app h (var ,x)))))
-                                       (lit (pos (app j (var ,x)))))))
-                        (forall
-                          ,(tie x `(or (lit (neg (app k (var ,x))))
-                                       (lit (pos (app h (var ,x))))))))))
-        `() `() `() q)))
-  `((conj conj conj savefml savefml savefml conj univ split
-      (split
-        (close)
-        (conj savefml savefml conj univ split
+(if (switch)
+    (testit 32
+      (run 1 (q)
+        (fresh-nom (x)
+          (proveo
+            `(and (and (and (lit (pos (app f (app g15.131))))
+                            (lit (pos (app k (app g15.131)))))
+                       (lit (neg (app j (app g15.131)))))
+                  (and (forall
+                         ,(tie x `(or (or (lit (neg (app f (var ,x))))
+                                          (and (lit (neg (app g (var ,x))))
+                                               (lit (neg (app h (var ,x))))))
+                                      (lit (pos (app i (var ,x)))))))
+                       (and (forall
+                              ,(tie x `(or (or (lit (neg (app i (var ,x))))
+                                               (lit (neg (app h (var ,x)))))
+                                           (lit (pos (app j (var ,x)))))))
+                            (forall
+                              ,(tie x `(or (lit (neg (app k (var ,x))))
+                                           (lit (pos (app h (var ,x))))))))))
+            `() `() `() q)))
+      `((conj conj conj savefml savefml savefml conj univ split
           (split
-            (savefml univ split (close) (close))
-            (savefml univ split (close) (close)))
-          (close)))
-      (savefml conj univ split
-        (split (close) (savefml univ split (close) (close)))
-        (close)))))
+            (close)
+            (conj savefml savefml conj univ split
+              (split
+                (savefml univ split (close) (close))
+                (savefml univ split (close) (close)))
+              (close)))
+          (savefml conj univ split
+            (split (close) (savefml univ split (close) (close)))
+            (close)))))
+
+    (pp 32
+      `(,(A x (=> (and (f ,x) (or (g ,x) (h ,x))) (i ,x)))
+        ,(A x (=> (and (i ,x) (h ,x)) (j ,x)))
+        ,(A x (=> (k ,x) (h ,x))))
+      `,(A x (=> (and (f ,x) (k ,x)) (j ,x)))))
 
 ;; (pp 33
 ;;   '()
@@ -539,16 +562,25 @@
 ;;                                       (and (r ,x ,w)
 ;;                                            (r ,w ,z)))))))))))
 
-;; (pp 39
-;;   '()
-;;   `(not ,(E x ,(A y (<=> (f ,y ,x) (not (f ,y ,y)))))))
+(if (switch)
+    (testit 39
+      (run 1 (q)
+        (fresh-nom (y)
+          (proveo 
+            `(forall ,(tie y `(or (and (lit (pos (app f (var ,y) (app g5.17)))) (lit (neg (app f (var ,y) (var ,y))))) (and (lit (neg (app f (var ,y) (app g5.17)))) (lit (pos (app f (var ,y) (var ,y))))))))
+            `() `() `() q)))
+      `((conj
+          univ
+          split
+          (savefml conj univ conj split (savefml conj savefml savefml conj close)
+            (conj savefml savefml conj savefml savefml conj close))
+          (savefml conj univ conj split (close)
+            (conj savefml savefml conj savefml savefml conj savefml univ split (close)
+              (close))))))
 
-(testit 39
-  (run 1 (q)
-    (fresh-nom (y)
-      (proveo 
-        `(forall ,(tie y `(or (and (lit (pos (app f (var ,y) (app g5.17)))) (lit (neg (app f (var ,y) (var ,y))))) (and (lit (neg (app f (var ,y) (app g5.17)))) (lit (pos (app f (var ,y) (var ,y)))))))))))
-  `(nofail))
+    (pp 39
+      '()
+      `(not ,(E x ,(A y (<=> (f ,y ,x) (not (f ,y ,y))))))))
 
 ;; Too slow
 ;; (pp 40
@@ -556,33 +588,46 @@
 ;;   `(=> ,(E y ,(A x (<=> (f ,x ,y) (f ,x ,x))))
 ;;      (not ,(A x ,(E y ,(A z (<=> (f ,z ,y) (not (f ,z ,x)))))))))
 
-
-
-;; 41 - 50
 ;; (Assigned to Joe Near)
 
-;; Too slow
-(pp 41
-  `(,(A z ,(E y ,(A x (<=> (F ,x ,y) (and (F ,x ,z) (not (F ,x ,x))))))))
-  `(not ,(E z ,(A x (F ,x ,z)))))
+;; (pp 41
+;;   `(,(A z ,(E y ,(A x (<=> (F ,x ,y) (and (F ,x ,z) (not (F ,x ,x))))))))
+;;   `(not ,(E z ,(A x (F ,x ,z)))))
+
+;; (testit 41
+;;   (run 1 (q)
+;;     (fresh-nom (x z)
+;;       (proveo `(and (forall ,(tie x `(lit (pos (app F (var ,x) (app g0.12)))))) (forall ,(tie z `(forall ,(tie x `(or (and (lit (pos (app F (var ,x) (app g1.13 (var ,z))))) (and (lit (pos (app F (var ,x) (var ,z)))) (lit (neg (app F (var ,x) (var ,x)))))) (and (lit (neg (app F (var ,x) (app g1.13 (var ,z))))) (or (lit (neg (app F (var ,x) (var ,z)))) (lit (pos (app F (var ,x) (var ,x))))))))))))
+;;         `() `() `() q)))
+;;   `((conj univ savefml univ univ split
+;;       (conj savefml conj savefml close)
+;;       (conj savefml split (close) (close)))))
 
 ;; Too slow
-(pp 42
-  '()
-  `(not ,(E y ,(A x (<=> (F ,x ,y) (not ,(E z (and (F ,x ,z) (F ,z ,x)))))))))
+;; (pp 42
+;;   '()
+;;   `(not ,(E y ,(A x (<=> (F ,x ,y) (not ,(E z (and (F ,x ,z) (F ,z ,x)))))))))
 
 ;; Too slow
-(pp 43
-  `(,(A x ,(A y (<=> (Q ,x ,y) ,(A z (<=> (F ,z ,x) (F ,z ,y)))))))
-  `,(A x ,(A y (<=> (Q ,x ,y) (Q ,y ,x)))))
+;; (pp 43
+;;   `(,(A x ,(A y (<=> (Q ,x ,y) ,(A z (<=> (F ,z ,x) (F ,z ,y)))))))
+;;   `,(A x ,(A y (<=> (Q ,x ,y) (Q ,y ,x)))))
 
-(pp 44
-  `(,(A x (and (=> (F ,x) ,(E y (and (G ,y) (H ,x ,y))))
-               ,(E y (and (G ,y) (not (H ,x ,y))))))
-    ,(E x (and (J ,x) ,(A y (=> (G ,y) (H ,x ,y))))))
-  `,(E x (and (J ,x) (not (F ,x)))))
+(if (switch)
+    (testit 44
+      (run 1 (q)
+        (fresh-nom (x y)
+          (proveo
+            `(and (forall ,(tie x `(or (lit (neg (app J (var ,x)))) (lit (pos (app F (var ,x))))))) (and (forall ,(tie x `(and (or (lit (neg (app F (var ,x)))) (and (lit (pos (app G (app g2.20 (var ,x))))) (lit (pos (app H (var ,x) (app g2.20 (var ,x))))))) (and (lit (pos (app G (app g3.21 (var ,x))))) (lit (neg (app H (var ,x) (app g3.21 (var ,x))))))))) (and (lit (pos (app J (app g4.22)))) (forall ,(tie y `(or (lit (neg (app G (var ,y)))) (lit (pos (app H (app g4.22) (var ,y))))))))))
+            `() `() `() q)))
+      `(nofail))
 
-;; Too slow
+    (pp 44
+      `(,(A x (and (=> (F ,x) ,(E y (and (G ,y) (H ,x ,y))))
+                   ,(E y (and (G ,y) (not (H ,x ,y))))))
+        ,(E x (and (J ,x) ,(A y (=> (G ,y) (H ,x ,y))))))
+      `,(E x (and (J ,x) (not (F ,x))))))
+
 (pp 45
   `(,(A x (and (F ,x) ,(A y (=> (and (G ,y) (=> (H ,x ,y) (J ,x ,y)))
                               ,(A y (and (G ,y) (=> (H ,x ,y) (K ,y))))))))
@@ -591,7 +636,21 @@
                ,(A y (and (G ,y) (=> (H ,x ,y) (J ,x ,y)))))))
   `,(E x (and (F ,x) (not ,(E y (and (G ,y) (H ,x ,y)))))))
 
-;; Too slow
+'(conj
+   univ
+   split
+   (savefml conj univ conj close)
+   (conj savefml savefml conj univ conj savefml univ split
+     (split
+       (close)
+       (conj savefml savefml conj univ split
+         (savefml conj conj savefml univ split (close) (close))
+         (savefml conj conj savefml univ split (close)
+           (savefml univ conj savefml split (close) (close)))))
+     (univ conj savefml split (close)
+       (savefml conj univ split
+         (savefml conj conj savefml univ split (close) (close)) (close)))))
+
 (pp 46
   `(,(A x (=> (and (F ,x) ,(A y (=> (and (F ,y) (H ,y ,x))
                                   (G ,y))))
@@ -602,6 +661,14 @@
     ,(A x ,(A y (=> (and (F ,x) (and (F ,y) (H ,x ,y))) (not (J ,y ,x))))))
   `,(A x (=> (F ,x) (G ,x))))
 
+'(conj conj savefml savefml conj univ split
+   (split
+     (savefml conj split (univ split (close) (close)) (conj close))
+     (conj conj savefml savefml savefml conj split (univ split (close) (close))
+       (conj savefml conj savefml univ split (split (close) (close))
+         (savefml univ univ split (split (close) (split (close) (close)))
+           (close)))))
+   (savefml conj split (univ split (close) (close)) (conj savefml conj close)))
 
 (printf "all done!\n")
 

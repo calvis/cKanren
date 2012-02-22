@@ -1,6 +1,9 @@
 (library (nnf)
   (export nnf prepare A E)
-  (import (chezscheme) (alphaK) (only (ck) constrained-var?))
+  (import 
+    (chezscheme)
+    ;; (alphaK-records)
+    (alphaK))
 
 
 ;; NNF taken from Oleg Kiselyov's translation of leanTAP

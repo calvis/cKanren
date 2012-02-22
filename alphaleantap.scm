@@ -1,7 +1,15 @@
 (library (alphaleantap)
   (export proveo do-prove-th A E)
-  (import (except (chezscheme) exists subst) (nnf) (alphaK)
-    (only (mk) conde fresh project prt lambdag@) (tracing))
+  (import
+    (except (chezscheme) subst)
+    (nnf)
+    #;
+    (rename (alphaK-records)
+      (fresh fresh-nom)
+      (exist fresh))
+    (alphaK)
+    (only (mk) conde fresh project)
+    (tracing))
 
 (define-syntax define-mk
   (syntax-rules ()
