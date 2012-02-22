@@ -1,6 +1,6 @@
 (library (alphaK)
-  (export run run* == nom? project
-    fresh-nom hash (rename (make-tie tie)) unify-s walk get-sus)
+  (export run run* == nom-constrained? project make-nom ==-check
+    fresh-nom hash (rename (make-tie tie)) unify-s walk get-sus nom?)
 
   (import
     (rnrs)
@@ -14,11 +14,16 @@
       constrained-var constrained-var?)
     (only (chezscheme)
       trace-lambda
-      gensym trace-define trace-define-syntax printf trace-let))
+      gensym trace-define trace-define-syntax printf trace-let)
+    (tracing))
 
 (define ==
   (lambda (u v)
     (goal-construct (unify-s u v))))
+
+(define ==-check
+  (lambda (u v)
+    (goal-construct (unify-s-check u v))))
 
 (define hash
   (lambda (b t)
@@ -42,14 +47,18 @@
              (if (eq? b (tie-a t)) a ((rec (tie-t t)) a)))
             ((pair? t)
              ((composem (rec (car t)) (rec (cdr t))) a))
-            ((and (var? t) (not (nom? t c)))
+            ((and (var? t) (not (nom-constrained? t c)))
              ((composem (sus t `()) (rec t)) a))
             (else a)))))))
+
+(define make-nom
+  (lambda (n)
+    (constrained-var n 'a)))
 
 (define-syntax fresh-nom
   (syntax-rules ()
     ((_ (n ...) g0 g ...)
-     (let ((n (constrained-var 'n 'a)) ...)
+     (let ((n (make-nom 'n)) ...)
        (fresh () (nom n) ... g0 g ...)))))
 
 (define (sus-constrained? x oc)
@@ -79,13 +88,19 @@
 (define (tie-a t) (cadr t))
 (define (tie-t t) (caddr t))
 
-(define (nom x) (goal-construct (nom-c x)))
-(define (sus x pi) (goal-construct (sus-c x pi)))
+(define nom
+  (lambda (x)
+    (goal-construct (nom-c x))))
+(define sus
+  (lambda (x pi)
+    (goal-construct (sus-c x pi))))
 
-(define (nom? x c)
-  (and (find (lambda (oc) (nom-constrained? x oc)) c) #t))
+(define (nom? x) (constrained-var? x))
 
-(define (nom-constrained? x oc)
+(define (nom-constrained? x c)
+  (and (find (lambda (oc) (nom-constraint? x oc)) c) #t))
+
+(define (nom-constraint? x oc)
   (and (eq? (oc->rator oc) 'nom-c)
        (eq? (nom-v oc) x)))
 
@@ -95,8 +110,7 @@
   (lambdam@ (a : s c)
     (let ((y (assq x s))) ;; hack
       (cond
-        ((and y (nom? (cdr y) c))
-         #f)
+        ((and y (nom-constrained? (cdr y) c)) #f)
         (else ((update-c (build-oc nom-c x)) a))))))
 
 (define unify-s
@@ -129,19 +143,85 @@
               (unify-s (car u) (car v))
               (unify-s (cdr u) (cdr v)))
             a))
-          ((and (var? u) (not (nom? u c)))
+          ((and (var? u) (not (nom-constrained? u c)))
            ((composem
               (sus u `())
               (update-s u (apply-pi `() v c)))
             a))
-          ((and (var? v) (not (nom? v c)))
+          ((and (var? v) (not (nom-constrained? v c)))
            ((composem
               (sus v `())
               (update-s v (apply-pi `() u c)))
             a))          
-          ((or (nom? u c) (nom? v c)) #f)          
+          ((or (nom-constrained? u c) (nom-constrained? v c)) #f)          
           ((equal? u v) a)
           (else #f))))))
+
+(define unify-s-check
+  (lambda (u v)
+    (lambdam@ (a : s c)
+      (let ((u (walk u s c)) (v (walk v s c)))
+        (cond
+          ((eq? u v) a)
+          ((sus? u)
+           ((ext-s-check (cadr u) (apply-pi (caddr u) v c)) a))
+          ((get-sus u c)
+           => (lambda (oc)
+                ((ext-s-check u (apply-pi (sus-pi oc) v c)) a)))
+          ((sus? v)
+           ((ext-s-check (cadr v) (apply-pi (caddr v) u c)) a))
+          ((get-sus v c)
+           => (lambda (oc)
+                ((ext-s-check v (apply-pi (sus-pi oc) u c)) a)))
+          ((and (tie? u) (tie? v))
+           (let ((au (tie-a u)) (av (tie-a v))
+                 (tu (tie-t u)) (tv (tie-t v)))
+             (if (eq? au av)
+                 ((unify-s tu tv) a)
+                 ((composem
+                    (hash-c au tv)
+                    (unify-s tu (apply-pi `((,au . ,av)) tv c)))
+                  a))))
+          ((and (pair? u) (pair? v))
+           ((composem
+              (unify-s (car u) (car v))
+              (unify-s (cdr u) (cdr v)))
+            a))
+          ((and (var? u) (not (nom-constrained? u c)))
+           ((composem
+              (sus u `())
+              (ext-s-check u (apply-pi `() v c)))
+            a))
+          ((and (var? v) (not (nom-constrained? v c)))
+           ((composem
+              (sus v `())
+              (ext-s-check v (apply-pi `() u c)))
+            a))          
+          ((or (nom-constrained? u c) (nom-constrained? v c)) #f)          
+          ((equal? u v) a)
+          (else #f))))))
+
+(define ext-s-check
+  (lambda (x u)
+    (lambdam@ (a : s c)
+      (and (occurs-check x u s c)
+           ((update-s x u) a)))))
+
+(define tie-t*
+  (lambda (t)
+    (if (tie? t) (tie-t* (tie-t t)) t)))
+
+(define occurs-check
+  (lambda (x t s c)
+    (let rec ([t t])
+      (let ([t (walk (tie-t* t) s c)])
+        (cond
+          [(sus? t) (not (eq? x (sus-v t)))]
+          [(get-sus t c)
+           => (lambda (sus-c)
+                (not (eq? x (sus-v sus-c))))]
+          [(pair? t) (and (rec (car t)) (rec (cdr t)))]
+          [else #t])))))
 
 (define walk-sym
   (lambda (v s)
@@ -155,6 +235,11 @@
   (lambda (x s c)
     (let f ((x x) (pi '()))
       (cond
+        ((sus? x)
+         (cond
+           ((walk-sym (sus-v x) s)
+            => (lambda (a) (f (cdr a) (compose-pis (sus-pi x) pi))))
+           (else (apply-pi pi x c))))
         ((get-sus x c)
          => (lambda (sus-c)
               (cond
@@ -214,7 +299,7 @@
   (lambda (pi t c)
     (let rec ((t t))
       (cond
-        ((nom? t c)
+        ((nom-constrained? t c)
          (app pi t))
         ((sus? t)
          (let ((pi (compose-pis pi (caddr t))))
@@ -233,7 +318,9 @@
 
 (define reify-constraints-alpha
   (lambda (v r c)
-    (let ((c (filter (lambda (oc) (memq (oc->rator oc) '(sus-c nom-c hash-c))) c)))
+    (let ((c (filter (lambda (oc) (memq (oc->rator oc)
+                               '(sus-c nom-c hash-c)))
+               c)))
       (let ((c (remp any/var? c)))
         (let ((c (fold-left (lambda (c oc)
                               (cond

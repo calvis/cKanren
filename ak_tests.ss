@@ -403,11 +403,11 @@
 ;; WEB 5 Feb 2012
 ;; diverges?
 ;; not sure what is up with this one
-'(testit
-   (run* (q)
-     (fresh-nom (c)
-       (typo '() `(lam ,(tie c `(app (var ,c) (var ,c)))) q)))
-   '())
+;; (testit 42.1
+;;   (run* (q)
+;;     (fresh-nom (c)
+;;       (typo '() `(lam ,(tie c `(app (var ,c) (var ,c)))) q)))
+;;   '())
 
 (testit 43
   (run 5 (q) (typo '() q '(-> int int)))
