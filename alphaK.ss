@@ -177,15 +177,15 @@
            (let ((au (tie-a u)) (av (tie-a v))
                  (tu (tie-t u)) (tv (tie-t v)))
              (if (eq? au av)
-                 ((unify-s tu tv) a)
+                 ((unify-s-check tu tv) a)
                  ((composem
                     (hash-c au tv)
-                    (unify-s tu (apply-pi `((,au . ,av)) tv c)))
+                    (unify-s-check tu (apply-pi `((,au . ,av)) tv c)))
                   a))))
           ((and (pair? u) (pair? v))
            ((composem
-              (unify-s (car u) (car v))
-              (unify-s (cdr u) (cdr v)))
+              (unify-s-check (car u) (car v))
+              (unify-s-check (cdr u) (cdr v)))
             a))
           ((and (var? u) (not (nom-constrained? u c)))
            ((composem

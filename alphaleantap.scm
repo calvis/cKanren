@@ -8,8 +8,8 @@
     ((_ (name a* ...) body)
      (define-mk name (lambda (a* ...) body)))
     ((_ name (lambda (a* ...) body))
-     (trace-define-mk name (lambda (a* ...) body))
-     ;;(define name (lambda (a* ...) body))
+     ;;(trace-define-mk name (lambda (a* ...) body))
+     (define name (lambda (a* ...) body))
      )))
 
 ;; substitution
@@ -51,12 +51,11 @@
 
 (define-mk lookupo
   (lambda (x env out)
-    (fresh (a)
-      (fresh (d va vd)
-        (conde
-          ((== `((,x . ,out) . ,d) env))
-          ((== `(,a . ,d) env)
-           (lookupo x d out)))))))
+    (fresh (a d va vd)
+      (conde
+        ((== `((,x . ,out) . ,d) env))
+        ((== `(,a . ,d) env)
+         (lookupo x d out))))))
 
 (define-mk negateo
   (lambda (fml neg)
