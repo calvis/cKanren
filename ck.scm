@@ -68,7 +68,7 @@
       (let ((x (walk x s))
             (v (walk v s)))
         (cond
-          ((or (var? x) (var v))
+          ((var? x)
            (let ((s^ (ext-s x v s)))
              ((run-constraints (if (var? v) `(,x ,v) `(,x)) c)
               (make-a s^ c))))

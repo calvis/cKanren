@@ -9,6 +9,8 @@
 (import (alphaK))
 ;; (import (alphaK-records))
 
+(import (only (mk) prt))
+
 (print-gensym 'pretty/suffix)
 
 (define-syntax pp
@@ -567,8 +569,9 @@
       (run 1 (q)
         (fresh-nom (y)
           (proveo 
-            `(forall ,(tie y `(or (and (lit (pos (app f (var ,y) (app g5.17)))) (lit (neg (app f (var ,y) (var ,y))))) (and (lit (neg (app f (var ,y) (app g5.17)))) (lit (pos (app f (var ,y) (var ,y))))))))
-            `() `() `() q)))
+            `(forall ,(tie y `(or (and (lit (pos (app f (var ,y) (app g0.6)))) (lit (neg (app f (var ,y) (var ,y))))) (and (lit (neg (app f (var ,y) (app g0.6)))) (lit (pos (app f (var ,y) (var ,y))))))))
+            `() `() `() q)
+          prt))
       `((conj
           univ
           split
