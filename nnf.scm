@@ -2,8 +2,9 @@
   (export nnf prepare A E)
   (import 
     (chezscheme)
-    ;; (alphaK-records)
-    (alphaK))
+    ;;(alphaK-records)
+    (alphaK)
+    )
 
 
 ;; NNF taken from Oleg Kiselyov's translation of leanTAP

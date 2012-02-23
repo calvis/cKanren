@@ -9,7 +9,8 @@
       (exist fresh))
     (alphaK)
     (only (mk) conde fresh project)
-    (tracing))
+    (tracing)
+    )
 
 (define-syntax define-mk
   (syntax-rules ()
@@ -127,9 +128,8 @@
          (== l3 (cons x l31))
          (appendo l11 l2 l31))))))
 
-(trace-define (do-prove-th axioms theorem)
+(define (do-prove-th axioms theorem)
   (let* ((nf (prepare axioms theorem)))
-    (printf "~s\n" nf)
     (let ((pr (run 1 (q) (proveo nf '() '() '() q))))
       (if (null? pr) (errorf 'prove "failure!"))
       (car pr))))
