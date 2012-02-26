@@ -17,40 +17,6 @@
       gensym trace-define trace-define-syntax printf trace-let)
     (tracing))
 
-(define ==
-  (lambda (u v)
-    (goal-construct (unify-s u v))))
-
-(define ==-check
-  (lambda (u v)
-    (goal-construct (unify-s-check u v))))
-
-(define hash
-  (lambda (b t)
-    (goal-construct (hash-c b t))))
-
-(define hash-c
-  (lambda (b t)
-    (let rec ((t t))
-      (lambdam@ (a : s c)
-        (let ((t (walk t s c)))
-          (cond
-            ((eq? b t) #f)
-            ((sus? t)
-             (let ((lhs (apply-pi (caddr t) b c)))
-               ((update-c (build-oc hash-c lhs t)) a)))
-            ((get-sus t c)
-             => (lambda (sus-c)
-                  (let ((lhs (apply-pi (sus-pi sus-c) b c)))
-                    ((update-c (build-oc hash-c lhs t)) a))))
-            ((tie? t)
-             (if (eq? b (tie-a t)) a ((rec (tie-t t)) a)))
-            ((pair? t)
-             ((composem (rec (car t)) (rec (cdr t))) a))
-            ((and (var? t) (not (nom-constrained? t c)))
-             ((composem (sus t `()) (rec t)) a))
-            (else a)))))))
-
 (define make-nom
   (lambda (n)
     (constrained-var n 'a)))
@@ -91,6 +57,7 @@
 (define nom
   (lambda (x)
     (goal-construct (nom-c x))))
+
 (define sus
   (lambda (x pi)
     (goal-construct (sus-c x pi))))
@@ -110,8 +77,12 @@
   (lambdam@ (a : s c)
     (let ((y (assq x s))) ;; hack
       (cond
-        ((and y (nom-constrained? (cdr y) c)) #f)
+        ((and y (nom? (cdr y))) #f)
         (else ((update-c (build-oc nom-c x)) a))))))
+
+(define ==
+  (lambda (u v)
+    (goal-construct (unify-s u v))))
 
 (define unify-s
   (lambda (u v)
@@ -120,15 +91,15 @@
         (cond
           ((eq? u v) a)
           ((sus? u)
-           ((update-s (cadr u) (apply-pi (caddr u) v c)) a))
+           ((update-s (sus-v u) (apply-pi (sus-pi u) v c)) a))
           ((get-sus u c)
-           => (lambda (oc)
-                ((update-s u (apply-pi (sus-pi oc) v c)) a)))
+           => (lambda (s)
+                ((update-s u (apply-pi (sus-pi s) v c)) a)))
           ((sus? v)
-           ((update-s (cadr v) (apply-pi (caddr v) u c)) a))
+           ((update-s (sus-v v) (apply-pi (sus-pi v) u c)) a))
           ((get-sus v c)
-           => (lambda (oc)
-                ((update-s v (apply-pi (sus-pi oc) u c)) a)))
+           => (lambda (s)
+                ((update-s v (apply-pi (sus-pi s) u c)) a)))
           ((and (tie? u) (tie? v))
            (let ((au (tie-a u)) (av (tie-a v))
                  (tu (tie-t u)) (tv (tie-t v)))
@@ -143,19 +114,23 @@
               (unify-s (car u) (car v))
               (unify-s (cdr u) (cdr v)))
             a))
-          ((and (var? u) (not (nom-constrained? u c)))
+          ((and (var? u) (not (nom? u)))
            ((composem
               (sus u `())
               (update-s u (apply-pi `() v c)))
             a))
-          ((and (var? v) (not (nom-constrained? v c)))
+          ((and (var? v) (not (nom? v)))
            ((composem
               (sus v `())
               (update-s v (apply-pi `() u c)))
             a))          
-          ((or (nom-constrained? u c) (nom-constrained? v c)) #f)          
+          ((or (nom? u) (nom? v)) #f)          
           ((equal? u v) a)
           (else #f))))))
+
+(define ==-check
+  (lambda (u v)
+    (goal-construct (unify-s-check u v))))
 
 (define unify-s-check
   (lambda (u v)
@@ -187,17 +162,17 @@
               (unify-s-check (car u) (car v))
               (unify-s-check (cdr u) (cdr v)))
             a))
-          ((and (var? u) (not (nom-constrained? u c)))
+          ((and (var? u) (not (nom? u)))
            ((composem
               (sus u `())
               (ext-s-check u (apply-pi `() v c)))
             a))
-          ((and (var? v) (not (nom-constrained? v c)))
+          ((and (var? v) (not (nom? v)))
            ((composem
               (sus v `())
               (ext-s-check v (apply-pi `() u c)))
             a))          
-          ((or (nom-constrained? u c) (nom-constrained? v c)) #f)          
+          ((or (nom? u) (nom? v)) #f)
           ((equal? u v) a)
           (else #f))))))
 
@@ -206,10 +181,6 @@
     (lambdam@ (a : s c)
       (and (occurs-check x u s c)
            ((update-s x u) a)))))
-
-(define tie-t*
-  (lambda (t)
-    (if (tie? t) (tie-t* (tie-t t)) t)))
 
 (define occurs-check
   (lambda (x t s c)
@@ -222,6 +193,36 @@
                 (not (eq? x (sus-v sus-c))))]
           [(pair? t) (and (rec (car t)) (rec (cdr t)))]
           [else #t])))))
+
+(define hash
+  (lambda (b t)
+    (goal-construct (hash-c b t))))
+
+(define hash-c
+  (lambda (b t)
+    (let rec ((t t))
+      (lambdam@ (a : s c)
+        (let ((t (walk t s c)))
+          (cond
+            ((eq? b t) #f)
+            ((sus? t)
+             (let ((lhs (apply-pi (caddr t) b c)))
+               ((update-c (build-oc hash-c lhs t)) a)))
+            ((get-sus t c)
+             => (lambda (sus-c)
+                  (let ((lhs (apply-pi (sus-pi sus-c) b c)))
+                    ((update-c (build-oc hash-c lhs t)) a))))
+            ((tie? t)
+             (if (eq? b (tie-a t)) a ((rec (tie-t t)) a)))
+            ((pair? t)
+             ((composem (rec (car t)) (rec (cdr t))) a))
+            ((and (var? t) (not (nom? t)))
+             ((composem (sus t `()) (rec t)) a))
+            (else a)))))))
+
+(define tie-t*
+  (lambda (t)
+    (if (tie? t) (tie-t* (tie-t t)) t)))
 
 (define walk-sym
   (lambda (v s)
@@ -299,8 +300,7 @@
   (lambda (pi t c)
     (let rec ((t t))
       (cond
-        ((nom-constrained? t c)
-         (app pi t))
+        ((nom? t) (app pi t))
         ((sus? t)
          (let ((pi (compose-pis pi (caddr t))))
            (if (id-pi? pi c) t `(sus ,(cadr t) ,pi))))
@@ -316,22 +316,26 @@
         ((pair? t) (cons (rec (car t)) (rec (cdr t))))
         (else t)))))
 
-(define reify-constraints-alpha
+(define alpha-constraint?
+  (lambda (oc)
+    (memq (oc->rator oc) '(sus-c nom-c hash-c))))
+
+(define reify-alpha-constraints
   (lambda (v r c)
-    (let ((c (filter (lambda (oc) (memq (oc->rator oc)
-                               '(sus-c nom-c hash-c)))
-               c)))
+    (let ((c (filter alpha-constraint? c)))
       (let ((c (remp any/var? c)))
-        (let ((c (fold-left (lambda (c oc)
-                              (cond
-                                ((reify-alpha-oc oc)
-                                 => (lambda (oc^)
-                                      (if (member oc^ c) c (cons oc^ c))))
-                                (else c)))
-                   '() c)))
+        (let ((c (fold-left reify-alpha-oc `() c)))
           (if (null? c) c `((alpha . ,c))))))))
 
 (define reify-alpha-oc
+  (lambda (c oc)
+    (cond
+      ((reify-oc oc)
+       => (lambda (oc^)
+            (if (member oc^ c) c (cons oc^ c))))
+      (else c))))
+
+(define reify-oc
   (lambda (oc)
     (case (oc->rator oc)
       ((hash-c)
@@ -341,6 +345,6 @@
            `(hash (,lhs ,rhs)))))
       (else #f))))
 
-(extend-reify-fns 'alpha reify-constraints-alpha)
+(extend-reify-fns 'alpha reify-alpha-constraints)
 
 )
