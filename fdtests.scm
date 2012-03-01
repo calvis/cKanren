@@ -192,6 +192,44 @@
       (distinctfd `(,x ,y ,z))))
   '())
 
+(test-check "17"
+  (run* (q)
+    (fresh (x y)
+      (infd x y (range 0 6))
+      (timesfd x y 6)
+      (== q `(,x ,y))))
+  `((1 6) (2 3) (3 2) (6 1)))
+
+(test-check "18"
+  (run* (q)
+    (fresh (x y)
+      (infd x y (range 0 6))
+      (timesfd x 6 y)
+      (== q `(,x ,y))))
+  `((0 0) (1 6)))
+
+(test-check "19"
+  (run* (q)
+    (fresh (x y)
+      (infd x y (range 0 6))
+      (timesfd 6 x y)
+      (== q `(,x ,y))))
+  `((0 0) (1 6)))
+
+(test-check "20"
+  (run* (q)
+    (infd q (range 0 36))
+    (timesfd q q 36))
+  `(6))
+
+(test-check "21"
+  (run* (q)
+    (fresh (x y)
+      (infd x y (range 1 100))
+      (timesfd x y 0)
+      (== q 5)))
+  `())
+
 (define add-digitso
   (lambda (augend addend carry-in carry digit)
     (fresh (partial-sum sum)
@@ -277,6 +315,85 @@
                 (infd x (range 1 n))
                 (loop (sub1 i) (cons x l))))))))
 
+(printf "Send More Money (addition)\n")
 (printf "~s\n" (time (run* (q) (send-more-moneyo q))))
+
+(printf "One Solution for Eight Queens\n")
 (printf "~s\n" (time (run 1 (q) (n-queenso q 8))))
+
+(printf "All Solutions for Eight Queens\n")
 (printf "~s\n" (time (length (run* (q) (n-queenso q 8)))))
+
+(define smm-mult
+  (lambda (letters)
+    (fresh (s e n d m o r y send more money)
+      (== letters `(,s ,e ,n ,d ,m ,o ,r ,y))
+      (distinctfd letters)
+      (infd s m (range 1 9))
+      (infd e n d o r y (range 0 9))
+      (infd send more (range 0 9999))
+      (infd money (range 0 99999))
+      (actual-wortho `(,s ,e ,n ,d) send)
+      (actual-wortho `(,m ,o ,r ,e) more)
+      (actual-wortho `(,m ,o ,n ,e ,y) money)
+      (plusfd send more money))))
+
+(define actual-wortho
+  (lambda (ls out)
+    (let ((n (length ls)))
+      (let loop ((ls (reverse ls)) (place 1) (acc 0))
+        (cond
+          ((null? ls)
+           (== acc out))
+          (else
+            (fresh (cur acc^)
+              (infd acc^ (range 0 (max-val place)))
+              (infd cur (range 0 (sub1 (* place 10))))
+              (timesfd (car ls) place cur)
+              (plusfd acc cur acc^)
+              (loop (cdr ls) (* place 10) acc^))))))))
+
+(define max-val
+  (lambda (n)
+    (case n
+      ((1) 9)
+      ((10) 99)
+      ((100) 999)
+      ((1000) 9999)
+      ((10000) 99999))))
+
+(test-check "30"
+  (run* (q)
+    (actual-wortho `(1 2 3) 123))
+  `(_.0))
+
+(test-check "31"
+  (run* (q)
+    (fresh (x y z)
+      (infd x y z (range 0 9))
+      (== q `(,x ,y ,z))
+      (actual-wortho `(,x ,y ,z) 123)))
+  `((1 2 3)))
+
+(test-check "32"
+  (run* (q)
+    (infd q (range 0 999))
+    (actual-wortho `(1 2 3) q))
+  `(123))
+
+(test-check "33"
+  (run* (q)
+    (infd q (range 0 9))
+    (actual-wortho `(5 ,q 3) 543))
+  `(4))
+
+(test-check "34"
+  (run* (q)
+    (fresh (x)
+      (infd x (range 0 9))
+      (infd q (range 0 999))
+      (actual-wortho `(5 ,x 3) q)))
+  `(503 513 523 533 543 553 563 573 583 593))
+
+(printf "Send More Money (multiplication)\n")
+(printf "~s\n" (time (run* (q) (smm-mult q))))

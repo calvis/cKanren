@@ -2,7 +2,7 @@
   (fd)
   (export
     infd domfd =fd =/=fd <=fd <fd
-    plusfd distinctfd range)
+    plusfd timesfd distinctfd range)
   (import (rnrs) (ck))
 
 ;;; helpers
@@ -336,6 +336,26 @@
             (process-dom v
               (range (- wmin umax) (- wmax umin)))))))))
 
+(define timesfd-c
+  (lambda (u v w)
+    (let ((safe-div (lambda (n c a) (if (zero? n) c (div a n)))))
+      (c-op timesfd-c ((u : d_u) (v : d_v) (w : d_w))
+        (let ((wmin (min-dom d_w)) (wmax (max-dom d_w))
+              (umin (min-dom d_u)) (umax (max-dom d_u))
+              (vmin (min-dom d_v)) (vmax (max-dom d_v)))
+          (let ([u-range (range
+                           (safe-div vmax umin wmin)
+                           (safe-div vmin umax wmax))]
+                [v-range (range
+                           (safe-div umax vmin wmin)
+                           (safe-div umin vmax wmax))]
+                [w-range (range (* umin vmin) (* umax vmax))])
+            (composem
+              (process-dom w w-range)
+              (composem
+                (process-dom u u-range)
+                (process-dom v v-range)))))))))
+
 (define enforce-constraintsfd
   (lambda (x)
     (fresh ()
@@ -356,7 +376,8 @@
     (unless (null? c)
       (let ((oc (car c)))
         (if (memq (oc->rator oc)
-              '(=/=fd-c distinctfd-c distinct/fd-c <=fd-c =fd-c))
+              '(=/=fd-c distinctfd-c distinct/fd-c
+                <=fd-c =fd-c plusfd-c timesfd-c))
             (cond
               ((find (lambda (x) (not (memq x bound-x*)))
                  (filter var? (oc->rands oc)))
@@ -402,6 +423,10 @@
 (define plusfd
   (lambda (u v w)
     (goal-construct (plusfd-c u v w))))
+
+(define timesfd
+  (lambda (u v w)
+    (goal-construct (timesfd-c u v w))))
 
 (define distinctfd
   (lambda (v*)
