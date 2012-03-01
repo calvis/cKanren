@@ -396,4 +396,4 @@
   `(503 513 523 533 543 553 563 573 583 593))
 
 (printf "Send More Money (multiplication)\n")
-(printf "~s\n" (time (run* (q) (smm-mult q))))
+;; (printf "~s\n" (time (run* (q) (smm-mult q))))
