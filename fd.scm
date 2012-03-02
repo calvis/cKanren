@@ -3,9 +3,14 @@
   (export
     infd domfd =fd =/=fd <=fd <fd
     plusfd timesfd distinctfd range)
-  (import (rnrs) (ck) (interval-domain))
+  (import
+    (rename (rnrs) (list-sort rnrs:list-sort))
+    (ck) (interval-domain)
+    (only (chezscheme) trace-define))
 
 ;;; helpers
+
+(define list-sort rnrs:list-sort)
 
 (define list-sorted?
   (lambda (pred ls)
@@ -161,10 +166,13 @@
           (else
             (let ((y (walk (car y*) s)))
               (cond
-                ((var? y) (loop (cdr y*) n* (cons y x*)))
-                ((memv-dom? y n*) #f)
-                (else (let ((n* (list-insert < y n*)))
-                        (loop (cdr y*) n* x*)))))))))))
+                ((var? y)
+                 (loop (cdr y*) n* (cons y x*)))
+                ;; n* is NOT A DOM
+                ((memv y n*) #f)
+                (else
+                  (let ((n* (list-insert < y n*)))
+                    (loop (cdr y*) n* x*)))))))))))
 
 (define exclude-from-dom
   (lambda (dom1 c x*)
@@ -282,7 +290,7 @@
 (define domfd-c
   (lambda (x n*)
     (lambdam@ (a : s c)
-      ((process-dom (walk x s) (make-dom (list-sort < n*))) a))))
+      ((process-dom (walk x s) (make-dom n*)) a))))
 
 (define-syntax infd
   (syntax-rules ()

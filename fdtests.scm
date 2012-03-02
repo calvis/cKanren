@@ -173,7 +173,29 @@
       (plusfd y 3 z)))
   `(3))
 
-(test-check "14"
+(test-check "14.0"
+  (run* (q)
+    (distinctfd `(1 2 3 4 5)))
+  `(_.0))
+
+(test-check "14.1"
+  (run* (q)
+    (distinctfd `(1 2 3 4 4 5)))
+  `())
+
+(test-check "14.2"
+  (run* (q)
+    (infd q (range 0 2))
+    (distinctfd `(,q)))
+  `(0 1 2))
+
+(test-check "14.3"
+  (run* (q)
+    (infd q (range 0 2))
+    (distinctfd `(,q ,q)))
+  `())
+
+(test-check "14.4"
   (run* (q)
     (fresh (x y z)
       (infd x y z (range 0 2))
@@ -403,4 +425,4 @@
   `(503 513 523 533 543 553 563 573 583 593))
 
 (printf "Send More Money (multiplication)\n")
-;; (printf "~s\n" (time (run* (q) (smm-mult q))))
+(printf "~s\n" (time (run* (q) (smm-mult q))))

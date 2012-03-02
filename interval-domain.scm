@@ -11,17 +11,14 @@
 
 ;;; domains (sorted lists of integers)
 
-;; OK
 (define range
   (lambda (lb ub)
     `((,lb . ,ub))))
 
-;; OK
 (define value-dom?
   (lambda (v)
     (and (integer? v) (<= 0 v))))
 
-;; OK
 (define interval?
   (lambda (x)
     (pair? x)))
