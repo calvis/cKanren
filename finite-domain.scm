@@ -22,21 +22,6 @@
 ;; of value-doms?, with no duplicates.
 (define make-dom (lambda (n*) n*))
 
-(define list-sorted?
-  (lambda (pred ls)
-    (cond
-      ((or (null? ls) (null? (cdr ls))) #t)
-      ((pred (car ls) (cadr ls))
-       (list-sorted? pred (cdr ls)))
-      (else #f))))
-
-(define list-insert
-  (lambda (pred x ls)
-    (cond
-      ((null? ls) (cons x '()))
-      ((pred x (car ls)) (cons x ls))
-      (else (cons (car ls) (list-insert pred x (cdr ls)))))))
-  
 (define map-sum
   (lambda (f)
     (letrec

@@ -3,10 +3,25 @@
   (export
     infd domfd =fd =/=fd <=fd <fd
     plusfd timesfd distinctfd range)
-  (import (rnrs) (ck) (finite-domain))
+  (import (rnrs) (ck) (interval-domain))
 
 ;;; helpers
 
+(define list-sorted?
+  (lambda (pred ls)
+    (cond
+      ((or (null? ls) (null? (cdr ls))) #t)
+      ((pred (car ls) (cadr ls))
+       (list-sorted? pred (cdr ls)))
+      (else #f))))
+
+(define list-insert
+  (lambda (pred x ls)
+    (cond
+      ((null? ls) (cons x '()))
+      ((pred x (car ls)) (cons x ls))
+      (else (cons (car ls) (list-insert pred x (cdr ls)))))))
+  
 (define pred_x
   (lambda (x)
     (lambda (oc)

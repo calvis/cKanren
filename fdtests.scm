@@ -28,18 +28,25 @@
 ;;       (<=fd c 5)))
 ;;  '((1 2 3)))
 
-(test-check "1^^"
+(test-check "0.0"
   (run* (x)
     (infd x '(1 2)))
   '(1 2))
 
-(test-check "1^"
+(test-check "0.1"
+  (run* (x)
+    (fresh (y)
+      (infd x y '(1 2))
+      (=fd x y)))
+  '(1 2))
+
+(test-check "1.0"
   (run* (x)
     (infd x '(1 2))
     (=/=fd x 1))
   `(2))
 
-(test-check "1"
+(test-check "1.1"
   (run* (q)
     (fresh (x)
       (infd x q '(1 2))
