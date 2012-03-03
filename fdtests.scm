@@ -369,18 +369,17 @@
 
 (define actual-wortho
   (lambda (ls out)
-    (let ((n (length ls)))
-      (let loop ((ls (reverse ls)) (place 1) (acc 0))
-        (cond
-          ((null? ls)
-           (== acc out))
-          (else
-            (fresh (cur acc^)
-              (infd acc^ (range 0 (max-val place)))
-              (infd cur (range 0 (sub1 (* place 10))))
-              (timesfd (car ls) place cur)
-              (plusfd acc cur acc^)
-              (loop (cdr ls) (* place 10) acc^))))))))
+    (let loop ((ls (reverse ls)) (place 1) (acc 0))
+      (cond
+        ((null? ls)
+         (== acc out))
+        (else
+          (fresh (cur acc^)
+            (infd acc^ (range 0 (max-val place)))
+            (infd cur (range 0 (sub1 (* place 10))))
+            (timesfd (car ls) place cur)
+            (plusfd acc cur acc^)
+            (loop (cdr ls) (* place 10) acc^)))))))
 
 (define max-val
   (lambda (n)
