@@ -108,11 +108,13 @@
 
 (define identitym (lambdam@ (a) a))
 
-(define composem
-  (lambda (fm f^m)
-    (lambdam@ (a)
-      (let ((a (fm a)))
-        (and a (f^m a))))))
+(define-syntax composem
+  (syntax-rules ()
+    ((_ fm) fm)
+    ((_ fm fm* ...)
+     (lambdam@ (a)
+       (let ((a (fm a)))
+         (and a ((composem fm* ...) a)))))))
 
 (define goal-construct
   (lambda (fm)

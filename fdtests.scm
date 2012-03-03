@@ -153,7 +153,15 @@
     (infd q '(1 2)))
   `())
 
-(test-check "12"
+(test-check "12.0"
+  (run* (q)
+    (fresh (x)
+      (infd x q (range 0 10))
+      (<=fd x 5)
+      (=fd q x)))
+  `(0 1 2 3 4 5))
+
+(test-check "12.1"
   (run* (q)
     (fresh (x)
       (<=fd x 5)
@@ -424,4 +432,22 @@
   `(503 513 523 533 543 553 563 573 583 593))
 
 (printf "Send More Money (multiplication)\n")
-(printf "~s\n" (time (run* (q) (smm-mult q))))
+;; (printf "~s\n" (time (run* (q) (smm-mult q))))
+
+;; Infinite / undelared domains
+
+(test-check "35"
+  (run* (q) (=fd q 5))
+  `(5))
+
+(test-check "36"
+  (run* (q) (<=fd q 5))
+  `(0 1 2 3 4 5))
+
+(test-check "37"
+  (run* (q)
+    (fresh (x y)
+      (infd x y (range 0 3))
+      (plusfd x y q)))
+  `(0 1 2 3 4 6 5))
+

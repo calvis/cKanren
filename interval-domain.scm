@@ -161,13 +161,14 @@
 
 (define min-dom
   (lambda (dom)
-    (caar dom)))
+    (and dom (caar dom))))
 
 (define max-dom
   (lambda (dom)
-    (cond
-      ((null-dom? (cdr dom)) (cdar dom))
-      (else (max-dom (cdr dom))))))
+    (and dom
+         (cond
+           ((null-dom? (cdr dom)) (cdar dom))
+           (else (max-dom (cdr dom)))))))
 
 (define memv-dom?
   (lambda (v dom)
@@ -177,19 +178,24 @@
 (define intersection-dom
   (lambda (dom1 dom2)
     (cond
-      ((or (null-dom? dom1) (null-dom? dom2)) '())
-      ((interval-< (car dom1) (car dom2))
-       (intersection-dom (cdr dom1) dom2))
-      ((interval-> (car dom1) (car dom2))
-       (intersection-dom dom1 (cdr dom2)))
+      ((not dom1) dom2)
+      ((not dom2) dom1)
       (else
-        (let ((a1 (interval-difference (car dom1) (car dom2)))
-              (a2 (interval-difference (car dom2) (car dom1))))
-          (append-dom
-            (interval-intersection (car dom1) (car dom2))
-            (intersection-dom
-              (append-dom a1 (cdr dom1))
-              (append-dom a2 (cdr dom2)))))))))
+        (let loop ((dom1 dom1) (dom2 dom2))
+          (cond
+            ((or (null-dom? dom1) (null-dom? dom2)) '())
+            ((interval-< (car dom1) (car dom2))
+             (loop (cdr dom1) dom2))
+            ((interval-> (car dom1) (car dom2))
+             (loop dom1 (cdr dom2)))
+            (else
+              (let ((a1 (interval-difference (car dom1) (car dom2)))
+                    (a2 (interval-difference (car dom2) (car dom1))))
+                (append-dom
+                  (interval-intersection (car dom1) (car dom2))
+                  (loop
+                    (append-dom a1 (cdr dom1))
+                    (append-dom a2 (cdr dom2))))))))))))
 
 (define diff-dom
   (lambda (dom1 dom2)
@@ -213,17 +219,20 @@
         (cond
           ((pred i)
            (if (= min i) `() `((,min . ,(- i 1)))))
-          ((= i max) `())
+          ((and max (= i max)) `())
           (else (loop (+ i 1))))))))
 
 (define copy-before-dom
   (lambda (pred dom)
-    (cond
-      ((null? dom) '())
-      ((let ((intvl (car dom)))
-         (and (pred (cdr intvl)) intvl))
-       => (lambda (intvl) (copy-before-interval pred intvl)))
-      (else (cons (car dom) (copy-before-dom pred (cdr dom)))))))
+    (if (not dom)
+        (copy-before-dom pred `((0 . #f)))
+        (let loop ((dom dom))
+          (cond
+            ((null? dom) '())
+            ((let ((intvl (car dom)))
+               (and (or (not (cdr intvl)) (pred (cdr intvl))) intvl))
+             => (lambda (intvl) (copy-before-interval pred intvl)))
+            (else (cons (car dom) (loop (cdr dom)))))))))
 
 (define drop-before-interval
   (lambda (pred intvl)
@@ -231,7 +240,7 @@
       (let loop ((i min))
         (cond
           ((pred i) `((,i . ,max)))
-          ((= i max) `())
+          ((and max (= i max)) `())
           (else (loop (+ i 1))))))))
 
 (define drop-before-dom
@@ -239,7 +248,7 @@
     (cond
       ((null? dom) '())
       ((let ((intvl (car dom)))
-         (and (pred (cdr intvl)) intvl))
+         (and (or (not (cdr intvl)) (pred (cdr intvl))) intvl))
        => (lambda (intvl)
             (append (drop-before-interval pred intvl) (cdr dom))))
       (else (drop-before-dom pred (cdr-dom dom))))))
@@ -362,6 +371,9 @@
 (assert (equal?
           (copy-before-dom (lambda (x) (>= x 2)) `((1 . 2) (4 . 6) (8 . 10)))
           `((1 . 1))))
+(assert (equal?
+          (copy-before-dom (lambda (x) (>= x 10)) `((0 . #f)))
+          `((0 . 9))))
 
 ;; drop-before
 (assert (equal?

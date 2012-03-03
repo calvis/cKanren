@@ -1,7 +1,7 @@
 (library
   (fd)
   (export
-    infd domfd =fd =/=fd <=fd <fd
+    infd domfd =fd =/=fd <=fd <fd c-op
     plusfd timesfd distinctfd range)
   (import
     (rename (rnrs) (list-sort rnrs:list-sort))
@@ -186,49 +186,64 @@
                 (loop (cdr x*)))))
         (else (loop (cdr x*)))))))
 
-(define-syntax c-op  ;;; returns sequel.
+(define enough-bound?
+  (lambda (dom*)
+    (let ((n (length dom*)))
+      (let loop ((i 0) (dom* dom*))
+        (cond
+          ((= i n) #f)
+          ((null? dom*) #t)
+          ((car dom*) (loop i (cdr dom*)))
+          (else (loop (+ i 1) (cdr dom*))))))))
+
+(define-syntax c-op
   (syntax-rules (:)
-    ((_ op ((u : d_u) ...) body)
+    ((_ op ((u : d_u) ...) (let (b ...) (v : nd_u) ...))
      (lambdam@ (a : s c)
        (let-dom (s c) ((u : d_u) ...)
          (let* ((oc (build-oc op u ...)))
-           (cond
-             ((and d_u ...) ((composem (update-c oc) body) a))
-             (else ((update-c oc) a)))))))))
+           ((cond
+              ((and d_u ...)
+               (let (b ...)
+                 (composem
+                   (update-c oc)
+                   (process-dom v nd_u)
+                   ...)))
+              ((enough-bound? `(,d_u ...))
+               (let (b ...)
+                 (composem
+                   (update-c oc)
+                   (if (not d_u)
+                       (process-dom v nd_u)
+                       identitym)
+                   ...)))
+              (else (update-c oc)))
+            a)))))))
 
 (define =fd-c
   (lambda (u v)
     (c-op =fd ((u : d_u) (v : d_v))
       (let ((i (intersection-dom d_u d_v)))
-        (composem
-          (process-dom u i)
-          (process-dom v i))))))
+        (u : i)
+        (v : i)))))
 
 (define <=fd-c
   (lambda (u v)
     (c-op <=fd-c ((u : d_u) (v : d_v))
       (let ((umin (min-dom d_u))
             (vmax (max-dom d_v)))
-        (composem
-          (process-dom u
-            (copy-before-dom (lambda (u) (< vmax u)) d_u))
-          (process-dom v
-            (drop-before-dom (lambda (v) (<= umin v)) d_v)))))))
+        (u : (copy-before-dom (lambda (u) (< vmax u)) d_u))
+        (v : (drop-before-dom (lambda (v) (<= umin v)) d_v))))))
 
 (define plusfd-c
   (lambda (u v w)
     (c-op plusfd-c ((u : d_u) (v : d_v) (w : d_w))
       (let ((wmin (min-dom d_w)) (wmax (max-dom d_w))
             (umin (min-dom d_u)) (umax (max-dom d_u))
-            (vmin (min-dom d_v)) (vmax (max-dom d_v)))
-        (composem
-          (process-dom w
-            (range (+ umin vmin) (+ umax vmax)))
-          (composem
-            (process-dom u
-              (range (- wmin vmax) (- wmax vmin)))
-            (process-dom v
-              (range (- wmin umax) (- wmax umin)))))))))
+            (vmin (min-dom d_v)) (vmax (max-dom d_v))) 
+        (u : (range (- wmin vmax) (- wmax vmin)))
+        (v : (range (- wmin umax) (- wmax umin)))
+        (w : (range (+ umin vmin) (+ umax vmax)))))))
 
 (define timesfd-c
   (lambda (u v w)
@@ -237,18 +252,13 @@
         (let ((wmin (min-dom d_w)) (wmax (max-dom d_w))
               (umin (min-dom d_u)) (umax (max-dom d_u))
               (vmin (min-dom d_v)) (vmax (max-dom d_v)))
-          (let ([u-range (range
-                           (safe-div vmax umin wmin)
-                           (safe-div vmin umax wmax))]
-                [v-range (range
-                           (safe-div umax vmin wmin)
-                           (safe-div umin vmax wmax))]
-                [w-range (range (* umin vmin) (* umax vmax))])
-            (composem
-              (process-dom w w-range)
-              (composem
-                (process-dom u u-range)
-                (process-dom v v-range)))))))))
+          (w : (range (* umin vmin) (* umax vmax)))
+          (u : (range
+                 (safe-div vmax umin wmin)
+                 (safe-div vmin umax wmax)))
+          (v : (range
+                 (safe-div umax vmin wmin)
+                 (safe-div umin vmax wmax))))))))
 
 (define enforce-constraintsfd
   (lambda (x)
