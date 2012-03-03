@@ -211,9 +211,9 @@
             (vmax (max-dom d_v)))
         (composem
           (process-dom u
-            (copy-before (lambda (u) (< vmax u)) d_u))
+            (copy-before-dom (lambda (u) (< vmax u)) d_u))
           (process-dom v
-            (drop-before (lambda (v) (<= umin v)) d_v)))))))
+            (drop-before-dom (lambda (v) (<= umin v)) d_v)))))))
 
 (define plusfd-c
   (lambda (u v w)
