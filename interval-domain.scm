@@ -119,8 +119,6 @@
   (lambda (v)
     (and (integer? v) (<= 0 v))))
 
-;; n* should be a non-empty sorted (small to large) list
-;; of value-dom?s, with no duplicates.
 (define make-dom
   (lambda (n*)
     (let loop ((n* n*))

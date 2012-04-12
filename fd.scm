@@ -41,12 +41,6 @@
           ((find pred c) (cons oc (remp pred c)))
           (else (cons oc c)))))))
 
-;;; domains (sorted lists of integers)
-
-
-;;; procedures below this point cannot
-;;; expose the representations of doms!
-
 (define get-dom
   (lambda (x c)
     (cond
@@ -139,9 +133,9 @@
 (define distinctfd-c
   (lambda (v*)
     (lambdam@ (a : s c)
-      (let ((v* (walk v* s)))
+      (let ((v* (walk* v* s)))
         (cond
-          ((var? v*)
+          ((not (list? v*))
            (let ((oc (build-oc distinctfd-c v*)))
              ((update-c oc) a))) 
           (else

@@ -31,14 +31,12 @@
           ((pred? x) a)
           (else ((update-c (build-oc required-c pred? x)) a)))))))
 
-(define required-enforce
+(define required-enforceo
   (lambda (x)
-    (goal-construct (enforce-required))))
-
-(define (enforce-required)
-  (lambdam@ (a : s c)
-    (and (not (find (lambda (oc) (eq? 'required-c (oc->rator oc))) c))
-         a)))
+    (goal-construct
+      (lambdam@ (a : s c)
+        (and (not (find (lambda (oc) (eq? 'required-c (oc->rator oc))) c))
+             a)))))
 
 (define allowedo
   (lambda (pred? x)
@@ -58,7 +56,7 @@
       (let ((c (walk* (map cddr c) r)))
         `((allowed . ,c))))))
 
-(extend-enforce-fns 'required required-enforce)
+(extend-enforce-fns 'required required-enforceo)
 (extend-reify-fns 'allowed reified-allowed)
 
 )
