@@ -3,7 +3,9 @@
   (import
     (rnrs)
     (cKanren ck)
-    (cKanren tree-unify))
+    (cKanren tree-unify)
+    (cKanren pref)
+    (cKanren tester))
 
   (define (run-preftests)
 

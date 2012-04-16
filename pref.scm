@@ -10,19 +10,12 @@
 ;; unground.  It is also acceptable if x is unified with any value
 ;; in the domain zbefore reification.
 ;;
-;; This goal is not compatitble with =/= (from neq.scm)
+;; This goal is not designed to be compatitble with =/= (from neq.scm)
 
 (library
-  (pref)
-  (export
-    prefo
-    usepref
-    get-dom
-    enforce-constraintspref)
-  (import
-    (rnrs)
-    (ck)
-    (mk))
+  (cKanren pref)
+  (export prefo enforce-constraintspref)
+  (import (rnrs) (cKanren ck) (cKanren tree-unify))
   
   (define prefo
     (lambda (x l)
@@ -30,66 +23,44 @@
   
   (define prefo-c
     (lambda (x l)
-      (lambdam@ (a : s d c)
-        ((process-prefdom (walk x s) l) a))))
-
-  (define process-prefdom
-    (lambda (x l)
-      (lambdam@ (a : s d c)
-        (cond
-          ((var? x)
-           (identitym (make-a s (ext-d x l d) c)))
-          ((memq x l) (identitym a))
-          (else #f)))))
-
-  (define get-dom
-    (lambda (x d)
-      (cond
-        ((assq x d) => rhs)
-        (else #f))))
-
-  (define (pick-prefs)
-    (lambdam@ (a : s d c)
-      ((letrec
-           ((loop
-              (lambda (d)
-                (cond
-                  ((null? d) unitg)
-                  (else
-                    (let ((x (walk (caar d) s)))
-                      (cond
-                        ((var? x)
-                         (fresh ()
-                           (== x (cadar d))
-                           (loop (cdr d))))
-                        (else (loop (cdr d))))))))))
-         (loop d))
-       a)))
-
-  (define process-prefixpref
-    (lambda (p c)
-      (cond
-        ((null? p) identitym)
-        (else
-          (let ((x (lhs (car p))) (v (rhs (car p))))
-            (lambdam@ (a : s d c)
-              (cond
-                ((and (not (var? v)) (get-dom x d))
-                 => (lambda (dom)
-                      (and (memq v dom)
-                           ((process-prefixpref (cdr p) c) a))))
-                (else ((process-prefixpref (cdr p) c) a)))))))))
-
-  (define reify-constraintspref identitym)
+      (lambdam@ (a : s c)
+        (let ((x (walk x s)))
+          (cond
+            ((var? x)
+             ((update-c (build-oc prefo-c x l)) a))
+            ((memq x l) a)
+            (else #f))))))
   
+  (define pick-prefs
+    (lambda ()
+      (lambdag@ (a : s c)
+        ((letrec
+             ((loop
+                (lambda (c^)
+                  (cond
+                    ((null? c^) unitg)
+                    (else
+                      (let ((x (walk (caar c^) s)))
+                        (cond
+                          ((var? x)
+                           (fresh ()
+                             (== x (cadar c^))
+                             (loop (cdr c^))))
+                          (else (loop (cdr c^))))))))))
+           (loop
+             (map
+               ;; This is lazy
+               (lambda (oc)
+                 (cons (caddr oc) (cadddr oc)))
+               (filter
+                 (lambda (oc) (eq? (oc->rator oc) 'prefo-c))
+                 c))))
+         a))))
+
   (define enforce-constraintspref
     (lambda (x)
-      (goal-construct (pick-prefs))))
+      (pick-prefs)))
   
-  (define usepref
-    (lambda ()
-      (process-prefix process-prefixpref)
-      (reify-constraints reify-constraintspref)
-      (enforce-constraints enforce-constraintspref)))
+  (extend-enforce-fns 'pref enforce-constraintspref)
 
 )
