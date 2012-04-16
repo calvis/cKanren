@@ -19,9 +19,49 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 
-
 ----------------------------------------------------------------------------
 
 The cKanren library (found in ck.scm) imports Chez Scheme paramters. 
 In order to use a different implementation of parameters, simply change 
 that import to the library of your choice (one alternative is SRFI 39).
+
+----------------------------------------------------------------------------
+
+Usage:
+-----
+
+Here are some examples for using cKanren and miniKanren. These require
+that cKanren be in your current directory, or alternatively in your
+libdirs path (if your implementation supports such a feature). For
+instance, to use cKanren in your libdir with Chez Scheme:
+
+`mv cKanren /usr/lib/scheme/
+scheme --libdirs ".:/usr/lib/scheme" --program my-minikanren-program.ss`
+
+### OR
+
+`mv cKanren /usr/lib/scheme/
+export CHEZSCHEMELIBDIRS="$CHEZSCHEMELIBDIRS:/usr/lib/scheme"
+scheme --program my-minikanren-program.ss`
+
+Here are a few example files that use miniKanren and cKanren:
+
+`(library (foo)
+  (export bar)
+  (import 
+    (cKanren miniKanren)
+    (cKanren mk)
+    (cKanren tree-unify))
+  
+  ;; your miniKanren code)`
+
+`(library (baz)
+  (export bar)
+  (import 
+    (cKanren ck)
+    (cKanren <constraints>)
+    ...)
+  
+  ;; your cKanren code)`
+
+
