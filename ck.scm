@@ -10,7 +10,7 @@
 
     ;; mk
     lhs rhs walk walk* var? lambdag@ mzerog unitg onceo
-    conde conda condu ifa ifu project fresh :)
+    conde conda condu ifa ifu project fresh succeed :)
   
   (import
     (rnrs)

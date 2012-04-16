@@ -1,7 +1,7 @@
 (import (cKanren tester))
 (import (cKanren ck))
 (import (cKanren fd))
-(import (cKanren tree-unfiy))
+(import (cKanren tree-unify))
 
 ;; (test-check "-1"
 ;;   (run* (q)
