@@ -35,33 +35,37 @@ that cKanren be in your current directory, or alternatively in your
 libdirs path (if your implementation supports such a feature). For
 instance, to use cKanren in your libdir with Chez Scheme:
 
-`mv cKanren /usr/lib/scheme/
-scheme --libdirs ".:/usr/lib/scheme" --program my-minikanren-program.ss`
+`mv cKanren /usr/lib/scheme/`
+`scheme --libdirs ".:/usr/lib/scheme" --program my-minikanren-program.ss`
 
 ### OR
 
-`mv cKanren /usr/lib/scheme/
-export CHEZSCHEMELIBDIRS="$CHEZSCHEMELIBDIRS:/usr/lib/scheme"
-scheme --program my-minikanren-program.ss`
+`mv cKanren /usr/lib/scheme/`
+`export CHEZSCHEMELIBDIRS="$CHEZSCHEMELIBDIRS:/usr/lib/scheme"`
+`scheme --program my-minikanren-program.ss`
 
 Here are a few example files that use miniKanren and cKanren:
 
-```(library (foo)
+```
+(library (foo)
   (export bar)
   (import 
     (cKanren miniKanren)
     (cKanren mk)
     (cKanren tree-unify))
   
-  ;; your miniKanren code)```
+  ;; your miniKanren code)
+```
 
-```(library (baz)
+```
+(library (baz)
   (export bar)
   (import 
     (cKanren ck)
     (cKanren <constraints>)
     ...)
   
-  ;; your cKanren code)```
+  ;; your cKanren code)
+```
 
 
