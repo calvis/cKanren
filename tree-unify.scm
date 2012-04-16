@@ -1,7 +1,7 @@
 (library
-  (tree-unify)
+  (cKanren tree-unify)
   (export == unify)
-  (import (rnrs) (ck))
+  (import (rnrs) (cKanren ck))
 
 ;; ---UNIFICATION--------------------------------------------------
 
@@ -64,6 +64,4 @@
             (loop (cdr s^))))))))
 
 )
-
-(import (tree-unify))
 

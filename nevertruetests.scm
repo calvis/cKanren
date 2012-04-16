@@ -1,6 +1,6 @@
-(import (never-true))
-(import (tree-unify))
-(import (tester))
+(import (cKanren never-true))
+(import (cKanren tree-unify))
+(import (cKanren tester))
 
 (test-check "1"
   (run* (q) (== q '()) (never-pairo q))

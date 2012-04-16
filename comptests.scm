@@ -1,6 +1,6 @@
-(load "ck.scm")
-(load "fd.scm")
-(load "neq.scm")
+(import (cKanren ck))
+(import (cKanren neq))
+(import (cKanren tree-unify))
 
 (define n-queenso
   (lambda (q n)

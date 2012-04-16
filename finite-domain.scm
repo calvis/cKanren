@@ -1,10 +1,10 @@
 (library
-  (finite-domain)
+  (cKanren finite-domain)
   (export range value-dom? list-sorted? list-insert
     map-sum null-dom? singleton-dom? singleton-element-dom
     min-dom max-dom memv-dom? intersection-dom diff-dom
     copy-before drop-before disjoint-dom? make-dom)
-  (import (rnrs) (ck))
+  (import (rnrs) (cKanren ck))
 
 ;;; domains (sorted lists of integers)
 

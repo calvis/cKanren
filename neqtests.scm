@@ -1,7 +1,7 @@
-(load "tester.scm")
-(load "ck.scm")
-(load "tree-unify.scm")
-(load "neq.scm")
+(import (cKanren tester))
+(import (cKanren ck))
+(import (cKanren tree-unify))
+(import (cKanren neq))
 
 (define distincto
   (lambda (l)

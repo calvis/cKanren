@@ -1,12 +1,12 @@
 (library
-  (fd)
+  (cKanren fd)
   (export
     infd domfd =fd =/=fd <=fd <fd
     plusfd timesfd distinctfd range)
   (import
     (rename (rnrs) (list-sort rnrs:list-sort))
-    (ck) (interval-domain)
-    (only (chezscheme) trace-define))
+    (cKanren ck)
+    (cKanren interval-domain))
 
 ;;; helpers
 
@@ -323,6 +323,4 @@
 (extend-enforce-fns 'fd enforce-constraintsfd)
 
 )
-
-(import (fd))
 

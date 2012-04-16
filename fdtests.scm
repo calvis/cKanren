@@ -1,7 +1,7 @@
-(load "tester.scm")
-(load "ck.scm")
-(load "fd.scm")
-(load "tree-unify.scm")
+(import (cKanren tester))
+(import (cKanren ck))
+(import (cKanren fd))
+(import (cKanren tree-unfiy))
 
 ;; (test-check "-1"
 ;;   (run* (q)
