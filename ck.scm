@@ -10,7 +10,7 @@
 
     ;; mk
     lhs rhs walk walk* var? lambdag@ mzerog unitg onceo
-    conde conda condu ifa ifu project fresh succeed :)
+    conde conda condu ifa ifu project fresh succeed fail :)
   
   (import
     (rnrs)
@@ -229,10 +229,10 @@
 
 (define run-reify-fns
   (lambda (v r c)
-    (let loop ((fns (reify-fns)) (c c))
+    (let loop ((fns (reify-fns)) (c^ `()))
       (cond
-        ((null? fns) c)
-        (else (loop (cdr fns) ((cdar fns) v r c)))))))
+        ((null? fns) c^)
+        (else (loop (cdr fns) (append ((cdar fns) v r c) c^)))))))
 
 ;; ---MACROS-------------------------------------------------------
 
