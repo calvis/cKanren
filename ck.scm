@@ -22,18 +22,18 @@
 (define any/var?
   (lambda (p)
     (cond
-      ((var? p) #t)
       ((pair? p)
        (or (any/var? (car p)) (any/var? (cdr p))))
+      ((var? p) #t)
       (else #f))))
 
 (define any-relevant/var?
   (lambda (t x*)
     (cond
-      ((var? t) (memq t x*))
       ((pair? t)
        (or (any-relevant/var? (car t) x*)
            (any-relevant/var? (cdr t) x*)))
+      ((var? t) (memq t x*))
       (else #f))))
 
 (define prefix-s
