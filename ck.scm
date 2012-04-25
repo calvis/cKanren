@@ -133,13 +133,13 @@
 (define-syntax build-oc-aux
   (syntax-rules ()
     ((_ op () (z ...) (arg ...))
-     (let ((z arg) ...) `(,(op z ...) . (op ,z ...))))
+     (let ((z arg) ...) `((op ,z ...) . ,(op z ...))))
     ((_ op (arg0 arg ...) (z ...) args)
      (build-oc-aux op (arg ...) (z ... q) args))))
 
-(define oc->proc car)
-(define oc->rands cddr)
-(define oc->rator cadr)
+(define oc->proc cdr)
+(define oc->rands cdar)
+(define oc->rator caar)
 
 ;; ---FIXED-POINT--------------------------------------------------
 

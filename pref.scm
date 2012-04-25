@@ -49,9 +49,9 @@
                           (else (loop (cdr c^))))))))))
            (loop
              (map
-               ;; This is lazy
                (lambda (oc)
-                 (cons (caddr oc) (cadddr oc)))
+                 (let ((p (oc->rands oc)))
+                   (cons (car p) (cadr p))))
                (filter
                  (lambda (oc) (eq? (oc->rator oc) 'prefo-c))
                  c))))

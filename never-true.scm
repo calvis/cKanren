@@ -53,7 +53,7 @@
 (define reified-allowed
   (lambda (v r c)
     (let ((c (filter (lambda (oc) (eq? (oc->rator oc) 'allowed-c)) c)))
-      (let ((c (walk* (map cddr c) r)))
+      (let ((c (walk* (map oc->rands c) r)))
         `((allowed . ,c))))))
 
 (extend-enforce-fns 'required required-enforceo)
