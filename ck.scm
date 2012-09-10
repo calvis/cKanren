@@ -15,7 +15,7 @@
   (import
     (rnrs)
     (cKanren mk)
-    (only (chezscheme) make-parameter))
+    (compat))
 
 ;; ---HELPERS------------------------------------------------------
 

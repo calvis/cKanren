@@ -1,7 +1,7 @@
 (library
   (cKanren tester)
   (export test-check test-divergence)
-  (import (chezscheme))
+  (import (rnrs) (compat))
 
 (define test-error
   (lambda (tag . args)
