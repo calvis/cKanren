@@ -1,51 +1,16 @@
 (library
-  (fd)
+  (cKanren fd)
   (export
     infd domfd =fd =/=fd <=fd <fd
-    plusfd distinctfd range)
-  (import (rnrs) (ck))
+    plusfd timesfd distinctfd range)
+  (import
+    (rename (rnrs) (list-sort rnrs:list-sort))
+    (cKanren ck)
+    (cKanren interval-domain))
 
 ;;; helpers
 
-(define range
-  (lambda (lb ub)
-    (cond
-      ((< lb ub) (cons lb (range (+ lb 1) ub)))
-      (else (cons lb '())))))
-
-(define-syntax lambdamfd@
-  (syntax-rules ()
-    ((_ (a) e) (lambdam@ (a) e))
-    ((_ (a : s c) e) (lambdam@ (a : s c) e))))
-
-(define-syntax lambdagfd@
-  (syntax-rules ()
-    ((_ (a) e) (lambdag@ (a) e))
-    ((_ (a : s c) e) (lambdag@ (a : s c) e))))
-
-(define pred_x
-  (lambda (x)
-    (lambda (oc)
-      (and (eq? (oc->rator oc) 'domfd-c)
-           (eq? (car (oc->rands oc)) x)))))
-
-(define ext-d
-  (lambda (x dom c)
-    (let ((oc (build-oc domfd-c x dom)))
-      (let ((pred (pred_x x)))
-        (cond
-          ((find pred c) (cons oc (remp pred c)))
-          (else (cons oc c)))))))
-
-;;; domains (sorted lists of integers)
-
-(define value-dom?
-  (lambda (v)
-    (and (integer? v) (<= 0 v))))
-
-;; n* should be a non-empty sorted (small to large) list
-;; of value-doms?, with no duplicates.
-(define make-dom (lambda (n*) n*))
+(define list-sort rnrs:list-sort)
 
 (define list-sorted?
   (lambda (pred ls)
@@ -62,99 +27,19 @@
       ((pred x (car ls)) (cons x ls))
       (else (cons (car ls) (list-insert pred x (cdr ls)))))))
   
-(define map-sum
-  (lambda (f)
-    (letrec
-      ((loop
-         (lambda (ls)
-           (cond
-             ((null? ls) (lambdagfd@ (a) (mzerog)))
-             (else
-               (conde
-                 ((f (car ls)))
-                 ((loop (cdr ls)))))))))
-      loop)))
-
-(define null-dom?
+(define pred_x
   (lambda (x)
-    (null? x)))
+    (lambda (oc)
+      (and (eq? (oc->rator oc) 'domfd-c)
+           (eq? (car (oc->rands oc)) x)))))
 
-(define singleton-dom?
-  (lambda (dom)
-    (null? (cdr dom))))
-
-(define singleton-element-dom
-  (lambda (dom)
-    (car dom)))
-
-(define min-dom
-  (lambda (dom)
-    (car dom)))
-
-(define max-dom
-  (lambda (dom)
-    (cond
-      ((null? (cdr dom)) (car dom))
-      (else (max-dom (cdr dom))))))
-
-(define memv-dom?
-  (lambda (v dom)
-    (and (value-dom? v) (memv v dom))))
-
-(define intersection-dom
-  (lambda (dom1 dom2)
-    (cond
-      ((or (null? dom1) (null? dom2)) '())
-      ((= (car dom1) (car dom2))
-       (cons (car dom1)
-         (intersection-dom (cdr dom1) (cdr dom2))))
-      ((< (car dom1) (car dom2))
-       (intersection-dom (cdr dom1) dom2))
-      (else (intersection-dom dom1 (cdr dom2))))))
-
-(define diff-dom
-  (lambda (dom1 dom2)
-    (cond
-      ((or (null? dom1) (null? dom2)) dom1)
-      ((= (car dom1) (car dom2))
-       (diff-dom (cdr dom1) (cdr dom2)))
-      ((< (car dom1) (car dom2))
-       (cons (car dom1) (diff-dom (cdr dom1) dom2)))
-      (else (diff-dom dom1 (cdr dom2))))))
-
-(define copy-before   
-  (lambda (pred dom)
-    (cond
-      ((null? dom) '())
-      ((pred (car dom)) '())
-      (else (cons (car dom) (copy-before pred (cdr dom)))))))
-
-(define drop-before
-  (lambda (pred dom)
-    (cond
-      ((null? dom) '())
-      ((pred (car dom)) dom)
-      (else (drop-before pred (cdr dom))))))
-
-(define disjoint-dom?
-  (lambda (dom1 dom2)
-    (cond
-      ((or (null? dom1) (null? dom2)) #t)
-      ((= (car dom1) (car dom2)) #f)
-      ((< (car dom1) (car dom2))
-       (disjoint-dom? (cdr dom1) dom2))
-      (else (disjoint-dom? dom1 (cdr dom2))))))
-
-;;; procedures below this point cannot
-;;; expose the representations of doms!
-
-;; (define get-dom
-;;   (lambda (x c)
-;;     (cond
-;;       ((find (lambda (oc) (and (eq? (oc->rator oc) 'domfd-c)
-;;                           (eq? (car (oc->rands oc)) x))) c)
-;;        => (lambda (oc) (cadr (oc->rands oc))))
-;;       (else #f))))
+(define ext-d
+  (lambda (x dom c)
+    (let ((oc (build-oc domfd-c x dom)))
+      (let ((pred (pred_x x)))
+        (cond
+          ((find pred c) (cons oc (remp pred c)))
+          (else (cons oc c)))))))
 
 (define get-dom
   (lambda (x c)
@@ -165,7 +50,7 @@
 
 (define process-dom
   (lambda (v dom)
-    (lambdamfd@ (a)
+    (lambdam@ (a)
       (cond
         ((var? v) ((update-var-dom v dom) a))
         ((memv-dom? v dom) a)
@@ -173,7 +58,7 @@
 
 (define update-var-dom 
   (lambda (x dom)
-    (lambdamfd@ (a : s c)
+    (lambdam@ (a : s c)
       (cond
         ((get-dom x c)
          => (lambda (xdom)
@@ -185,7 +70,7 @@
 
 (define resolve-storable-dom
   (lambda (dom x)
-    (lambdamfd@ (a : s c)
+    (lambdam@ (a : s c)
       (cond
         ((singleton-dom? dom)
          (let ((n (singleton-element-dom dom)))
@@ -194,7 +79,7 @@
 
 (define force-ans
   (lambda (x)
-    (lambdagfd@ (a : s c)
+    (lambdag@ (a : s c)
       (let ((x (walk x s)))
         ((cond
            ((and (var? x) (get-dom x c))
@@ -219,7 +104,7 @@
 
 (define =/=fd-c
   (lambda (u v)
-    (lambdamfd@ (a : s c)
+    (lambdam@ (a : s c)
       (let-dom (s c) ((u : d_u) (v : d_v))
         (cond
           ((or (not d_u) (not d_v))
@@ -247,10 +132,10 @@
 
 (define distinctfd-c
   (lambda (v*)
-    (lambdamfd@ (a : s c)
-      (let ((v* (walk v* s)))
+    (lambdam@ (a : s c)
+      (let ((v* (walk* v* s)))
         (cond
-          ((var? v*)
+          ((not (list? v*))
            (let ((oc (build-oc distinctfd-c v*)))
              ((update-c oc) a))) 
           (else
@@ -263,7 +148,7 @@
 
 (define distinct/fd-c
   (lambda (y* n*)
-    (lambdamfd@ (a : s c)
+    (lambdam@ (a : s c)
       (let loop ((y* y*) (n* n*) (x* '()))
         (cond
           ((null? y*)
@@ -275,10 +160,13 @@
           (else
             (let ((y (walk (car y*) s)))
               (cond
-                ((var? y) (loop (cdr y*) n* (cons y x*)))
-                ((memv-dom? y n*) #f)
-                (else (let ((n* (list-insert < y n*)))
-                        (loop (cdr y*) n* x*)))))))))))
+                ((var? y)
+                 (loop (cdr y*) n* (cons y x*)))
+                ;; n* is NOT A DOM
+                ((memv y n*) #f)
+                (else
+                  (let ((n* (list-insert < y n*)))
+                    (loop (cdr y*) n* x*)))))))))))
 
 (define exclude-from-dom
   (lambda (dom1 c x*)
@@ -295,7 +183,7 @@
 (define-syntax c-op  ;;; returns sequel.
   (syntax-rules (:)
     ((_ op ((u : d_u) ...) body)
-     (lambdamfd@ (a : s c)
+     (lambdam@ (a : s c)
        (let-dom (s c) ((u : d_u) ...)
          (let* ((oc (build-oc op u ...)))
            (cond
@@ -317,9 +205,9 @@
             (vmax (max-dom d_v)))
         (composem
           (process-dom u
-            (copy-before (lambda (u) (< vmax u)) d_u))
+            (copy-before-dom (lambda (u) (< vmax u)) d_u))
           (process-dom v
-            (drop-before (lambda (v) (<= umin v)) d_v)))))))
+            (drop-before-dom (lambda (v) (<= umin v)) d_v)))))))
 
 (define plusfd-c
   (lambda (u v w)
@@ -336,11 +224,31 @@
             (process-dom v
               (range (- wmin umax) (- wmax umin)))))))))
 
+(define timesfd-c
+  (lambda (u v w)
+    (let ((safe-div (lambda (n c a) (if (zero? n) c (div a n)))))
+      (c-op timesfd-c ((u : d_u) (v : d_v) (w : d_w))
+        (let ((wmin (min-dom d_w)) (wmax (max-dom d_w))
+              (umin (min-dom d_u)) (umax (max-dom d_u))
+              (vmin (min-dom d_v)) (vmax (max-dom d_v)))
+          (let ([u-range (range
+                           (safe-div vmax umin wmin)
+                           (safe-div vmin umax wmax))]
+                [v-range (range
+                           (safe-div umax vmin wmin)
+                           (safe-div umin vmax wmax))]
+                [w-range (range (* umin vmin) (* umax vmax))])
+            (composem
+              (process-dom w w-range)
+              (composem
+                (process-dom u u-range)
+                (process-dom v v-range)))))))))
+
 (define enforce-constraintsfd
   (lambda (x)
     (fresh ()
       (force-ans x)
-      (lambdagfd@ (a : s c)
+      (lambdag@ (a : s c)
         (let ((bound-x* (map
                           (lambda (oc)
                             (let ((r (oc->rands oc)))
@@ -356,7 +264,8 @@
     (unless (null? c)
       (let ((oc (car c)))
         (if (memq (oc->rator oc)
-              '(=/=fd-c distinctfd-c distinct/fd-c <=fd-c =fd-c))
+              '(=/=fd-c distinctfd-c distinct/fd-c
+                <=fd-c =fd-c plusfd-c timesfd-c))
             (cond
               ((find (lambda (x) (not (memq x bound-x*)))
                  (filter var? (oc->rands oc)))
@@ -374,8 +283,8 @@
 
 (define domfd-c
   (lambda (x n*)
-    (lambdamfd@ (a : s c)
-      ((process-dom (walk x s) (make-dom (list-sort < n*))) a))))
+    (lambdam@ (a : s c)
+      ((process-dom (walk x s) (make-dom n*)) a))))
 
 (define-syntax infd
   (syntax-rules ()
@@ -403,6 +312,10 @@
   (lambda (u v w)
     (goal-construct (plusfd-c u v w))))
 
+(define timesfd
+  (lambda (u v w)
+    (goal-construct (timesfd-c u v w))))
+
 (define distinctfd
   (lambda (v*)
     (goal-construct (distinctfd-c v*))))
@@ -410,6 +323,4 @@
 (extend-enforce-fns 'fd enforce-constraintsfd)
 
 )
-
-(import (fd))
 

@@ -1,5 +1,5 @@
 (library 
-  (ck)
+  (cKanren ck)
 
   (export
     ;; framework
@@ -10,28 +10,30 @@
 
     ;; mk
     lhs rhs walk walk* var? lambdag@ mzerog unitg onceo
-    conde conda condu ifa ifu project fresh :)
+    conde conda condu ifa ifu project fresh succeed fail :)
   
-  (import (rnrs) (mk)
-          (compat))
+  (import
+    (rnrs)
+    (cKanren mk)
+    (compat))
 
 ;; ---HELPERS------------------------------------------------------
 
 (define any/var?
   (lambda (p)
     (cond
-      ((var? p) #t)
       ((pair? p)
        (or (any/var? (car p)) (any/var? (cdr p))))
+      ((var? p) #t)
       (else #f))))
 
 (define any-relevant/var?
   (lambda (t x*)
     (cond
-      ((var? t) (memq t x*))
       ((pair? t)
        (or (any-relevant/var? (car t) x*)
            (any-relevant/var? (cdr t) x*)))
+      ((var? t) (memq t x*))
       (else #f))))
 
 (define prefix-s
@@ -131,13 +133,13 @@
 (define-syntax build-oc-aux
   (syntax-rules ()
     ((_ op () (z ...) (arg ...))
-     (let ((z arg) ...) `(,(op z ...) . (op ,z ...))))
+     (let ((z arg) ...) `((op ,z ...) . ,(op z ...))))
     ((_ op (arg0 arg ...) (z ...) args)
      (build-oc-aux op (arg ...) (z ... q) args))))
 
-(define oc->proc car)
-(define oc->rands cddr)
-(define oc->rator cadr)
+(define oc->proc cdr)
+(define oc->rands cdar)
+(define oc->rator caar)
 
 ;; ---FIXED-POINT--------------------------------------------------
 
@@ -227,10 +229,10 @@
 
 (define run-reify-fns
   (lambda (v r c)
-    (let loop ((fns (reify-fns)) (c c))
+    (let loop ((fns (reify-fns)) (c^ `()))
       (cond
-        ((null? fns) c)
-        (else (loop (cdr fns) ((cdar fns) v r c)))))))
+        ((null? fns) c^)
+        (else (loop (cdr fns) (append ((cdar fns) v r c) c^)))))))
 
 ;; ---MACROS-------------------------------------------------------
 
@@ -251,4 +253,3 @@
 
 )
 
-(import (ck))

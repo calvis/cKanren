@@ -1,8 +1,8 @@
 (library
-  (neq)
+  (cKanren neq)
   (export =/=)
-  (import (rnrs) (ck)
-    (only (tree-unify) unify))
+  (import (rnrs) (cKanren ck)
+    (only (cKanren tree-unify) unify))
 
 ;;; little helpers
 
@@ -94,4 +94,3 @@
 
 )
 
-(import (neq))
