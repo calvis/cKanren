@@ -1,21 +1,31 @@
 #lang racket
 
-(require racket/generic syntax/parse) 
+(require racket/generic) 
 
 (provide
  ;; framework for defining constraints
  update-s update-c make-a any/var? prefix-s prtm
  lambdam@ identitym composem goal-construct ext-c
  build-oc oc->proc oc->rands oc->rator run run* prt
- extend-enforce-fns extend-reify-fns
+ extend-enforce-fns extend-reify-fns goal? a? 
  lhs rhs walk walk* var? lambdag@ mzerog unitg onceo
- conde conda condu ifa ifu project fresh succeed fail)
+ conde conda condu ifa ifu project fresh succeed fail
+ lambdaf@ inc enforce-constraints reify empty-a take
+ safe-goals?)
+
+(define safe-goals? (make-parameter #f))
+
+(define-generics constrained-var)
+
+(define (write-var var port mode)
+  ((case mode [(#t) write] [(#f) display] [else print])
+   (format "#(~s)" (var-x var)) port))
 
 ;; vars are actually constrained-vars  
-(define-generics constrained-var)
 (define-struct var (x) 
   #:transparent 
-  #:methods gen:constrained-var ())
+  #:methods gen:constrained-var ()
+  #:methods gen:custom-write ([define write-proc write-var]))
 
 (define lhs (lambda (x) (car x)))
 (define rhs (lambda (x) (cdr x)))
@@ -57,7 +67,7 @@
 ;; the failure value
 (define (mzerog) #f)
 
-;; returns the identity goal
+;; the identity goal
 (define unitg (lambdag@ (a) a))
 
 ;; succeed and fail are the simplest succeeding and failing goals
@@ -101,18 +111,31 @@
        ((a) (cons a '()))
        ((a f) (cons a (take (and n (- n 1)) f)))))))
 
+(define-syntax wrap-goal
+  (syntax-rules ()
+    [(_ g)
+     (if (safe-goals?) 
+         (let ((g^ g)) (safe-goal-wrap 'g g^)) 
+         g)]))
+
+(define (safe-goal-wrap orig val)
+  (cond
+   [(goal? val) val] 
+   [else (error 'ck "~s evaluated to ~s which is not a goal" orig val)]))
+
 (define-syntax bindg*
   (syntax-rules ()
-    ((_ e) e)
-    ((_ e g0 g ...) (bindg* (bindg e g0) g ...))))
+    [(_ e) e]
+    [(_ e g g* ...)
+     (bindg* (bindg e g) g* ...)]))
 
 (define bindg
   (lambda (a-inf g)
     (case-inf a-inf
       (() (mzerog))
       ((f) (inc (bindg (f) g)))
-      ((a) (g a))
-      ((a f) (mplusg (g a) (lambdaf@ () (bindg (f) g)))))))
+      ((a) ((wrap-goal g) a))
+      ((a f) (mplusg ((wrap-goal g) a) (lambdaf@ () (bindg (f) g)))))))
 
 (define-syntax conde
   (syntax-rules ()
@@ -120,8 +143,8 @@
      (lambdag@ (a) 
        (inc 
         (mplusg* 
-         (bindg* (g0 a) g ...)
-         (bindg* (g1 a) g^ ...) ...))))))
+         (bindg* ((wrap-goal g0) a) g ...)
+         (bindg* ((wrap-goal g1) a) g^ ...) ...))))))
 
 (define-syntax mplusg*
   (syntax-rules ()
@@ -141,7 +164,8 @@
   (syntax-rules ()
     ((_ (g0 g ...) (g1 g^ ...) ...)
      (lambdag@ (a)
-       (inc (ifa ((g0 a) g ...) ((g1 a) g^ ...) ...))))))
+       (inc (ifa (((wrap-goal g0) a) g ...) 
+                 (((wrap-goal g1) a) g^ ...) ...))))))
 
 (define-syntax ifa
   (syntax-rules ()
@@ -159,8 +183,8 @@
     ((_ (g0 g ...) (g1 g^ ...) ...)
      (lambdag@ (a)
        (inc
-        (ifu ((g0 a) g ...)
-             ((g1 a) g^ ...) ...))))))
+        (ifu (((wrap-goal g0) a) g ...)
+             (((wrap-goal g1) a) g^ ...) ...))))))
 
 (define-syntax ifu
   (syntax-rules ()
@@ -173,13 +197,11 @@
          ((a) (bindg* a-inf g ...))
          ((a f) (bindg* a g ...)))))))
 
-(define-syntax fresh
-  (syntax-rules ()
-    ((_ (x ...) g g* ...)
-     (lambdag@ (a)
-       (inc
-        (let ((x (var 'x)) ...)
-          (bindg* (g a) g* ...)))))))
+(define-syntax-rule (fresh (x ...) g g* ...)
+  (lambdag@ (a) 
+    (inc 
+     (let ((x (var 'x)) ...) 
+       (bindg* ((wrap-goal g) a) g* ...)))))
 
 (define-syntax project 
   (syntax-rules ()
