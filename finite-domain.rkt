@@ -1,10 +1,10 @@
-(library
-  (cKanren finite-domain)
-  (export range value-dom? list-sorted? list-insert
-    map-sum null-dom? singleton-dom? singleton-element-dom
-    min-dom max-dom memv-dom? intersection-dom diff-dom
-    copy-before drop-before disjoint-dom? make-dom)
-  (import (rnrs) (cKanren ck))
+#lang racket
+
+(require "ck.rkt")
+(provide range value-dom? list-sorted? list-insert
+         map-sum null-dom? singleton-dom? singleton-element-dom
+         min-dom max-dom memv-dom? intersection-dom diff-dom
+         copy-before drop-before disjoint-dom? make-dom)
 
 ;;; domains (sorted lists of integers)
 
@@ -25,15 +25,15 @@
 (define map-sum
   (lambda (f)
     (letrec
-      ((loop
-         (lambda (ls)
-           (cond
-             ((null? ls)
-              (lambdag@ (a) (mzerog)))
-             (else
+        ((loop
+          (lambda (ls)
+            (cond
+              ((null? ls)
+               (lambdag@ (a) (mzerog)))
+              (else
                (conde
-                 ((f (car ls)))
-                 ((loop (cdr ls)))))))))
+                ((f (car ls)))
+                ((loop (cdr ls)))))))))
       loop)))
 
 (define null-dom?
@@ -68,7 +68,7 @@
       ((or (null? dom1) (null? dom2)) '())
       ((= (car dom1) (car dom2))
        (cons (car dom1)
-         (intersection-dom (cdr dom1) (cdr dom2))))
+             (intersection-dom (cdr dom1) (cdr dom2))))
       ((< (car dom1) (car dom2))
        (intersection-dom (cdr dom1) dom2))
       (else (intersection-dom dom1 (cdr dom2))))))
@@ -105,7 +105,4 @@
       ((< (car dom1) (car dom2))
        (disjoint-dom? (cdr dom1) dom2))
       (else (disjoint-dom? dom1 (cdr dom2))))))
-
-)
-
 

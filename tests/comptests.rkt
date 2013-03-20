@@ -1,12 +1,8 @@
-(library (cKanren comptests)
-  (export run-comptests)
-  (import
-    (rnrs)
-    (cKanren ck)
-    (cKanren neq)
-    (cKanren fd)
-    (cKanren tester)
-    (cKanren tree-unify))
+#lang racket
+
+(provide run-comptests)
+(require "../ck.rkt" "../neq.rkt" "../fd.rkt" "../tree-unify.rkt"
+         "tester.rkt")
 
   (define n-queenso
     (lambda (q n)
@@ -72,4 +68,3 @@
       (run* (q) (infd q '(2 3 4)) (distincto `(a 3 ,q)))
       '(2 4)))
 
-  )

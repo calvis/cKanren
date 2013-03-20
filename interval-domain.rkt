@@ -1,15 +1,17 @@
-(library
-  (cKanren interval-domain)
-  (export range value-dom?
-    ;; for fd
-    map-sum null-dom? singleton-dom? singleton-element-dom
-    min-dom max-dom memv-dom? intersection-dom diff-dom
-    copy-before-dom drop-before-dom disjoint-dom? make-dom
+#lang racket
 
-    ;; interval helpers
-    interval-difference interval-union interval-intersection
-    interval-memq? cons-dom interval-combinable? interval-> interval-<)
-  (import (rnrs) (cKanren ck))
+(require "ck.rkt")
+
+(provide range value-dom?
+         
+         ;; for fd
+         map-sum null-dom? singleton-dom? singleton-element-dom
+         min-dom max-dom memv-dom? intersection-dom diff-dom
+         copy-before-dom drop-before-dom disjoint-dom? make-dom
+         
+         ;; interval helpers
+         interval-difference interval-union interval-intersection
+         interval-memq? cons-dom interval-combinable? interval-> interval-<)
 
 ;;INTERVALS;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -20,7 +22,7 @@
 (define interval-union
   (lambda (i j)
     (let ((imin (car i)) (imax (cdr i))
-          (jmin (car j)) (jmax (cdr j)))
+                         (jmin (car j)) (jmax (cdr j)))
       (cond
         ((or (= imax jmin)
              (= imax (- jmin 1)))
@@ -39,7 +41,7 @@
 (define interval-difference
   (lambda (i j)
     (let ((imin (car i)) (imax (cdr i))
-          (jmin (car j)) (jmax (cdr j)))
+                         (jmin (car j)) (jmax (cdr j)))
       (cond
         ((> jmin imax) `((,imin . ,imax)))
         ((and (<= jmin imin) (>= jmax imax)) `())
@@ -54,7 +56,7 @@
 (define interval-intersection
   (lambda (i j)
     (let ((imin (car i)) (imax (cdr i))
-          (jmin (car j)) (jmax (cdr j)))
+                         (jmin (car j)) (jmax (cdr j)))
       (cond
         ((< imax jmin) `())
         ((< jmax imin) `())
@@ -73,7 +75,7 @@
 (define interval-combinable?
   (lambda (i j)
     (let ((imin (car i)) (imax (cdr i))
-          (jmin (car j)) (jmax (cdr j)))
+                         (jmin (car j)) (jmax (cdr j)))
       (or (= imax (- jmin 1))
           (= jmax (- imin 1))
           (not (or (> jmin imax) (> imin jmax)))))))
@@ -180,7 +182,7 @@
 (define memv-dom?
   (lambda (v dom)
     (and (value-dom? v)
-         (exists (lambda (d) (interval-memq? v d)) dom))))
+         (findf (lambda (d) (interval-memq? v d)) dom))))
 
 (define intersection-dom
   (lambda (dom1 dom2)
@@ -191,13 +193,13 @@
       ((interval-> (car dom1) (car dom2))
        (intersection-dom dom1 (cdr dom2)))
       (else
-        (let ((a1 (interval-difference (car dom1) (car dom2)))
-              (a2 (interval-difference (car dom2) (car dom1))))
-          (append-dom
-            (interval-intersection (car dom1) (car dom2))
-            (intersection-dom
-              (append-dom a1 (cdr dom1))
-              (append-dom a2 (cdr dom2)))))))))
+       (let ((a1 (interval-difference (car dom1) (car dom2)))
+             (a2 (interval-difference (car dom2) (car dom1))))
+         (append-dom
+          (interval-intersection (car dom1) (car dom2))
+          (intersection-dom
+           (append-dom a1 (cdr dom1))
+           (append-dom a2 (cdr dom2)))))))))
 
 (define diff-dom
   (lambda (dom1 dom2)
@@ -208,11 +210,11 @@
       ((interval-> (car dom1) (car dom2))
        (diff-dom dom1 (cdr dom2)))
       (else
-        (let ((a1 (interval-difference (car dom1) (car dom2)))
-              (a2 (interval-difference (car dom2) (car dom1))))
-          (diff-dom
-            (append-dom a1 (cdr dom1))
-            (append-dom a2 (cdr dom2))))))))
+       (let ((a1 (interval-difference (car dom1) (car dom2)))
+             (a2 (interval-difference (car dom2) (car dom1))))
+         (diff-dom
+          (append-dom a1 (cdr dom1))
+          (append-dom a2 (cdr dom2))))))))
 
 (define copy-before-dom
   (lambda (pred dom)
@@ -246,18 +248,16 @@
 (define map-sum
   (lambda (f)
     (letrec
-      ((loop
-         (lambda (dom)
-           (cond
-             ((null-dom? dom)
-              (lambdag@ (a) (mzerog)))
-             (else
+        ((loop
+          (lambda (dom)
+            (cond
+              ((null-dom? dom)
+               (lambdag@ (a) (mzerog)))
+              (else
                (conde
-                 ((f (car-dom dom)))
-                 ((loop (cdr-dom dom)))))))))
+                ((f (car-dom dom)))
+                ((loop (cdr-dom dom)))))))))
       loop)))
-
-)
 
 ;; Uncomment for interval test programs!
 

@@ -1,7 +1,7 @@
-(library
-  (cKanren tree-unify)
-  (export == unify)
-  (import (rnrs) (cKanren ck))
+#lang racket
+
+(require "ck.rkt")
+(provide == unify)
 
 ;; ---UNIFICATION--------------------------------------------------
 
@@ -36,7 +36,7 @@
                    (unify e (ext-s v u s))))
              ((and (pair? u) (pair? v))
               (loop (car u) (car v)
-                `((,(cdr u) . ,(cdr v)) . ,e)))
+                    `((,(cdr u) . ,(cdr v)) . ,e)))
              ((equal? u v) (unify e s))
              (else #f))))))))
 
@@ -47,11 +47,11 @@
 (define ==-c
   (lambda (u v)
     (lambdam@ (a : s c)
-      (cond
-        ((unify `((,u . ,v)) s)
-         => (lambda (s^)
-              ((update-prefix s s^) a)))
-        (else #f)))))
+              (cond
+                ((unify `((,u . ,v)) s)
+                 => (lambda (s^)
+                      ((update-prefix s s^) a)))
+                (else #f)))))
 
 (define update-prefix
   (lambda (s s^)
@@ -59,9 +59,7 @@
       (cond
         ((eq? s s^) identitym)
         (else
-          (composem
-            (update-s (caar s^) (cdar s^))
-            (loop (cdr s^))))))))
-
-)
+         (composem
+          (update-s (caar s^) (cdar s^))
+          (loop (cdr s^))))))))
 

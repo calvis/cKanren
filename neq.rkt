@@ -1,8 +1,7 @@
-(library
-  (cKanren neq)
-  (export =/=)
-  (import (rnrs) (cKanren ck)
-    (only (cKanren tree-unify) unify))
+#lang racket
+
+(require "ck.rkt" (only-in "tree-unify.rkt" unify))
+(provide =/=)
 
 ;;; little helpers
 
@@ -34,7 +33,7 @@
   (lambda (v r c)
     (let ((c (filter (lambda (oc) (eq? (oc->rator oc) '=/=neq-c)) c)))
       (let ((p* (walk* (map oc->prefix c) r)))
-        (let ((p* (remp any/var? p*)))
+        (let ((p* (filter-not any/var? p*)))
           (cond
             ((null? p*) '())
             (else `((=/= . ,p*)))))))))
@@ -91,6 +90,4 @@
         (else a)))))
 
 (extend-reify-fns 'neq reify-constraintsneq)
-
-)
 

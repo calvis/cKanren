@@ -1,6 +1,7 @@
-(library (cKanren tracing)
-  (export trace-define-mk)
-  (import (rnrs) (cKanren mk))
+#lang racket
+
+(require "ck.rkt")
+(provide trace-define-mk)
 
 (define-syntax trace-define-mk
   (syntax-rules ()
@@ -16,5 +17,3 @@
                (newline)
                succeed))
            body))))))
-
-)

@@ -1,7 +1,7 @@
-(library
-  (cKanren never-true)
-  (export never-trueo never-pairo requiredo allowedo)
-  (import (rnrs) (cKanren ck))
+#lang racket
+
+(require "ck.rkt")
+(provide never-trueo never-pairo requiredo allowedo)
 
 (define never-true-c
   (lambda (pred? x)
@@ -35,7 +35,7 @@
   (lambda (x)
     (goal-construct
       (lambdam@ (a : s c)
-        (and (not (find (lambda (oc) (eq? 'required-c (oc->rator oc))) c))
+        (and (not (findf (lambda (oc) (eq? 'required-c (oc->rator oc))) c))
              a)))))
 
 (define allowedo
@@ -54,9 +54,8 @@
   (lambda (v r c)
     (let ((c (filter (lambda (oc) (eq? (oc->rator oc) 'allowed-c)) c)))
       (let ((c (walk* (map oc->rands c) r)))
-        `((allowed . ,c))))))
+        (if (null? c) `() `((allowed . ,c)))))))
 
 (extend-enforce-fns 'required required-enforceo)
 (extend-reify-fns 'allowed reified-allowed)
 
-)

@@ -1,7 +1,6 @@
-(library
-  (cKanren tester)
-  (export test-check test-divergence)
-  (import (chezscheme))
+#lang racket
+
+(provide test-check test-divergence)
 
 (define test-error
   (lambda (tag . args)
@@ -35,6 +34,4 @@
                "infinite loop returned ~s after ~s ticks"
                v (- max-ticks t)))
            (lambda (e^) (void))))))))
-
-)
 
