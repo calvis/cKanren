@@ -3,12 +3,16 @@
 (require (rename-in "ck.rkt"
                     [run  run-unsafe]
                     [run* run*-unsafe]))
-(provide (except-out (all-from-out racket) #%app)
-         conde conda condu fresh succeed fail 
-         run run* prt prtm use-constraints
-         (rename-out
-          [#%app-safe #%app]
-          [trace-define-mk trace-define]))
+(provide 
+ ;; things we need from racket
+ define lambda quote quasiquote cons
+
+ ;; mk things
+ conde conda condu fresh succeed fail 
+ run run* prt prtm use-constraints
+ (rename-out
+  [#%app-safe #%app]
+  [trace-define-mk trace-define]))
 
 (define-syntax-rule (run n (q) g g* ...)
   (parameterize ([safe-goals? #t])
@@ -56,26 +60,26 @@
   (syntax-case x () 
     [(_ fn arg)
      (quasisyntax/loc x
-      (let ((arg^ arg))
-        (let ((fn^ fn))
-          (cond
-           [(or (not (goal? fn^)) (a? arg^)) 
-            (#%app fn^ arg^)]
-           [else 
-            (raise-goal-as-fn-exn 
-             'fn
-             '(arg)
-             (srcloc '#,(syntax-source #'fn)
-                     '#,(syntax-line #'fn)
-                     '#,(syntax-column #'fn)
-                     '#,(syntax-position #'fn)
-                     '#,(syntax-span #'fn)))]))))]
+       (let ((fn^ fn))
+         (let ((arg^ arg))
+           (cond
+            [(or (not (goal? fn^)) (a? arg^)) 
+             (#%app fn^ arg^)]
+            [else 
+             (raise-goal-as-fn-exn 
+              'fn
+              '(arg)
+              (srcloc '#,(syntax-source #'fn)
+                      '#,(syntax-line #'fn)
+                      '#,(syntax-column #'fn)
+                      '#,(syntax-position #'fn)
+                      '#,(syntax-span #'fn)))]))))]
     [(_ fn arg ...) 
      (with-syntax ([(arg^ ...) (generate-temporaries #'(arg ...))])
        (quasisyntax/loc 
         x
-        (let ((arg^ arg) ...)
-          (let ((fn^ fn))
+        (let ((fn^ fn))
+          (let ((arg^ arg) ...)
             (cond
              [(not (goal? fn)) (#%app fn^ arg^ ...)]
              [else
