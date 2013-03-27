@@ -1,31 +1,19 @@
 #lang racket
 
-(require (rename-in "ck.rkt"
-                    [run  run-unsafe]
-                    [run* run*-unsafe]))
+(require "ck.rkt" (for-syntax "ck.rkt" racket/syntax))
+
 (provide 
- ;; things we need from racket
- define lambda quote quasiquote cons
+ (except-out (all-from-out racket) #%app)
 
  ;; mk things
  conde conda condu fresh succeed fail 
- run run* prt prtm use-constraints
- (rename-out
-  [#%app-safe #%app]
-  [trace-define-mk trace-define]))
+ run run* prt prtm use-constraints trace-define
+ (rename-out [#%app-safe #%app]))
 
-(define-syntax-rule (run n (q) g g* ...)
-  (parameterize ([safe-goals? #t])
-    (take n (lambdaf@ ()
-              ((fresh (q) g g* ...
-                 (enforce-constraints q) 
-                 (reify q))
-               empty-a)))))
-
-(define-syntax-rule (run* (q) g g* ...)
-  (run #f (q) g g* ...))
-
-(define-syntax trace-define-mk
+;; This is a tracing macro, akin to trace-define in Chez Scheme.  Upon
+;; entry to the goal, all arguments to the function will be projected
+;; in the current substitution and printed out.
+(define-syntax trace-define
   (syntax-rules ()
     ((_ (name a* ...) body)
      (trace-define-mk name (lambda (a* ...) body)))
@@ -40,54 +28,42 @@
                succeed))
            body))))))
 
-(define-syntax-rule (use-constraints file ...)
-  (require file ...))
+;; Should be able to think of importing constraint files as using
+;; constraints, not as requiring files.  Abstractiiooonnnnn.
+(define-syntax-rule (use-constraints file ...) (require file ...))
 
-(define-struct (exn:goal-as-fn exn:fail) ())
+;; =============================================================================
 
-(define (raise-goal-as-fn-exn fn arg src)
+;; This is a version of application that will catch when users have
+;; misplaced goals.
+
+;; If the user is trying to apply a goal to something that is not a
+;; package, or trying to apply a goal to zero or many things, they
+;; will get an goal-as-fn-exn.  This will fix the stupid "incorrect
+;; number of arguments to #<procedure>" errors.
+(struct exn:goal-as-fn exn:fail ())
+(define (raise-goal-as-fn-exn src)
   (raise
-   (make-exn:goal-as-fn
-    (format "goal ~s applied as a function at ~a:~s:~s" 
-            fn
-            (let ((p (srcloc-source src)))
-              (if (path? p) (path->string p) p))
-            (srcloc-line src)
-            (srcloc-column src))
+   (exn:goal-as-fn
+    (format "~s: goal applied as a procedure" (format-source src))
     (current-continuation-marks))))
+
+;; The only correct application of a goal g is to a package a; i.e. (g a).
+(define-for-syntax (valid-app?-pred fn args) 
+  (syntax-case args ()
+    [(a) #`(or (not (goal? #,fn)) (a? a))]
+    [(a* ...) #`(not (goal? #,fn))]))
 
 (define-syntax (#%app-safe x)
   (syntax-case x () 
-    [(_ fn arg)
-     (quasisyntax/loc x
-       (let ((fn^ fn))
-         (let ((arg^ arg))
-           (cond
-            [(or (not (goal? fn^)) (a? arg^)) 
-             (#%app fn^ arg^)]
-            [else 
-             (raise-goal-as-fn-exn 
-              'fn
-              '(arg)
-              (srcloc '#,(syntax-source #'fn)
-                      '#,(syntax-line #'fn)
-                      '#,(syntax-column #'fn)
-                      '#,(syntax-position #'fn)
-                      '#,(syntax-span #'fn)))]))))]
-    [(_ fn arg ...) 
-     (with-syntax ([(arg^ ...) (generate-temporaries #'(arg ...))])
-       (quasisyntax/loc 
-        x
-        (let ((fn^ fn))
-          (let ((arg^ arg) ...)
-            (cond
-             [(not (goal? fn)) (#%app fn^ arg^ ...)]
-             [else
-              (raise-goal-as-fn-exn 
-               'fn
-               '(arg ...)
-               (srcloc '#,(syntax-source #'fn)
-                       '#,(syntax-line #'fn)
-                       '#,(syntax-column #'fn)
-                       '#,(syntax-position #'fn)
-                       '#,(syntax-span #'fn)))])))))]))
+    [(_ fn arg ...)
+     (with-syntax* ([(fn^ arg^ ...) 
+                     (generate-temporaries #'(fn arg ...))]
+                    [src (build-srcloc #'fn)]
+                    [valid-app? (valid-app?-pred #'fn^ #'(arg^ ...))])
+       #'(let ((fn^ fn))
+           (let ((arg^ arg) ...)
+             (cond
+              [valid-app? (#%app fn^ arg^ ...)]
+              [else (raise-goal-as-fn-exn src)]))))]))
+

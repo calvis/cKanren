@@ -11,20 +11,22 @@
  lhs rhs walk walk* var? lambdag@ mzerog unitg onceo
  conde conda condu ifa ifu project fresh succeed fail
  lambdaf@ inc enforce-constraints reify empty-a take
- safe-goals?)
+ format-source
+ (for-syntax build-srcloc))
 
-(define safe-goals? (make-parameter #f))
+;; normal miniKanren vars are actually an instance of a more general
+;; "constrained var", or cvar for short.
+(define-generics cvar (cvar->str cvar))
 
-(define-generics constrained-var)
-
+;; controls how variables are displayed
 (define (write-var var port mode)
   ((case mode [(#t) write] [(#f) display] [else print])
-   (format "#(~s)" (var-x var)) port))
+   (format "#~a(~s)" (cvar->str var) (var-x var)) port))
 
 ;; vars are actually constrained-vars  
 (define-struct var (x) 
   #:transparent 
-  #:methods gen:constrained-var ()
+  #:methods gen:cvar [(define (cvar->str x) "_")]
   #:methods gen:custom-write ([define write-proc write-var]))
 
 (define lhs (lambda (x) (car x)))
@@ -41,6 +43,7 @@
      (lambdag@ (a) (let ((s (a-s a)) (c (a-c a))) e ...)))
     ((_ (a) e ...) (make-goal (lambda (a) e ...)))))
 
+;; macro that delays the expression
 (define-syntax lambdaf@
   (syntax-rules ()
     ((_ () e) (lambda () e))))
@@ -79,6 +82,7 @@
 (define prt  (lambdag@ (a) (begin (pretty-print a) a)))
 (define prtm (lambda m (lambdag@ (a) (begin (apply printf m) a))))
 
+;; delays an expression
 (define-syntax inc 
   (syntax-rules ()
     ((_ e) (lambdaf@ () e))))
@@ -111,17 +115,36 @@
        ((a) (cons a '()))
        ((a f) (cons a (take (and n (- n 1)) f)))))))
 
-(define-syntax wrap-goal
-  (syntax-rules ()
-    [(_ g)
-     (if (safe-goals?) 
-         (let ((g^ g)) (safe-goal-wrap 'g g^)) 
-         g)]))
+(define-for-syntax (build-srcloc stx)
+  #`(srcloc '#,(syntax-source stx)
+            '#,(syntax-line stx)
+            '#,(syntax-column stx)
+            '#,(syntax-position stx)
+            '#,(syntax-span stx)))
 
-(define (safe-goal-wrap orig val)
+(define-syntax (app-goal x)
+  (syntax-case x ()
+    [(_ g a) #`((wrap-goal g #,(build-srcloc #'g)) a)]))
+
+(define cd (current-directory))
+
+(define (format-source src)
+  (define absolute-path (srcloc-source src))
+  (define absolute-path-string (path->string absolute-path))
+  (define relative-path (find-relative-path cd absolute-path-string))
+  (define line (srcloc-line src))
+  (define column (srcloc-column src))
+  (string->symbol (format "~a:~s:~s" relative-path line column)))
+
+(define (non-goal-error-msg val)
+  (string-append
+   "expression evaluated to non-goal where a goal was expected"
+   (format "\n  value: ~s" val)))
+
+(define (wrap-goal val src)
   (cond
-   [(goal? val) val] 
-   [else (error 'ck "~s evaluated to ~s which is not a goal" orig val)]))
+   [(goal? val) val]
+   [else (error (format-source src) (non-goal-error-msg val))]))
 
 (define-syntax bindg*
   (syntax-rules ()
@@ -134,8 +157,8 @@
     (case-inf a-inf
       (() (mzerog))
       ((f) (inc (bindg (f) g)))
-      ((a) ((wrap-goal g) a))
-      ((a f) (mplusg ((wrap-goal g) a) (lambdaf@ () (bindg (f) g)))))))
+      ((a) (app-goal g a))
+      ((a f) (mplusg (app-goal g a) (lambdaf@ () (bindg (f) g)))))))
 
 (define-syntax conde
   (syntax-rules ()
@@ -143,8 +166,8 @@
      (lambdag@ (a) 
        (inc 
         (mplusg* 
-         (bindg* ((wrap-goal g0) a) g ...)
-         (bindg* ((wrap-goal g1) a) g^ ...) ...))))))
+         (bindg* (app-goal g0 a) g ...)
+         (bindg* (app-goal g1 a) g^ ...) ...))))))
 
 (define-syntax mplusg*
   (syntax-rules ()
@@ -164,8 +187,8 @@
   (syntax-rules ()
     ((_ (g0 g ...) (g1 g^ ...) ...)
      (lambdag@ (a)
-       (inc (ifa (((wrap-goal g0) a) g ...) 
-                 (((wrap-goal g1) a) g^ ...) ...))))))
+       (inc (ifa ((app-goal g0 a) g ...) 
+                 ((app-goal g1 a) g^ ...) ...))))))
 
 (define-syntax ifa
   (syntax-rules ()
@@ -183,8 +206,8 @@
     ((_ (g0 g ...) (g1 g^ ...) ...)
      (lambdag@ (a)
        (inc
-        (ifu (((wrap-goal g0) a) g ...)
-             (((wrap-goal g1) a) g^ ...) ...))))))
+        (ifu ((app-goal g0 a) g ...)
+             ((app-goal g1 a) g^ ...) ...))))))
 
 (define-syntax ifu
   (syntax-rules ()
@@ -201,7 +224,7 @@
   (lambdag@ (a) 
     (inc 
      (let ((x (var 'x)) ...) 
-       (bindg* ((wrap-goal g) a) g* ...)))))
+       (bindg* (app-goal g a) g* ...)))))
 
 (define-syntax project 
   (syntax-rules ()
@@ -388,14 +411,14 @@
 (define (reify-s v s)
   (let ((v (walk v s)))
     (cond
-      ((var? v) `((,v . ,(reify-n (size-s s))) . ,s))
+      ((var? v) `((,v . ,(reify-n v (size-s s))) . ,s))
       ((pair? v) (reify-s (cdr v) (reify-s (car v) s)))
       (else s))))
 
 ;; creates a reified symbol
-(define (reify-n n)
+(define (reify-n cvar n)
   (string->symbol
-   (string-append "_" "." (number->string n))))
+   (string-append (cvar->str cvar) "." (number->string n))))
 
 ;; reifies the constraint store by running all the reification fns
 (define (reify-constraints v r c)

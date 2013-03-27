@@ -2,6 +2,9 @@
 (use-constraints "tree-unify.rkt" "neq.rkt")
 
 ;; (run* (q) ((== q 5)))
+;; (run* (q) ((== q 5) 5))
+;; (run* (q) ((== q 5) (== q 6)))
+;; (run* (q) ((== q 5) 5 6))
 
 ;; (define fake-goal (lambda (x) "hi"))
 ;; (run* (q) (fake-goal 5))
@@ -19,5 +22,5 @@
         (== s `(,a . ,res))
         (rembero x d res))))))
 
-(run* (q) (rembero 'x '(a b x e c x) q))
+(run* (q) (rembero 'x '(x) q))
   
