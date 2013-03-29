@@ -15,18 +15,18 @@
 ;; in the current substitution and printed out.
 (define-syntax trace-define
   (syntax-rules ()
-    ((_ (name a* ...) body)
-     (trace-define-mk name (lambda (a* ...) body)))
-    ((_ name (λ (a* ...) body))
+    [(_ (name a* ...) body)
+     (trace-define-mk name (lambda (a* ...) body))]
+    [(_ name (λ (a* ...) body))
      (define name
        (λ (a* ...)
-         (fresh ()
-           (project (a* ...)
-             (begin
-               (display (list 'name a* ...))
-               (newline)
-               succeed))
-           body))))))
+          (fresh ()
+            (project (a* ...)
+              (begin
+                (display (list 'name a* ...))
+                (newline)
+                succeed))
+            body)))]))
 
 ;; Should be able to think of importing constraint files as using
 ;; constraints, not as requiring files.  Abstractiiooonnnnn.
@@ -41,6 +41,7 @@
 ;; package, or trying to apply a goal to zero or many things, they
 ;; will get an goal-as-fn-exn.  This will fix the stupid "incorrect
 ;; number of arguments to #<procedure>" errors.
+
 (struct exn:goal-as-fn exn:fail ())
 (define (raise-goal-as-fn-exn src)
   (raise
@@ -61,9 +62,10 @@
                      (generate-temporaries #'(fn arg ...))]
                     [src (build-srcloc #'fn)]
                     [valid-app? (valid-app?-pred #'fn^ #'(arg^ ...))])
-       #'(let ((fn^ fn))
-           (let ((arg^ arg) ...)
-             (cond
-              [valid-app? (#%app fn^ arg^ ...)]
-              [else (raise-goal-as-fn-exn src)]))))]))
+       (syntax/loc x
+        (let ([fn^ fn])
+          (let ([arg^ arg] ...)
+            (cond
+             [valid-app? (#%app fn^ arg^ ...)]
+             [else (raise-goal-as-fn-exn src)])))))]))
 
