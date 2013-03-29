@@ -245,36 +245,28 @@
                   (process-dom u u-range)
                   (process-dom v v-range)))))))))
 
-(define enforce-constraintsfd
-  (lambda (x)
-    (fresh ()
-      (force-ans x)
-      (lambdag@ (a : s c)
-        (let ((bound-x* (map
-                         (lambda (oc)
-                           (let ((r (oc->rands oc)))
-                             (car r)))
-                         (filter
-                          (lambda (oc) (eq? (oc->rator oc) 'domfd-c))
-                          c))))
-          (verify-all-bound s c bound-x*)
-          ((onceo (force-ans bound-x*)) a))))))
+(define (enforce-constraintsfd x)
+  (define (domfd-c? oc) (eq? (oc->rator oc) 'domfd-c))
+  (define (domfd-c->var domfd-c) (car (oc->rands domfd-c)))
+  (fresh ()
+    (force-ans x)
+    (lambdag@ (a : s c)
+      (let ((bound-x* (map domfd-c->var (filter domfd-c? c))))
+        (verify-all-bound s c bound-x*)
+        ((onceo (force-ans bound-x*)) a)))))
 
-(define verify-all-bound
-  (lambda (s c bound-x*)
-    (unless (null? c)
-      (let ((oc (car c)))
-        (when (memq (oc->rator oc)
-                    '(=/=fd-c distinctfd-c distinct/fd-c
-                              <=fd-c =fd-c plusfd-c timesfd-c))
-          (cond
-            ((findf (lambda (x) (not (memq x bound-x*)))
-                    (filter var? (oc->rands oc)))
-             => (lambda (x)
-                  (unless (value-dom? (walk x s))
-                    (error 'verify-all-bound
-                           "Constrained variable ~s without domain" x))))))
-        (verify-all-bound s (cdr c) bound-x*)))))
+(define (verify-all-bound s c bound-x*)
+  (define (bound? x) (memq x bound-x*))
+  (define fd-cs '(=/=fd-c distinctfd-c distinct/fd-c <=fd-c =fd-c plusfd-c timesfd-c))
+  (define (fd-c? oc) (memq (oc->rator oc) fd-cs))
+  (for ([oc c] #:when (fd-c? oc))
+    (define oc-vars (filter var? (oc->rands oc)))
+    (cond
+     ((findf (compose not bound?) oc-vars)
+      => (lambda (x)
+           (unless (value-dom? (walk x s))
+             (error 'verify-all-bound
+                    "constrained variable ~s without domain" x)))))))
 
 ;;; goals
 
