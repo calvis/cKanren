@@ -22,5 +22,5 @@
         (== s `(,a . ,res))
         (rembero x d res))))))
 
-(run* (q) (rembero 'x '(x) q))
-  
+(run* (q) (rembero 'x '(x y) q) prt)
+      
