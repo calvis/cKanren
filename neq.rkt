@@ -10,8 +10,8 @@
     (cond
       ((null? p) '())
       (else
-        (let ((x (lhs (car p)))
-              (v (rhs (car p)))
+        (let ((x (car (car p)))
+              (v (cdr (car p)))
               (r (recover/vars (cdr p))))
           (cond
             ((var? v) (ext/vars v (ext/vars x r)))
