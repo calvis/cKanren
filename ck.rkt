@@ -8,64 +8,48 @@
  lambdam@ identitym composem goal-construct ext-c
  build-oc oc->proc oc->rands oc->rator run run* prt
  extend-enforce-fns extend-reify-fns goal? a? 
- lhs rhs walk walk* var? lambdag@ mzerog unitg onceo
+ walk walk* var? lambdag@ mzerog unitg onceo
  conde conda condu ifa ifu project fresh succeed fail
  lambdaf@ inc enforce-constraints reify empty-a take
  format-source
  (for-syntax build-srcloc))
 
+;; == VARIABLES =================================================================
+
 ;; normal miniKanren vars are actually an instance of a more general
 ;; "constrained var", or cvar for short.
 (define-generics cvar (cvar->str cvar))
 
-;; controls how variables are displayed
-(define (write-var var port mode)
-  ((case mode [(#t) write] [(#f) display] [else print])
-   (format "#~a(~s)" (cvar->str var) (var-x var)) port))
-
-;; vars are actually constrained-vars  
-(define-struct var (x) 
+;; defines a normal miniKanren var as a cvar that is printed with "_"
+(struct var (x) 
   #:transparent 
-  #:methods gen:cvar [(define (cvar->str x) "_")]
-  #:methods gen:custom-write ([define write-proc write-var]))
+  #:methods gen:cvar 
+  [(define (cvar->str x) "_")]
+  #:methods gen:custom-write 
+  [(define (write-proc . args) (apply write-var args))])
 
-(define lhs (lambda (x) (car x)))
-(define rhs (lambda (x) (cdr x)))
+;; write-var controls how variables are displayed
+(define (write-var var port mode)
+  ((parse-mode mode) (format "#~a(~s)" (cvar->str var) (var-x var)) port))
+
+(define (parse-mode mode)
+  (case mode [(#t) write] [(#f) display] [else display]))
+
+;; == GOALS ====================================================================
 
 ;; a goal is just a function that can be applied to a's
-(define-struct goal (fn)
-  #:property prop:procedure (struct-field-index fn))
+(struct goal (fn) #:property prop:procedure (struct-field-index fn))
 
 ;; macro to return a goal with the specified function
 (define-syntax lambdag@
   (syntax-rules (:)
     ((_ (a : s c) e ...)
-     (lambdag@ (a) (let ((s (a-s a)) (c (a-c a))) e ...)))
-    ((_ (a) e ...) (make-goal (lambda (a) e ...)))))
-
-;; macro that delays the expression
-(define-syntax lambdaf@
-  (syntax-rules ()
-    ((_ () e) (lambda () e))))
-
-(define (walk v s)
-  (cond
-    ((var? v)
-     (let ((a (assq v s)))
-       (cond
-         (a (walk (rhs a) s))
-         (else v))))
-    (else v)))
-
-(define (walk* w s)
-  (let ((v (walk w s)))
-    (cond
-      ((var? v) v)
-      ((pair? v)
-       (cons
-        (walk* (car v) s)
-        (walk* (cdr v) s)))
-      (else v))))
+     (lambdag@ (a) 
+       (let ([s (substitution-als (a-s a))]
+             [c (a-c a)])
+         e ...)))
+    ((_ (a) e ...) 
+     (goal (lambda (a) e ...)))))
 
 ;; the failure value
 (define (mzerog) #f)
@@ -79,13 +63,22 @@
 
 ;; for debugging, a goal that prints the substitution and a goal
 ;; that prints a message.  both succeed.
-(define prt  (lambdag@ (a) (begin (pretty-print a) a)))
+(define prt  (lambdag@ (a) (begin (printf "~a\n" a) a)))
 (define prtm (lambda m (lambdag@ (a) (begin (apply printf m) a))))
+
+;; =============================================================================
+
+;; macro that delays expressions
+(define-syntax lambdaf@
+  (syntax-rules ()
+    ((_ () e) (lambda () e))))
 
 ;; delays an expression
 (define-syntax inc 
   (syntax-rules ()
     ((_ e) (lambdaf@ () e))))
+
+;; =============================================================================
 
 (define-syntax case-inf
   (syntax-rules ()
@@ -115,12 +108,15 @@
        ((a) (cons a '()))
        ((a f) (cons a (take (and n (- n 1)) f)))))))
 
+;; =============================================================================
+
 (define-for-syntax (build-srcloc stx)
-  #`(srcloc '#,(syntax-source stx)
-            '#,(syntax-line stx)
-            '#,(syntax-column stx)
-            '#,(syntax-position stx)
-            '#,(syntax-span stx)))
+  #`(srcloc
+     '#,(syntax-source stx)
+     '#,(syntax-line stx)
+     '#,(syntax-column stx)
+     '#,(syntax-position stx)
+     '#,(syntax-span stx)))
 
 (define-syntax (app-goal x)
   (syntax-case x ()
@@ -129,12 +125,15 @@
 (define cd (current-directory))
 
 (define (format-source src)
-  (define absolute-path (srcloc-source src))
-  (define absolute-path-string (path->string absolute-path))
-  (define relative-path (find-relative-path cd absolute-path-string))
-  (define line (srcloc-line src))
-  (define column (srcloc-column src))
-  (string->symbol (format "~a:~s:~s" relative-path line column)))
+  (define source (srcloc-source src))
+  (cond
+   [(path? source)
+    (define absolute-path (path->string source))
+    (define location (find-relative-path cd absolute-path))
+    (define line (srcloc-line src))
+    (define column (srcloc-column src))
+    (string->symbol (format "~a:~s:~s" location line column))]
+   [else #f]))
 
 (define (non-goal-error-msg val)
   (string-append
@@ -144,7 +143,11 @@
 (define (wrap-goal val src)
   (cond
    [(goal? val) val]
-   [else (error (format-source src) (non-goal-error-msg val))]))
+   [(format-source src) => 
+    (lambda (loc) (error loc (non-goal-error-msg val)))]
+   [else (error (non-goal-error-msg val))]))
+
+;; =============================================================================
 
 (define-syntax bindg*
   (syntax-rules ()
@@ -201,13 +204,11 @@
          ((a) (bindg* a-inf g ...))
          ((a f) (bindg* a-inf g ...)))))))
 
-(define-syntax condu
-  (syntax-rules ()
-    ((_ (g0 g ...) (g1 g^ ...) ...)
-     (lambdag@ (a)
-       (inc
-        (ifu ((app-goal g0 a) g ...)
-             ((app-goal g1 a) g^ ...) ...))))))
+(define-syntax-rule (condu (g0 g ...) (g1 g^ ...) ...)
+  (lambdag@ (a)
+    (inc
+     (ifu ((app-goal g0 a) g ...)
+          ((app-goal g1 a) g^ ...) ...))))
 
 (define-syntax ifu
   (syntax-rules ()
@@ -235,18 +236,50 @@
 
 (define onceo (lambda (g) (condu (g))))
 
-;; ---SUBSITUTION--------------------------------------------------
+;; == SUBSTITUTIONS ============================================================
 
-;; the empty substitution
+(struct substitution (als)
+  #:transparent
+  #:methods gen:custom-write
+  [(define (write-proc . args) (apply write-substitution args))])
+
+(define (write-substitution substitution port mode)
+  (define fn (parse-mode mode))
+  (define subst-as-str (format-als (substitution-als substitution)))
+  (fn subst-as-str port))
+
+(define (format-als s)
+  (define (p->str p) 
+    (format "(~a . ~a)" (car p) (cdr p)))
+  (map p->str s))
+
+;; the empty association list, abbreviated s
 (define empty-s '())
 
 ;; extends a substitution with a binding of x to v
-(define (ext-s x v s) (cons `(,x . ,v) s))
+(define (ext-s x v s)
+  (cons `(,x . ,v) s))
 
 ;; returns the size of a substitution
 (define size-s
-  (lambda (x)
-    (length x)))
+  (lambda (s)
+    (length s)))
+
+;; walk an s
+(define (walk v s)
+  (cond
+   ((and (var? v) (assq v s))
+    => (lambda (a) (walk (cdr a) s)))
+   (else v)))
+
+(define (walk* w s)
+  (let ((v (walk w s)))
+    (cond
+      ((pair? v)
+       (cons
+        (walk* (car v) s)
+        (walk* (cdr v) s)))
+      (else v))))
 
 ;; a function that will safely extend the subsitution with
 ;; a binding of x to v
@@ -270,7 +303,7 @@
 
 (define update-s update-s-nocheck)
 
-;; ---CONSTRAINT-STORE---------------------------------------------
+;; == CONSTRAINT STORE =========================================================
 
 ;; an empty constraint store
 (define empty-c '())
@@ -287,11 +320,22 @@
          (make-a s (ext-c oc c)))
         (else a)))))
 
-;; ---PACKAGE------------------------------------------------------
+;; == PACKAGE ==================================================================
 
 ;; a package is a structure containing a substitution and
 ;; a constraint store
-(define-struct a (s c) #:transparent)
+(struct a (s c) 
+  #:transparent
+  #:methods gen:custom-write 
+  [(define (write-proc . args) (apply write-package args))])
+
+;; controls how packages are displayed
+(define (write-package a port mode)
+  ((parse-mode mode)
+   (format "(~a . ~a)" (a-s a) (a-c a)) port))
+
+(define (make-a s c) 
+  (a (substitution s) c))
 
 ;; the empty package
 (define empty-a (make-a empty-s empty-c))
@@ -304,7 +348,10 @@
     ((_ (a) e ...) 
      (lambda (a) e ...))
     ((_ (a : s c) e ...)
-     (lambdam@ (a) (let ((s (a-s a)) (c (a-c a))) e ...)))))
+     (lambdam@ (a) 
+       (let ([s (substitution-als (a-s a))] 
+             [c (a-c a)]) 
+         e ...)))))
 
 ;; the identity constraint
 (define identitym (lambdam@ (a) a))
@@ -316,14 +363,23 @@
       (and a (f^m a)))))
 
 ;; constructs a goal from a constraint
-(define (goal-construct fm) (lambdag@ (a) (fm a)))
+(define-syntax-rule (goal-construct fm)
+  (lambdag@ (a) (fm a)))
 
 ;; ---BUILD-OC-----------------------------------------------------
 
 ;; the representation of a constraint in the constraint store 
 ;; contains a closure waiting to be evaluated with a new package,
 ;; a symbolic representation of the constrant's name and it's args
-(define-struct oc (proc rator rands) #:transparent)
+(struct oc (proc rator rands) 
+  #:transparent
+  #:methods gen:custom-write 
+  [(define (write-proc . args) (apply write-oc args))])
+
+(define make-oc oc)
+
+(define (write-oc oc port mode)
+  ((parse-mode mode) (format "this is an oc") port))
 
 ;; accessors
 (define oc->proc oc-proc)
@@ -331,18 +387,12 @@
 (define oc->rands oc-rands)
 
 ;; creates an oc given the constraint operation and it's args
-(define-syntax build-oc
-  (syntax-rules ()
+(define-syntax (build-oc x)
+  (syntax-case x ()
     ((_ op arg ...)
-     (build-oc-aux op (arg ...) () (arg ...)))))
-
-(define-syntax build-oc-aux
-  (syntax-rules ()
-    ((_ op () (z ...) (arg ...))
-     (let ((z arg) ...) 
-       (make-oc (op z ...) 'op `(,z ...))))
-    ((_ op (arg0 arg ...) (z ...) args)
-     (build-oc-aux op (arg ...) (z ... q) args))))
+     (with-syntax ([(arg^ ...) (generate-temporaries #'(arg ...))])
+       #'(let ((arg^ arg) ...)
+           (make-oc (op arg^ ...) 'op `(,arg^ ...)))))))
 
 ;; ---FIXED-POINT--------------------------------------------------
 
@@ -431,10 +481,9 @@
 ;; runs all the reification functions
 (define run-reify-fns
   (lambda (v r c)
-    (let loop ((fns (reify-fns)) (c^ `()))
-      (cond
-        ((null? fns) c^)
-        (else (loop (cdr fns) (append ((cdar fns) v r c) c^)))))))
+    (for/fold ([c^ `()])
+              ([fn (map cdr (reify-fns))])
+       (append (fn v r c) c^))))
 
 ;; ---MACROS-------------------------------------------------------
 
