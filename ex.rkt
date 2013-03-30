@@ -1,5 +1,5 @@
 #lang s-exp "ck-lang.rkt"
-(use-constraints "tree-unify.rkt" "neq.rkt")
+(use-constraints "tree-unify.rkt")
 
 ;; (run* (q) ((== q 5)))
 ;; (run* (q) ((== q 5) 5))
