@@ -8,10 +8,10 @@
  lambdam@ identitym composem goal-construct ext-c
  build-oc oc->proc oc->rands oc->rator run run* prt
  extend-enforce-fns extend-reify-fns goal? a? 
- walk walk* var? lambdag@ mzerog unitg onceo
+ walk walk* var? lambdag@ mzerog unitg onceo fresh-aux
  conde conda condu ifa ifu project fresh succeed fail
  lambdaf@ inc enforce-constraints reify empty-a take
- format-source
+ format-source define-cvar-type reify-cvar var
  (for-syntax build-srcloc))
 
 ;; == VARIABLES =================================================================
@@ -26,6 +26,13 @@
   [(define (cvar->str x) "_")]
   #:methods gen:custom-write 
   [(define (write-proc . args) (apply write-var args))])
+
+(define-syntax-rule (define-cvar-type name str)
+  (struct name var ()
+    #:methods gen:cvar
+    [(define (cvar->str x) str)]
+    #:methods gen:custom-write
+    [(define (write-proc . args) (apply write-var args))]))
 
 ;; write-var controls how variables are displayed
 (define (write-var var port mode)
@@ -110,11 +117,14 @@
 
 ;; =============================================================================
 
-(define-syntax-rule (fresh (x ...) g g* ...)
+(define-syntax-rule (fresh-aux constructor (x ...) g g* ...)
   (lambdag@ (a) 
     (inc 
-     (let ((x (var 'x)) ...) 
+     (let ((x (constructor 'x)) ...) 
        (bindg* (app-goal g a) g* ...)))))
+
+(define-syntax-rule (fresh (x ...) g g* ...)
+  (fresh-aux var (x ...) g g* ...))
 
 (define-syntax bindg*
   (syntax-rules ()
@@ -455,6 +465,8 @@
        ((null? r) v)
        (else (reify-constraints (walk* v r) r c))))
     (choiceg answer empty-f)))
+
+(define (reify-cvar cvar r) (walk cvar r))
 
 ;; reifies the substitution, returning the reified substitution
 (define (reify-s v s)
