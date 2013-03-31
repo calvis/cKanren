@@ -13,6 +13,7 @@
  lambdaf@ inc enforce-constraints reify empty-a take
  format-source define-cvar-type reify-cvar var ext-s
  gen:mk-struct do-unify do-walk* do-reify-s occurs-check
+ mk-struct?
  (for-syntax build-srcloc))
 
 ;; == VARIABLES =================================================================
@@ -246,16 +247,19 @@
 ;; =============================================================================
 
 (define-generics mk-struct
+  ;; recur will expect a first two things to unify, and then
+  ;; an association list of remaining things to unify; we already
+  ;; know that eq? is false, so no need to check again
   (do-unify   mk-struct x s recur)
   (do-walk*   mk-struct s   recur)
   (do-reify-s mk-struct r   recur)
   #:defaults
   ([pair?
-    (define (do-unify p p^ s recur)
+    (define (do-unify p p^ e recur)
       (cond
        [(pair? p^) 
         (recur (car p) (car p^)
-               (recur (cdr p) (cdr p^) s))]
+               `((,(cdr p) . ,(cdr p^)) . ,e))]
        [else #f]))
     (define (do-walk* p s recur)
       (cons (recur (car p) s)
@@ -263,7 +267,28 @@
     (define (do-reify-s p r recur)
       (let-values ([(a^ r) (recur (car p) r)])
         (let-values ([(d^ r) (recur (cdr p) r)])
-          (values (cons a^ d^) r))))]))
+          (values (cons a^ d^) r))))]
+   [vector?
+    (define (do-unify v v^ e recur)
+      (cond
+       [(and (vector? v^)
+             (= (vector-length v)
+                (vector-length v^))) 
+        (let ([v  (vector->list v)]
+              [v^ (vector->list v^)])
+          (recur (car v) (car v^)
+                 `((,(cdr v) . ,(cdr v^)) . ,e)))]
+       [else #f]))
+    (define (do-walk* v s recur)
+      (vector-map (lambda (x) (recur x s)) v))
+    (define (do-reify-s v r recur)
+      (define-values (ls r)
+        (for/fold ([ls '()]
+                   [r '()])
+                  ([x v])
+          (let-values ([(x^ r) (recur x r)])
+            (values (cons x^ ls) r))))
+      (values (list->vector (reverse ls)) r))]))
 
 ;; == SUBSTITUTIONS ============================================================
 

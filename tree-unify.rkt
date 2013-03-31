@@ -20,9 +20,10 @@
              ((var? v)
               (and (not (occurs-check v u s))
                    (unify e (ext-s v u s))))
-             ((and (pair? u) (pair? v))
-              (loop (car u) (car v)
-                    `((,(cdr u) . ,(cdr v)) . ,e)))
+             ((and (mk-struct? u)
+                   (do-unify u v e loop)))
+             ((and (mk-struct? v)
+                   (do-unify v u e loop)))
              ((equal? u v) (unify e s))
              (else #f))))))))
 
