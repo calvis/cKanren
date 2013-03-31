@@ -11,7 +11,8 @@
  walk walk* var? lambdag@ mzerog unitg onceo fresh-aux
  conde conda condu ifa ifu project fresh succeed fail
  lambdaf@ inc enforce-constraints reify empty-a take
- format-source define-cvar-type reify-cvar var
+ format-source define-cvar-type reify-cvar var ext-s
+ gen:mk-struct do-unify do-walk* do-reify-s occurs-check
  (for-syntax build-srcloc))
 
 ;; == VARIABLES =================================================================
@@ -39,7 +40,7 @@
   ((parse-mode mode) (format "#~a(~s)" (cvar->str var) (var-x var)) port))
 
 (define (parse-mode mode)
-  (case mode [(#t) write] [(#f) display] [else display]))
+  (case mode [(#t) display] [(#f) display] [else display]))
 
 ;; == GOALS ====================================================================
 
@@ -242,6 +243,28 @@
     (lambda (loc) (error loc (non-goal-error-msg val)))]
    [else (error (non-goal-error-msg val))]))
 
+;; =============================================================================
+
+(define-generics mk-struct
+  (do-unify   mk-struct x s recur)
+  (do-walk*   mk-struct s   recur)
+  (do-reify-s mk-struct r   recur)
+  #:defaults
+  ([pair?
+    (define (do-unify p p^ s recur)
+      (cond
+       [(pair? p^) 
+        (recur (car p) (car p^)
+               (recur (cdr p) (cdr p^) s))]
+       [else #f]))
+    (define (do-walk* p s recur)
+      (cons (recur (car p) s)
+            (recur (cdr p) s)))
+    (define (do-reify-s p r recur)
+      (let-values ([(a^ r) (recur (car p) r)])
+        (let-values ([(d^ r) (recur (cdr p) r)])
+          (values (cons a^ d^) r))))]))
+
 ;; == SUBSTITUTIONS ============================================================
 
 (struct substitution (s)
@@ -265,6 +288,17 @@
 (define (ext-s x v s)
   (cons `(,x . ,v) s))
 
+;; checks if x appears in v
+(define occurs-check
+  (lambda (x v s)
+    (let ((v (walk v s)))
+      (cond
+        ((var? v) (eq? v x))
+        ((pair? v) 
+         (or (occurs-check x (car v) s)
+             (occurs-check x (cdr v) s)))
+        (else #f)))))
+
 ;; returns the size of a substitution
 (define size-s
   (lambda (s)
@@ -280,11 +314,9 @@
 (define (walk* w s)
   (let ((v (walk w s)))
     (cond
-      ((pair? v)
-       (cons
-        (walk* (car v) s)
-        (walk* (cdr v) s)))
-      (else v))))
+     ((mk-struct? v)
+      (do-walk* v s walk*))
+     (else v))))
 
 ;; a function that will safely extend the subsitution with
 ;; a binding of x to v
@@ -452,18 +484,18 @@
 ;; == REIFICATION ==============================================================
 
 ;; a list of functions to be run during reification
-(define reify-fns   (make-parameter '()))
-(define extend-reify-fns   (extend-parameter reify-fns))
+(define reify-fns        (make-parameter '()))
+(define extend-reify-fns (extend-parameter reify-fns))
 
 ;; reifies the constraint store with respect to x
 (define (reify x)
   (lambdag@ (a : s c)
     (define v (walk* x s))
-    (define r (reify-s v empty-s))
+    (define-values (v^ r) (reify-s v empty-s))
     (define answer
       (cond
-       ((null? r) v)
-       (else (reify-constraints (walk* v r) r c))))
+       ((null? r) v^)
+       (else (reify-constraints v^ r c))))
     (choiceg answer empty-f)))
 
 (define (reify-cvar cvar r) (walk cvar r))
@@ -472,9 +504,12 @@
 (define (reify-s v s)
   (let ((v (walk v s)))
     (cond
-      ((var? v) `((,v . ,(reify-n v (size-s s))) . ,s))
-      ((pair? v) (reify-s (cdr v) (reify-s (car v) s)))
-      (else s))))
+      ((var? v) 
+       (let ([v^ (reify-n v (size-s s))])
+         (values v^ `((,v . ,v^) . ,s))))
+      ((mk-struct? v) 
+       (do-reify-s v s reify-s))
+      (else (values v s)))))
 
 ;; creates a reified symbol
 (define (reify-n cvar n)

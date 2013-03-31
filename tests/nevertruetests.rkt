@@ -40,3 +40,6 @@
               (run* (q) (allowedo symbol? q))
               `((_.0 : (allowed (,symbol? _.0))))))
 
+(module+ main
+  (run-nevertruetests))
+

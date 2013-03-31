@@ -431,3 +431,6 @@
   '((((_.0 _.1) a.2) : (alpha (hash (a.2 _.0)) (hash (a.2 _.1))))))
 
 )
+
+(module+ main
+  (run-aktests))

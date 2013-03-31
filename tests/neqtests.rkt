@@ -434,3 +434,7 @@
   (test-check "=/=-54"
               (run* (q) (rembero 'a '(a b c) '(a b c)))
               '()))
+
+(module+ main
+  (run-neqtests))
+

@@ -5,20 +5,6 @@
 
 ;; ---UNIFICATION--------------------------------------------------
 
-(define ext-s
-  (lambda (x v s)
-    (cons `(,x . ,v) s)))
-
-(define occurs-check
-  (lambda (x v s)
-    (let ((v (walk v s)))
-      (cond
-        ((var? v) (eq? v x))
-        ((pair? v) 
-         (or (occurs-check x (car v) s)
-             (occurs-check x (cdr v) s)))
-        (else #f)))))
-
 (define unify
   (lambda (e s)
     (cond

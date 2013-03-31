@@ -402,3 +402,7 @@
   (display "Send More Money (multiplication)\n")
   (display (time (run* (q) (smm-mult q))))
   (newline))
+
+
+(module+ main
+  (run-fdtests))

@@ -68,3 +68,6 @@
       (run* (q) (infd q '(2 3 4)) (distincto `(a 3 ,q)))
       '(2 4)))
 
+(module+ main
+  (run-comptests))
+

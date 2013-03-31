@@ -17,3 +17,5 @@
               `())
   )
 
+(module+ main
+  (run-preftests))

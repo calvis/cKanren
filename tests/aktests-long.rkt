@@ -36,6 +36,8 @@
 
 ;; Pelletier Problems
 
+(define (run-aktests-long)
+
 (pp 1 '() '(<=> (=> p q) (=> (not q) (not p))))
 (pp 2 '() '(=>  (not (not p)) p))
 (pp 3 '() '(=> (not (=> p q)) (=> q p)))
@@ -856,4 +858,9 @@
       (savefml conj split (univ split (close) (close)) (conj savefml conj close)))))
 
 (printf "all done!\n")
+
+)
+
+(module+ main
+  (run-aktests-long))
 
