@@ -35,7 +35,7 @@
   (lambda (x)
     (goal-construct
       (lambdam@ (a : s c)
-        (and (not (findf (lambda (oc) (eq? 'required-c (oc->rator oc))) c))
+        (and (not (findf (lambda (oc) (eq? 'required-c (oc-rator oc))) c))
              a)))))
 
 (define allowedo
@@ -52,8 +52,8 @@
 
 (define reified-allowed
   (lambda (v r c)
-    (let ((c (filter (lambda (oc) (eq? (oc->rator oc) 'allowed-c)) c)))
-      (let ((c (walk* (map oc->rands c) r)))
+    (let ((c (filter (lambda (oc) (eq? (oc-rator oc) 'allowed-c)) c)))
+      (let ((c (walk* (map oc-rands c) r)))
         (if (null? c) `() `((allowed . ,c)))))))
 
 (extend-enforce-fns 'required required-enforceo)

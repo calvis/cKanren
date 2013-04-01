@@ -58,7 +58,7 @@
   (lambda (x c)
     (cond
       ((findf (existing-domain x) c)
-       => (lambda (oc) (cadr (oc->rands oc))))
+       => (lambda (oc) (cadr (oc-rands oc))))
       (else #f))))
 
 (define process-dom
@@ -255,8 +255,8 @@
             (process-dom v new-v-dom))))))))
 
 (define (enforce-constraintsfd x)
-  (define (domfd-c? oc) (eq? (oc->rator oc) 'domfd-c))
-  (define (domfd-c->var domfd-c) (car (oc->rands domfd-c)))
+  (define (domfd-c? oc) (eq? (oc-rator oc) 'domfd-c))
+  (define (domfd-c->var domfd-c) (car (oc-rands domfd-c)))
   (fresh ()
     (force-ans x)
     (lambdag@ (a : s c)
@@ -266,12 +266,12 @@
 
 (define fd-cs '(=/=fd-c distinctfd-c distinct/fd-c 
                 <=fd-c =fd-c plusfd-c timesfd-c))
-(define (fd-c? oc) (memq (oc->rator oc) fd-cs))
+(define (fd-c? oc) (memq (oc-rator oc) fd-cs))
 
 (define (verify-all-bound s c bound-x*)
   (define (bound? x) (memq x bound-x*))
   (for ([oc c] #:when (fd-c? oc))
-    (define oc-vars (filter var? (oc->rands oc)))
+    (define oc-vars (filter var? (oc-rands oc)))
     (cond
      ((findf (compose not bound?) oc-vars)
       => (lambda (x)
@@ -295,8 +295,8 @@
    (else (cons (car ls) (list-insert pred x (cdr ls))))))
 
 (define ((existing-domain x) oc)
-  (and (eq? (oc->rator oc) 'domfd-c)
-       (eq? (car (oc->rands oc)) x)))
+  (and (eq? (oc-rator oc) 'domfd-c)
+       (eq? (car (oc-rands oc)) x)))
 
 ;;; 
 

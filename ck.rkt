@@ -6,7 +6,7 @@
  ;; framework for defining constraints
  update-s update-c make-a any/var? prefix-s prtm
  lambdam@ identitym composem goal-construct ext-c
- build-oc oc->proc oc->rands oc->rator run run* prt
+ build-oc oc-proc oc-rands oc-rator run run* prt
  extend-enforce-fns extend-reify-fns goal? a? 
  walk walk* var? lambdag@ mzerog unitg onceo fresh-aux
  conde conda condu ifa ifu project fresh succeed fail
@@ -373,7 +373,7 @@
   (lambda (oc)
     (lambdam@ (a : s c)
       (cond
-        ((any/var? (oc->rands oc))
+        ((any/var? (oc-rands oc))
          (make-a s (ext-c oc c)))
         (else a)))))
 
@@ -428,10 +428,9 @@
 ;; contains a closure waiting to be evaluated with a new package,
 ;; a symbolic representation of the constrant's name and it's args
 (struct oc (proc rator rands) 
+  #:extra-constructor-name make-oc
   #:methods gen:custom-write 
   [(define (write-proc . args) (apply write-oc args))])
-
-(define make-oc oc)
 
 (define (write-oc oc port mode)
   (define fn (lambda (str) ((parse-mode mode) str port)))
@@ -439,11 +438,6 @@
   (for ([arg (oc-rands oc)])
     (fn (format " ~a" arg)))
   (fn (format ")")))
-
-;; accessors
-(define oc->proc  oc-proc)
-(define oc->rator oc-rator)
-(define oc->rands oc-rands)
 
 ;; creates an oc given the constraint operation and it's args
 (define-syntax (build-oc x)
@@ -461,7 +455,7 @@
 (define (run-constraints x* c)
   (for/fold ([rest identitym])
             ([oc c]
-             #:when (any-relevant/var? (oc->rands oc) x*))
+             #:when (any-relevant/var? (oc-rands oc) x*))
     (composem rest (rem/run oc))))
 
 ;; removes a constraint from the constraint store and then 
@@ -471,7 +465,7 @@
   (lambdam@ (a : s c)
     (cond
       ((memq oc c)
-       ((oc->proc oc)
+       ((oc-proc oc)
         (make-a s (remq oc c))))
       (else a))))
 

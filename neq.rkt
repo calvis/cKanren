@@ -25,16 +25,16 @@
 
 ;;; serious functions
 
-(define oc->prefix
+(define oc-prefix
   (lambda (oc)
-    (car (oc->rands oc))))
+    (car (oc-rands oc))))
 
 (define reify-prefix-dot (make-parameter #t))
 
 (define reify-constraintsneq
   (lambda (v r c)
-    (let ((c (filter (lambda (oc) (eq? (oc->rator oc) '=/=neq-c)) c)))
-      (let ((p* (walk* (map oc->prefix c) r)))
+    (let ((c (filter (lambda (oc) (eq? (oc-rator oc) '=/=neq-c)) c)))
+      (let ((p* (walk* (map oc-prefix c) r)))
         (let ((p* (sort-p* (filter-not any/var? p*))))
           (cond
             ((null? p*) '())
@@ -74,9 +74,9 @@
           ((null? c)
            (let ((c^ (ext-c (build-oc =/=neq-c p) c^)))
              (make-a s c^)))
-          ((eq? (oc->rator (car c)) '=/=neq-c)
+          ((eq? (oc-rator (car c)) '=/=neq-c)
            (let* ((oc (car c))
-                  (p^ (oc->prefix oc)))
+                  (p^ (oc-prefix oc)))
              (cond
                ((subsumes? p^ p) a)
                ((subsumes? p p^) (loop (cdr c) c^))

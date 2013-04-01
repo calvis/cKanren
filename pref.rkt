@@ -50,10 +50,10 @@
                  (loop
                   (map
                    (lambda (oc)
-                     (let ((p (oc->rands oc)))
+                     (let ((p (oc-rands oc)))
                        (cons (car p) (cadr p))))
                    (filter
-                    (lambda (oc) (eq? (oc->rator oc) 'prefo-c))
+                    (lambda (oc) (eq? (oc-rator oc) 'prefo-c))
                     c))))
                a))))
 

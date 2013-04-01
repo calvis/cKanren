@@ -11,17 +11,17 @@
   (fresh-aux nom (n ...) g g* ...))
 
 (define (sus-constrained? x oc)
-  (and (eq? (oc->rator oc) 'sus-c)
+  (and (eq? (oc-rator oc) 'sus-c)
        (eq? (sus-constraint-v oc) x)))
 
-(define (sus-constraint-v oc) (car (oc->rands oc)))
+(define (sus-constraint-v oc) (car (oc-rands oc)))
 
 (define (sus? x)
   (and (pair? x) (eq? (car x) 'sus)))
 
 (define (get-sus x c)
   (let ((oc (findf (lambda (oc) (sus-constrained? x oc)) c)))
-    (and oc (cons 'sus (oc->rands oc)))))
+    (and oc (cons 'sus (oc-rands oc)))))
 
 (define (sus-v s)  (cadr s))
 (define (sus-pi s) (caddr s))
@@ -269,7 +269,7 @@
      (else t))))
 
 (define (alpha-constraint? oc)
-  (memq (oc->rator oc) '(sus-c hash-c)))
+  (memq (oc-rator oc) '(sus-c hash-c)))
 
 (define (reify-alpha-constraints v r c)
   (let ((c (filter alpha-constraint? c)))
@@ -286,10 +286,10 @@
      (else c^))))
 
 (define (reify-oc oc r)
-  (case (oc->rator oc)
+  (case (oc-rator oc)
     ((hash-c)
-     (let ((lhs (car (oc->rands oc)))
-           (rhs (cadr (oc->rands oc))))
+     (let ((lhs (car (oc-rands oc)))
+           (rhs (cadr (oc-rands oc))))
        (let ((rhs (if (sus? rhs) (cadr rhs) rhs)))
          (let ((lhs (reify-cvar lhs r))
                (rhs (reify-cvar rhs r)))
