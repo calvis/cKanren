@@ -5,27 +5,29 @@
 
 ;; ---UNIFICATION--------------------------------------------------
 
-(define unify
-  (lambda (e s)
-    (cond
-      ((null? e) s)
-      (else
-       (let loop ((u (caar e)) (v (cdar e)) (e (cdr e)))
-         (let ((u (walk u s)) (v (walk v s)))
-           (cond
-             ((eq? u v) (unify e s))
-             ((var? u)
-              (and (not (occurs-check u v s))
-                   (unify e (ext-s u v s))))
-             ((var? v)
-              (and (not (occurs-check v u s))
-                   (unify e (ext-s v u s))))
-             ((and (mk-struct? u)
-                   (do-unify u v e loop)))
-             ((and (mk-struct? v)
-                   (do-unify v u e loop)))
-             ((equal? u v) (unify e s))
-             (else #f))))))))
+(define (unify e s)
+  (cond
+   ((null? e) s)
+   (else
+    (let loop ((u (caar e)) (v (cdar e)) (e (cdr e)))
+      (let ((u (walk u s)) (v (walk v s)))
+        (cond
+         ((eq? u v) (unify e s))
+         ((var? u)
+          (and (not (occurs-check u v s))
+               (unify e (ext-s u v s))))
+         ((var? v)
+          (and (not (occurs-check v u s))
+               (unify e (ext-s v u s))))
+         ((and (mk-struct? u)
+               (mk-struct? v))
+          (recur u 
+           (lambda (ua ud)
+             (recur v
+              (lambda (va vd)
+                (loop ua va `((,ud . ,vd) . ,e)))))))
+         ((equal? u v) (unify e s))
+         (else #f)))))))
 
 ;; ---GOAL---------------------------------------------------------
 

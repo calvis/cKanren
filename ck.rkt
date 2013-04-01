@@ -12,8 +12,8 @@
  conde conda condu ifa ifu project fresh succeed fail
  lambdaf@ inc enforce-constraints reify empty-a take
  format-source define-cvar-type reify-cvar var ext-s
- gen:mk-struct do-unify do-walk* do-reify-s occurs-check
- mk-struct? lex<= sort-by-lex<= reify-with-colon
+ gen:mk-struct recur constructor mk-struct? 
+ lex<= sort-by-lex<= reify-with-colon occurs-check
  (for-syntax build-srcloc))
 
 ;; == VARIABLES =================================================================
@@ -247,48 +247,32 @@
 ;; =============================================================================
 
 (define-generics mk-struct
-  ;; recur will expect a first two things to unify, and then
-  ;; an association list of remaining things to unify; we already
-  ;; know that eq? is false, so no need to check again
-  (do-unify   mk-struct x s recur)
-  (do-walk*   mk-struct s   recur)
-  (do-reify-s mk-struct r   recur)
+  ;; recur allows generic traversing of mk-structs (for example,
+  ;; this is used during unification).  k should be a procedure
+  ;; expecting two arguments, the first thing to process, and a 
+  ;; list of remaining things to process.  
+  (recur mk-struct k)
+
+  ;; returns a function that will create a new mk-struct given
+  ;; arguments like the arguments to k
+  (constructor mk-struct)
+
+  ;; for reification 
+  (mk-struct->sexp mk-struct)
+
   #:defaults
   ([pair?
-    (define (do-unify p p^ e recur)
-      (cond
-       [(pair? p^) 
-        (recur (car p) (car p^)
-               `((,(cdr p) . ,(cdr p^)) . ,e))]
-       [else #f]))
-    (define (do-walk* p s recur)
-      (cons (recur (car p) s)
-            (recur (cdr p) s)))
-    (define (do-reify-s p r recur)
-      (let-values ([(a^ r) (recur (car p) r)])
-        (let-values ([(d^ r) (recur (cdr p) r)])
-          (values (cons a^ d^) r))))]
+    (define (recur p k)
+      (k (car p) (cdr p)))
+    (define (constructor p) cons)
+    (define (mk-struct->sexp v) v)]
    [vector?
-    (define (do-unify v v^ e recur)
-      (cond
-       [(and (vector? v^)
-             (= (vector-length v)
-                (vector-length v^))) 
-        (let ([v  (vector->list v)]
-              [v^ (vector->list v^)])
-          (recur (car v) (car v^)
-                 `((,(cdr v) . ,(cdr v^)) . ,e)))]
-       [else #f]))
-    (define (do-walk* v s recur)
-      (vector-map (lambda (x) (recur x s)) v))
-    (define (do-reify-s v r recur)
-      (define-values (ls r)
-        (for/fold ([ls '()]
-                   [r '()])
-                  ([x v])
-          (let-values ([(x^ r) (recur x r)])
-            (values (cons x^ ls) r))))
-      (values (list->vector (reverse ls)) r))]))
+    (define (recur v k)
+      (let ([v (vector->list v)])
+        (k (car v) (cdr v))))
+    (define (constructor v)
+      (compose list->vector cons))
+    (define (mk-struct->sexp v) v)]))
 
 ;; == SUBSTITUTIONS ============================================================
 
@@ -340,7 +324,11 @@
   (let ((v (walk w s)))
     (cond
      ((mk-struct? v)
-      (do-walk* v s walk*))
+      (recur v 
+       (lambda (a d) 
+         ((constructor v)
+          (walk* a s)
+          (walk* d s)))))
      (else v))))
 
 ;; a function that will safely extend the subsitution with
@@ -522,7 +510,7 @@
     (define answer
       (cond
        ((null? r) v^)
-       (else (reify-constraints v^ r c))))
+       (else (reify-constraints (walk* v^ r) r c))))
     (choiceg answer empty-f)))
 
 (define (reify-cvar cvar r) (walk cvar r))
@@ -535,7 +523,13 @@
        (let ([v^ (reify-n v (size-s s))])
          (values v^ `((,v . ,v^) . ,s))))
       ((mk-struct? v) 
-       (do-reify-s v s reify-s))
+       (recur v
+        (lambda (a d)
+          (define-values (a^ r) (reify-s a s))
+          (define-values (d^ r^) (reify-s d r))
+          (values (mk-struct->sexp
+                   ((constructor v) a^ d^))
+                  r^))))
       (else (values v s)))))
 
 ;; creates a reified symbol

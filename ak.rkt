@@ -35,12 +35,13 @@
   #:transparent
   #:extra-constructor-name make-tie
   #:methods gen:mk-struct
-  [(define (do-walk* tie s recur)
-     (make-tie (tie-a tie) (recur (tie-t tie) s)))
-   (define (do-reify-s tie r recur)
-     (let-values ([(a^ r) (recur (tie-a tie) r)])
-       (let-values ([(t^ r) (recur (tie-t tie) r)])
-         (values `(tie ,a^ ,t^) r))))])
+  [(define (recur tie k)
+     (k (tie-a tie) (list (tie-t tie))))
+   (define (constructor tie)
+     (lambda (a t-ls)
+       (make-tie a (car t-ls))))
+   (define (mk-struct->sexp tie)
+     `(tie ,(tie-a tie) ,(tie-t tie)))])
 
 (define (sus x pi)
   (goal-construct (sus-c x pi)))
