@@ -1,7 +1,7 @@
 #lang racket
 
 (require "ck.rkt" (only-in "tree-unify.rkt" unify))
-(provide =/= =/=-c)
+(provide =/= =/=-c reify-prefix-dot)
 
 ;;; little helpers
 
@@ -29,14 +29,29 @@
   (lambda (oc)
     (car (oc->rands oc))))
 
+(define reify-prefix-dot (make-parameter #t))
+
 (define reify-constraintsneq
   (lambda (v r c)
     (let ((c (filter (lambda (oc) (eq? (oc->rator oc) '=/=neq-c)) c)))
       (let ((p* (walk* (map oc->prefix c) r)))
-        (let ((p* (filter-not any/var? p*)))
+        (let ((p* (sort-p* (filter-not any/var? p*))))
           (cond
             ((null? p*) '())
-            (else `((=/= . ,p*)))))))))
+            ((reify-prefix-dot) `((=/= . ,p*)))
+            (else `((=/= . ,(map remove-dots p*))))))))))
+
+(define (remove-dots p*)
+  (map (lambda (p) (list (car p) (cdr p))) p*))
+
+(define (sort-p* p*)
+  (sort-by-lex<=
+   (map (lambda (p)
+          (map (lambda (a)
+                 (let ([u (car a)] [v (cdr a)])
+                   (if (lex<= u v) (cons u v) (cons v u))))
+               p))
+        p*)))
 
 (define =/=neq-c
   (lambda (p)

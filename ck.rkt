@@ -13,7 +13,7 @@
  lambdaf@ inc enforce-constraints reify empty-a take
  format-source define-cvar-type reify-cvar var ext-s
  gen:mk-struct do-unify do-walk* do-reify-s occurs-check
- mk-struct?
+ mk-struct? lex<= sort-by-lex<= reify-with-colon
  (for-syntax build-srcloc))
 
 ;; == VARIABLES =================================================================
@@ -512,6 +512,8 @@
 (define reify-fns        (make-parameter '()))
 (define extend-reify-fns (extend-parameter reify-fns))
 
+(define reify-with-colon (make-parameter #t))
+
 ;; reifies the constraint store with respect to x
 (define (reify x)
   (lambdag@ (a : s c)
@@ -546,7 +548,10 @@
     ((null? c) v)
     (else
      (let ((c^ (run-reify-fns v r c)))
-       (if (null? c^) v `(,v : . ,c^))))))
+       (cond
+        [(null? c^) v] 
+        [(reify-with-colon) `(,v : . ,(sort-store c^))]
+        [else `(,v ,(sort-store c^))])))))
 
 ;; runs all the reification functions
 (define run-reify-fns
@@ -554,6 +559,59 @@
     (for/fold ([c^ `()])
               ([fn (map cdr (reify-fns))])
        (append (fn v r c) c^))))
+
+(define (sort-store c) (sort c lex<= #:key car))
+
+(define (sort-by-lex<= l) (sort l lex<=))
+
+;; for pretty reification
+(define lex<=
+  (lambda (x y)
+    (cond
+      ((vector? x) #t)
+      ((vector? y) #f)
+      ((port? x) #t)
+      ((port? y) #f)
+      ((procedure? x) #t)
+      ((procedure? y) #f)
+      ((boolean? x)
+       (cond
+         ((boolean? y) (or (not x) (eq? x y)))
+         (else #t)))
+      ((boolean? y) #f)
+      ((null? x) #t)
+      ((null? y) #f)
+      ((char? x)
+       (cond
+         ((char? y) (char<=? x y))
+         (else #t)))
+      ((char? y) #f)
+      ((number? x)
+       (cond
+         ((number? y) (<= x y))
+         (else #t)))
+      ((number? y) #f)
+      ((string? x)
+       (cond
+         ((string? y) (string<=? x y))
+         (else #t)))
+      ((string? y) #f)
+      ((symbol? x)
+       (cond
+         ((symbol? y)
+          (string<=? (symbol->string x)
+                     (symbol->string y)))
+         (else #t)))
+      ((symbol? y) #f)
+      ((pair? x)
+       (cond
+         ((pair? y)
+          (cond          
+            ((equal? (car x) (car y))
+             (lex<= (cdr x) (cdr y)))
+            (else (lex<= (car x) (car y)))))))
+      ((pair? y) #f)
+      (else #t))))
 
 ;; == INTEGRATION ==============================================================
 
