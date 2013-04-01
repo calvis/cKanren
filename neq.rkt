@@ -1,7 +1,7 @@
 #lang racket
 
 (require "ck.rkt" (only-in "tree-unify.rkt" unify))
-(provide =/=)
+(provide =/= =/=-c)
 
 ;;; little helpers
 
