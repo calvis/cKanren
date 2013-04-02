@@ -5,6 +5,12 @@
 
 ;; ---UNIFICATION--------------------------------------------------
 
+(define (unifiable-structs? u v)
+  (and (mk-struct? u)
+       (mk-struct? v)
+       (unifiable? u v)
+       (unifiable? v u)))
+
 (define (unify e s)
   (cond
    ((null? e) s)
@@ -19,8 +25,7 @@
          ((var? v)
           (and (not (occurs-check v u s))
                (unify e (ext-s v u s))))
-         ((and (mk-struct? u)
-               (mk-struct? v))
+         ((unifiable-structs? u v)
           (recur u 
            (lambda (ua ud)
              (recur v
@@ -31,24 +36,22 @@
 
 ;; ---GOAL---------------------------------------------------------
 
-(define == (lambda (u v) (goal-construct (==-c u v))))
+(define (== u v) (goal-construct (==-c u v)))
 
-(define ==-c
-  (lambda (u v)
-    (lambdam@ (a : s c)
-              (cond
-                ((unify `((,u . ,v)) s)
-                 => (lambda (s^)
-                      ((update-prefix s s^) a)))
-                (else #f)))))
+(define (==-c u v)
+  (lambdam@ (a : s c)
+    (cond
+     ((unify `((,u . ,v)) s)
+      => (lambda (s^)
+           ((update-prefix s s^) a)))
+     (else #f))))
 
-(define update-prefix
-  (lambda (s s^)
-    (let loop ((s^ s^))
-      (cond
-        ((eq? s s^) identitym)
-        (else
-         (composem
-          (update-s (caar s^) (cdar s^))
-          (loop (cdr s^))))))))
+(define (update-prefix s s^)
+  (let loop ((s^ s^))
+    (cond
+     ((eq? s s^) identitym)
+     (else
+      (composem
+       (update-s (caar s^) (cdar s^))
+       (loop (cdr s^)))))))
 

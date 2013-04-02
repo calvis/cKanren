@@ -40,6 +40,8 @@
    (define (constructor tie)
      (lambda (a t-ls)
        (make-tie a (car t-ls))))
+   (define (unifiable? tie x) 
+     (tie? x))
    (define (mk-struct->sexp tie)
      `(tie ,(tie-a tie) ,(tie-t tie)))])
 

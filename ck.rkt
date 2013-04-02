@@ -12,7 +12,7 @@
  conde conda condu ifa ifu project fresh succeed fail
  lambdaf@ inc enforce-constraints reify empty-a take
  format-source define-cvar-type reify-cvar var ext-s
- gen:mk-struct recur constructor mk-struct? 
+ gen:mk-struct recur constructor mk-struct? unifiable?
  lex<= sort-by-lex<= reify-with-colon occurs-check
  (for-syntax build-srcloc))
 
@@ -257,6 +257,9 @@
   ;; arguments like the arguments to k
   (constructor mk-struct)
 
+  ;; determines whether mk-struct can unify with x
+  (unifiable? mk-struct x)
+
   ;; for reification 
   (mk-struct->sexp mk-struct)
 
@@ -265,6 +268,7 @@
     (define (recur p k)
       (k (car p) (cdr p)))
     (define (constructor p) cons)
+    (define (unifiable? p x) (pair? x))
     (define (mk-struct->sexp v) v)]
    [vector?
     (define (recur v k)
@@ -272,6 +276,7 @@
         (k (car v) (cdr v))))
     (define (constructor v)
       (compose list->vector cons))
+    (define (unifiable? v x) (vector? x))
     (define (mk-struct->sexp v) v)]))
 
 ;; == SUBSTITUTIONS ============================================================

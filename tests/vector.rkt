@@ -17,4 +17,10 @@
                 (fresh (x y)
                   (== (vector x 2) (vector 1 y))
                   (== q `(,x ,y))))
-              `((1 2))))
+              `((1 2)))
+  
+  (test-check "3"
+              (run* (q)
+                 (== (vector 1 2) (list 1 2)))
+              `())
+  )
