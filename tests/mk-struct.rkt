@@ -39,6 +39,14 @@
   
   (test-check "4" (run* (q) (== q (my-struct 'x))) `((my-struct x)))
   (test-check "5" (run* (q) (== q (my-other-struct 'x 'y))) `((my-struct x)))
+
+  (test-check "5.1" 
+              (run* (q)
+                (fresh (x y)
+                  (== (my-other-struct x 2)
+                      (my-other-struct 1 y))
+                  (== q `(,x ,y))))
+              `((1 2)))
   
   (test-check "6" 
               (run* (q) (== (my-struct 'x) (my-other-struct 'x 'y)))
