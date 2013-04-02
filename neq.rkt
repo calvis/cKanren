@@ -1,7 +1,7 @@
 #lang racket
 
 (require "ck.rkt" (only-in "tree-unify.rkt" unify))
-(provide =/= =/=-c reify-prefix-dot)
+(provide =/= =/=-c =/=neq-c oc-prefix reify-prefix-dot)
 
 ;;; little helpers
 
@@ -47,29 +47,40 @@
 (define (sort-p* p*)
   (sort-by-lex<=
    (map (lambda (p)
-          (map (lambda (a)
+          (sort-by-lex<=
+           (map (lambda (a)
                  (let ([u (car a)] [v (cdr a)])
-                   (if (lex<= u v) (cons u v) (cons v u))))
-               p))
+                   (sort-diseq u v)))
+               p)))
         p*)))
+
+(define (sort-diseq u v)
+  (cond
+  ((char<?
+      (string-ref (format "~s" v) 0)
+      (string-ref "_" 0))
+   (cons u v))
+  ((lex<= u v) (cons u v))
+  (else (cons v u))))
 
 (define =/=neq-c
   (lambda (p)
     (lambdam@ (a : s c)
-      (cond
-        ((unify p s)
-         =>
-         (lambda (s^)
-           (let ((p (prefix-s s s^)))
-             (cond
+      (let ([p (walk* p s)])
+        (cond
+         ((unify p s c)
+          =>
+          (lambda (s^)
+            (let ((p (prefix-s s s^)))
+              (cond
                ((null? p) #f)
                (else ((normalize-store p) a))))))
-        (else a)))))
+         (else a))))))
 
 (define normalize-store
   (lambda (p)
-    (lambdam@ (a : s c)
-      (let loop ((c c) (c^ '()))
+    (lambdam@ (a : s c-old)
+      (let loop ((c c-old) (c^ '()))
         (cond
           ((null? c)
            (let ((c^ (ext-c (build-oc =/=neq-c p) c^)))
@@ -78,15 +89,15 @@
            (let* ((oc (car c))
                   (p^ (oc-prefix oc)))
              (cond
-               ((subsumes? p^ p) a)
-               ((subsumes? p p^) (loop (cdr c) c^))
+               ((subsumes? p^ p c-old) a)
+               ((subsumes? p p^ c-old) (loop (cdr c) c^))
                (else (loop (cdr c) (cons oc c^))))))
           (else (loop (cdr c) (cons (car c) c^))))))))
 
 (define subsumes?
-  (lambda (p s)
+  (lambda (p s c)
     (cond
-      ((unify p s) => (lambda (s^) (eq? s s^)))
+      ((unify p s c) => (lambda (s^) (eq? s s^)))
       (else #f))))
 
 ;;; goals
@@ -99,7 +110,7 @@
   (lambda (u v)
     (lambdam@ (a : s c)
       (cond
-        ((unify `((,u . ,v)) s)
+        ((unify `((,u . ,v)) s c)
          => (lambda (s^)
               ((=/=neq-c (prefix-s s s^)) a)))
         (else a)))))

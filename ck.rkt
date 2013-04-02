@@ -14,6 +14,8 @@
  format-source define-cvar-type reify-cvar var ext-s
  gen:mk-struct recur constructor mk-struct? unifiable?
  lex<= sort-by-lex<= reify-with-colon occurs-check
+ run-constraints build-attr-oc attr-oc? attr-oc-uw?
+ get-attributes filter/rator filter-not/rator
  (for-syntax build-srcloc))
 
 ;; == VARIABLES =================================================================
@@ -373,6 +375,12 @@
 (define (write-constraint-store constraint-store port mode)
   ((parse-mode mode) (format "~a" (constraint-store-c constraint-store)) port))
 
+(define (filter/rator sym c)
+  (filter (lambda (oc) (eq? (oc-rator oc) sym)) c))
+
+(define (filter-not/rator sym c)
+  (filter-not (lambda (oc) (eq? (oc-rator oc) sym)) c))
+
 ;; adds oc to the constraint store if it contains a non-ground var
 (define update-c
   (lambda (oc)
@@ -451,6 +459,21 @@
      (with-syntax ([(arg^ ...) (generate-temporaries #'(arg ...))])
        #'(let ((arg^ arg) ...)
            (make-oc (op arg^ ...) 'op `(,arg^ ...)))))))
+
+(struct attr-oc oc (uw?) ;; for "unifies with?"
+  #:extra-constructor-name make-attr-oc)
+
+(define-syntax build-attr-oc
+  (syntax-rules ()
+    ((_ op x uw?)
+     (let ((x^ x))
+       (make-attr-oc (op x^) 'op `(,x^) uw?)))))
+
+(define (get-attributes x c)
+  (define (x-attr-oc? oc) 
+    (and (attr-oc? oc) (eq? (car (oc-rands oc)) x)))
+  (let ((attrs (filter x-attr-oc? c)))
+    (and (not (null? attrs)) attrs)))
 
 ;; == FIXPOINT =================================================================
 
@@ -544,7 +567,7 @@
        (cond
         [(null? c^) v] 
         [(reify-with-colon) `(,v : . ,(sort-store c^))]
-        [else `(,v ,(sort-store c^))])))))
+        [else `(,v . ,(sort-store c^))])))))
 
 ;; runs all the reification functions
 (define run-reify-fns
