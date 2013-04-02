@@ -5,7 +5,8 @@
          "tests/comptests.rkt"
          "tests/nevertruetests.rkt"
          "tests/preftests.rkt"
-         "tests/aktests.rkt")
+         "tests/aktests.rkt"
+         "tests/mk-struct.rkt")
 
 (run-fdtests)
 (run-neqtests)
@@ -13,3 +14,4 @@
 (run-nevertruetests)
 (run-preftests)
 (run-aktests)
+(run-mk-struct-tests)

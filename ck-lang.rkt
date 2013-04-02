@@ -6,7 +6,7 @@
  (except-out (all-from-out racket) #%app)
 
  ;; mk things
- conde conda condu fresh succeed fail 
+ conde conda condu fresh succeed fail gen:mk-struct
  run run* prt prtm use-constraints trace-define
  (rename-out [#%app-safe #%app]))
 
