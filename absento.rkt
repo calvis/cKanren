@@ -24,7 +24,8 @@
 (define (symbol-uw? x attrs)
   (define incompatible '(number-c))
   (and (not (pair? x)) (not (number? x))
-       (or (not attrs) (andmap (lambda (aoc) (not (memq (oc-rator aoc) incompatible))) attrs))))
+       (or (not attrs) (andmap (lambda (aoc) (not (memq (oc-rator aoc) incompatible)))
+                               attrs))))
 
 (define symbol-constrained?
   (lambda (v c)
@@ -45,7 +46,8 @@
   (define incompatible '(symbol-c))
   (and (not (pair? x)) 
        (not (symbol? x))
-       (or (not attrs) (andmap (lambda (aoc) (not (memq (oc-rator aoc) incompatible))) attrs))))
+       (or (not attrs) (andmap (lambda (aoc) (not (memq (oc-rator aoc) incompatible)))
+                               attrs))))
 
 (define number-c
   (lambda (u)
@@ -83,8 +85,10 @@
       (let ([u (walk* u s)]
             [v (walk* v s)])
         (cond
-         ((or (symbol? v) (symbol-constrained? v c)
-              (number? v) (number-constrained? v c))
+         ((or (symbol? v) 
+              (number? v)
+              (symbol-constrained? v c)
+              (number-constrained? v c))
           (cond
            [(pair? u) a]
            [else ((=/=-c u v) a)]))
@@ -125,20 +129,18 @@
   (lambda (u t s c)
     (cond
      ((unify `((,u . ,t)) s c) =>
-      (lambda (s^) (eq? s ^s)))
+      (lambda (s^) (eq? s s^)))
      (else #f))))
 
 (define reify-absent-cs
   (default-reify 'absento '(absent-c) remove-duplicates))
 
 (define (absento-split u v)
-  (lambdam@ (a : s c)
-    ((composem
-      (absent-c u (car v))
-      (composem
-       (absent-c u (cdr v))
-       (=/=-c u v)))
-     a)))
+  (composem
+   (absent-c u (car v))
+   (composem
+    (absent-c u (cdr v))
+    (=/=-c u v))))
 
 (define type-cs '(number-c symbol-c))
 (define (rerun-type-cs x)
