@@ -6,7 +6,7 @@
  "../fd.rkt"
  "tester.rkt")
 
-(provide run-fdtests)
+(provide test-fd test-fd-long)
 
 (define add-digitso
   (lambda (augend addend carry-in carry digit)
@@ -103,7 +103,7 @@
       ((1000) 9999)
       ((10000) 99999))))
 
-(define (run-fdtests)
+(define (test-fd)
   
   (test-check "0.0"
               (run* (x)
@@ -362,10 +362,6 @@
   (display (time (run 1 (q) (n-queenso q 8))))
   (newline)
   
-  (display "All Solutions for Eight Queens\n")
-  (display (time (length (run* (q) (n-queenso q 8)))))
-  (newline)
-  
   (test-check "30"
               (run* (q)
                     (actual-wortho `(1 2 3) 123))
@@ -399,10 +395,17 @@
                            (actual-wortho `(5 ,x 3) q)))
               `(503 513 523 533 543 553 563 573 583 593))
   
+)
+
+(define (test-fd-long)
+  (test-fd)
+  (display "All Solutions for Eight Queens\n")
+  (display (time (length (run* (q) (n-queenso q 8)))))
+  (newline)
+  
   (display "Send More Money (multiplication)\n")
   (display (time (run* (q) (smm-mult q))))
   (newline))
 
-
 (module+ main
-  (run-fdtests))
+  (test-fd-long))

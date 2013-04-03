@@ -2,7 +2,10 @@
 
 ;; In order to use "basic" miniKanren
 (require "ck.rkt" "tree-unify.rkt")
+
 (provide
+ (all-from-out "ck.rkt")
+ (all-from-out "tree-unify.rkt")
  run1 run2 run3 run4 
  run5 run6 run7 run8 
  run9 run10 run11 run12
@@ -20,7 +23,7 @@
  addero gen-addero pluso minuso
  *o odd-*o bound-*o =lo <lo <=lo
  <o <=o /o splito logo exp2
- repeated-mul expo prnt)
+ repeated-mul expo prnt zeroo)
 
 
 (define-syntax run1 (syntax-rules () ((_ (x) g0 g ...) (run 1 (x) g0 g ...))))
@@ -154,6 +157,10 @@
        (cons 0
              (build-num (quotient n 2))))
       ((zero? n) '()))))
+
+(define zeroo
+  (lambda (n)
+    (== '() n)))
 
 (define poso
   (lambda (n)

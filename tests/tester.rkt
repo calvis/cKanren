@@ -1,37 +1,45 @@
 #lang racket
 
-(provide test-check test-divergence)
-
-(define test-error
-  (lambda (tag . args)
-    (printf "Failed: ~s: ~%" tag)
-    (apply printf args)
-    (error 'WiljaCodeTester "That's all, folks!")))
-
-(define-syntax test-check
-  (syntax-rules ()
-    ((_ title tested-expression expected-result)
-     (begin
-       (printf "Testing ~a\n" title)
-       (let* ((expected expected-result)
-              (produced tested-expression))
-         (or (equal? expected produced)
-             (test-error 'test-check
-               "Failed: ~a~%Expected: ~a~%Computed: ~a~%"
-               'tested-expression expected produced)))))))
+(require "../ck.rkt")
+(provide test (rename-out [test test-check]) test-divergence test-disable)
 
 (define max-ticks 10000000)
+
+(define-syntax (test x)
+  (syntax-case x ()
+    ((_ title tested-expression expected-result)
+     (quasisyntax/loc x
+      (begin
+        (printf "Testing ~a\n" title)
+        (let ([expected expected-result]
+              [produced tested-expression])
+          (cond
+           [(equal? expected produced) (void)] 
+           [else
+            (make-error #,(build-srcloc x)
+                        "error while running tests\nExpression: ~a~%Expected: ~a~%Computed: ~a~%"
+                        'tested-expression expected produced)])))))))
+
+(define (make-error src msg . exprs)
+  (cond
+   [(format-source src)
+    => (lambda (loc) (apply error loc msg exprs))]
+   [else (apply error 'test msg exprs)]))
 
 (define-syntax test-divergence
   (syntax-rules ()
     ((_ title tested-expression)
      (begin
-       (printf "Testing ~s (engine with ~s ticks fuel)\n" title max-ticks)
+       (printf "Testing ~a (engine with ~s ticks fuel)\n" title max-ticks)
        (let ((eng (make-engine (lambda () tested-expression))))
          (eng max-ticks
            (lambda (t v)
-             (test-error 'test-divergence
-               "infinite loop returned ~s after ~s ticks"
-               v (- max-ticks t)))
+             (error 'test-divergence
+                    "infinite loop returned ~s after ~s ticks"
+                    v (- max-ticks t)))
            (lambda (e^) (void))))))))
 
+(define-syntax test-disable
+  (syntax-rules ()
+    ((_ title tested-expression expected-result)
+     (printf "Disable testing ~s\n" title))))

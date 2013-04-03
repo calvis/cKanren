@@ -1,9 +1,10 @@
 #lang s-exp "../ck-lang.rkt"
 
 (require racket/base "tester.rkt" "../tree-unify.rkt")
-(provide run-mk-struct-tests)
 
-(define (run-mk-struct-tests)
+(provide test-mk-struct test-mk-struct-long)
+
+(define (test-mk-struct)
   (test-check "1" 
               (run* (q) 
                     (fresh (x y)
@@ -58,5 +59,8 @@
   
   (void))
 
+(define (test-mk-struct-long)
+  (test-mk-struct))
+
 (module+ main
-  (run-mk-struct-tests))
+  (test-mk-struct))

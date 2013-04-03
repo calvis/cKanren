@@ -5,7 +5,7 @@
          "../tree-unify.rkt"
          "../neq.rkt")
 
-(provide distincto rembero run-neqtests)
+(provide distincto rembero test-neq test-neq-long)
 
 (define distincto
   (lambda (l)
@@ -29,25 +29,11 @@
               ((== a x) (== out res))
               ((=/= a x) (== `(,a . ,res) out))))))))
 
-(define (run-neqtests)
+(define (test-neq)
   
-  (test-check "=/=--1"
-              (run* (q)
-                    (fresh (x y)
-                           (=/= `(,x 1) `(2 ,y))
-                           (== `(,x ,y) q)))
-              '(((_.0 _.1) : (=/= ((_.0 . 2) (_.1 . 1))))))
-  
-  (test-check "=/=-0"
-              (run* (q)
-                    (fresh (x y z)
-                           (=/= `(,x 2 ,z)  `(1 ,z 3))
-                           (=/= `(,x 6 ,z)  `(4 ,z 6))
-                           (=/= `(,x ,y ,z)  `(7 ,z 9))
-                           (== x z)
-                           (== q `(,x ,y ,z))))
-              '((_.0 _.1 _.0)))
-  
+  (test-check "test 0.0" (run* (q) (== 5 5)) '(_.0))
+  (test-check "test 0.1" (run* (q) (=/= 5 6)) '(_.0))
+
   (test-check "=/=-1"
               (run* (q)
                     (=/= 3 q)
@@ -216,6 +202,16 @@
                            (== x 2)
                            (== y 1)))
               '())
+  
+  (test-check "=/=21.1"
+              (run* (q)
+                    (fresh (x y z)
+                           (=/= `(,x 2 ,z)  `(1 ,z 3))
+                           (=/= `(,x 6 ,z)  `(4 ,z 6))
+                           (=/= `(,x ,y ,z)  `(7 ,z 9))
+                           (== x z)
+                           (== q `(,x ,y ,z))))
+              '((_.0 _.1 _.0)))
   
   (test-check "=/=-22"
               (run* (q)
@@ -433,8 +429,16 @@
   
   (test-check "=/=-54"
               (run* (q) (rembero 'a '(a b c) '(a b c)))
-              '()))
+              '())
+
+  (test-check "=/=-55"
+              (run* (q) (=/= q #f))
+              '((_.0 : (=/= ((_.0 . #f))))))
+)
+
+(define (test-neq-long)
+  (test-neq))
 
 (module+ main
-  (run-neqtests))
+  (test-neq-long))
 

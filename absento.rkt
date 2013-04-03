@@ -19,7 +19,9 @@
         (cond
          ((symbol? u) a)
          ((not (var? u)) #f)
-         (else ((update-c (build-attr-oc symbol-c u symbol-uw?)) a)))))))
+         ((symbol-uw? u (get-attributes u c))
+          ((update-c (build-attr-oc symbol-c u symbol-uw?)) a))
+         (else #f))))))
  
 (define (symbol-uw? x attrs)
   (define incompatible '(number-c))
@@ -56,7 +58,9 @@
         (cond
          ((number? u) a)
          ((not (var? u)) #f)
-         (else ((update-c (build-attr-oc number-c u number-uw?)) a)))))))
+         ((number-uw? u (get-attributes u c))
+          ((update-c (build-attr-oc number-c u number-uw?)) a))
+         (else #f))))))
 
 (define number-constrained?
   (lambda (v c)

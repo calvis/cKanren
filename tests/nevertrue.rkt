@@ -2,10 +2,10 @@
 
 (require "../ck.rkt" "../never-true.rkt" "../tree-unify.rkt"
          "tester.rkt")
-(provide run-nevertruetests)
 
-(define (run-nevertruetests)
-  
+(provide test-nevertrue test-nevertrue-long)
+
+(define (test-nevertrue)
   (test-check "1"
               (run* (q) (== q '()) (never-pairo q))
               '(()))
@@ -40,6 +40,9 @@
               (run* (q) (allowedo symbol? q))
               `((_.0 : (allowed (,symbol? _.0))))))
 
+(define (test-nevertrue-long)
+  (test-nevertrue))
+
 (module+ main
-  (run-nevertruetests))
+  (test-nevertrue-long))
 
