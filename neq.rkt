@@ -31,28 +31,16 @@
 
 (define reify-prefix-dot (make-parameter #t))
 
-(define reify-constraintsneq
-  (lambda (v r c)
-    (let ((c (filter (lambda (oc) (eq? (oc-rator oc) '=/=neq-c)) c)))
-      (let ((p* (walk* (map oc-prefix c) r)))
-        (let ((p* (sort-p* (filter-not any/var? p*))))
-          (cond
-            ((null? p*) '())
-            ((reify-prefix-dot) `((=/= . ,p*)))
-            (else `((=/= . ,(map remove-dots p*))))))))))
-
 (define (remove-dots p*)
-  (map (lambda (p) (list (car p) (cdr p))) p*))
+  (cond
+   [(reify-prefix-dot) p*]
+   [else (map (lambda (p) (list (car p) (cdr p))) p*)]))
 
-(define (sort-p* p*)
-  (sort-by-lex<=
-   (map (lambda (p)
-          (sort-by-lex<=
-           (map (lambda (a)
-                 (let ([u (car a)] [v (cdr a)])
-                   (sort-diseq u v)))
-               p)))
-        p*)))
+(define (sort-ps p*)
+  (map (lambda (p)
+         (sort-by-lex<=
+          (map (lambda (a) (sort-diseq (car a) (cdr a))) p)))
+       p*))
 
 (define (sort-diseq u v)
   (cond
@@ -62,6 +50,14 @@
    (cons u v))
   ((lex<= u v) (cons u v))
   (else (cons v u))))
+
+(define reify-constraintsneq 
+  (default-reify 
+    '=/= 
+    '(=/=neq-c)
+    (lambda (rands)
+      (let ([p* (map car rands)])
+        (map remove-dots (sort-ps p*))))))
 
 (define =/=neq-c
   (lambda (p)

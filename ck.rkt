@@ -15,7 +15,7 @@
  gen:mk-struct recur constructor mk-struct? unifiable?
  lex<= sort-by-lex<= reify-with-colon occurs-check
  run-constraints build-attr-oc attr-oc? attr-oc-uw?
- get-attributes filter/rator filter-not/rator
+ get-attributes filter/rator filter-not/rator default-reify
  (for-syntax build-srcloc))
 
 ;; == VARIABLES =================================================================
@@ -570,11 +570,17 @@
         [else `(,v . ,(sort-store c^))])))))
 
 ;; runs all the reification functions
-(define run-reify-fns
-  (lambda (v r c)
-    (for/fold ([c^ `()])
-              ([fn (map cdr (reify-fns))])
-       (append (fn v r c) c^))))
+(define (run-reify-fns v r c)
+  (for/fold ([c^ `()])
+            ([fn (map cdr (reify-fns))])
+    (append (fn v r c) c^)))
+
+(define ((default-reify sym cs fn) v r c)
+  (let ((c (filter (lambda (oc) (memq (oc-rator oc) cs)) c)))
+    (let ((rands (filter-not any/var? (walk* (map oc-rands c) r))))
+      (cond
+       ((null? rands) `())
+       (else `((,sym . ,(sort (fn rands) lex<=))))))))
 
 (define (sort-store c) (sort c lex<= #:key car))
 

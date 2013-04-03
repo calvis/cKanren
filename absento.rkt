@@ -31,13 +31,9 @@
     (findf (lambda (oc) (and (eq? (oc-rator oc) 'symbol-c) 
                              (eq? (car (oc-rands oc)) v))) c)))
  
-(define (reify-symbol-cs v r c)
-  (let ([c (filter (lambda (oc) (eq? (oc-rator oc) 'symbol-c)) c)])
-    (let ([ocs (map (lambda (oc) (walk (car (oc-rands oc)) r)) c)])
-      (let ([ocs (filter-not any/var? ocs)])
-        (cond
-         [(null? ocs) '()]
-         [else `((sym . ,(sort (remove-duplicates ocs) lex<=)))])))))
+(define reify-symbol-cs
+  (default-reify 'sym '(symbol-c)
+    (lambda (rands) (remove-duplicates (map car rands)))))
 
 ;; numbero
 
@@ -65,13 +61,15 @@
     (findf (lambda (oc) (and (eq? (oc-rator oc) 'number-c) 
                              (eq? (car (oc-rands oc)) v))) c)))
  
-(define (reify-number-cs v r c)
-  (let ([c (filter (lambda (oc) (eq? (oc-rator oc) 'number-c)) c)])
-    (let ([ocs (map (lambda (oc) (walk (car (oc-rands oc)) r)) c)])
-      (let ([ocs (filter-not any/var? ocs)])
-        (cond
-         [(null? ocs) '()]
-         [else `((num . ,(sort (remove-duplicates ocs) lex<=)))])))))
+(define remove-duplicates
+  (lambda (l)
+    (for/fold ([s '()])
+              ([x l])
+      (if (member x s) s (cons x s)))))
+
+(define reify-number-cs
+  (default-reify 'num '(number-c) 
+    (lambda (rands) (remove-duplicates (map car rands)))))
 
 ;; absento
 
@@ -127,16 +125,11 @@
   (lambda (u t s c)
     (cond
      ((unify `((,u . ,t)) s c) =>
-      (lambda (s0) (eq? s0 s)))
+      (lambda (s^) (eq? s ^s)))
      (else #f))))
 
-(define (reify-absent-cs v r c)
-  (let ([c (filter (lambda (oc) (eq? (oc-rator oc) 'absent-c)) c)])
-    (let ([ocs (map (lambda (oc) (walk* (oc-rands oc) r)) c)])
-      (let ([ocs (filter-not any/var? ocs)])
-        (cond
-         [(null? ocs) '()]
-         [else `((absento . ,(sort (remove-duplicates ocs) lex<=)))])))))
+(define reify-absent-cs
+  (default-reify 'absento '(absent-c) remove-duplicates))
 
 (define (absento-split u v)
   (lambdam@ (a : s c)
@@ -189,12 +182,6 @@
       ((== #f x) succeed)
       ((== #t x) succeed))))
          
-(define remove-duplicates
-  (lambda (l)
-    (for/fold ([s '()])
-              ([x l])
-      (if (member x s) s (cons x s)))))
-
 ;; ckanren stuffs
 
 (extend-enforce-fns 'absento rerun-type-cs)
