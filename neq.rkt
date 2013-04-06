@@ -64,14 +64,14 @@
     (lambdam@ (a : s c)
       (let ([p (walk* p s)])
         (cond
-         ((unify p s c)
-          =>
-          (lambda (s^)
+         [((unify p) a)
+          => 
+          (lambdam@ (a^ : s^ c^)
             (let ((p (prefix-s s s^)))
               (cond
                ((null? p) #f)
-               (else ((normalize-store p) a))))))
-         (else a))))))
+               (else ((normalize-store p) a)))))]
+         [else a])))))
 
 (define normalize-store
   (lambda (p)
@@ -85,16 +85,21 @@
            (let* ((oc (car c))
                   (p^ (oc-prefix oc)))
              (cond
-               ((subsumes? p^ p c-old) a)
-               ((subsumes? p p^ c-old) (loop (cdr c) c^))
-               (else (loop (cdr c) (cons oc c^))))))
+              (((subsumes? p^ p) a) a)
+              (((subsumes? p p^) a) (loop (cdr c) c^))
+              (else (loop (cdr c) (cons oc c^))))))
           (else (loop (cdr c) (cons (car c) c^))))))))
 
 (define subsumes?
-  (lambda (p s c)
-    (cond
-      ((unify p s c) => (lambda (s^) (eq? s s^)))
-      (else #f))))
+  (lambda (p p^)
+    (lambdam@ (a : s c)
+      (cond
+       (((unify p) 
+         (make-a p^ c))
+        => 
+        (lambdam@ (a^ : s^ c^) 
+          (eq? p^ s^)))
+       (else #f)))))
 
 ;;; goals
 
@@ -106,10 +111,10 @@
   (lambda (u v)
     (lambdam@ (a : s c)
       (cond
-        ((unify `((,u . ,v)) s c)
-         => (lambda (s^)
-              ((=/=neq-c (prefix-s s s^)) a)))
-        (else a)))))
+       (((unify `((,u . ,v))) a)
+        => (lambdam@ (a^ : s^ c^)
+             ((=/=neq-c (prefix-s s s^)) a)))
+       (else a)))))
 
 (extend-reify-fns 'neq reify-constraintsneq)
 

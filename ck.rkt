@@ -7,15 +7,16 @@
  update-s update-c make-a any/var? prefix-s prtm
  lambdam@ identitym composem goal-construct ext-c
  build-oc oc-proc oc-rands oc-rator run run* prt
- extend-enforce-fns extend-reify-fns goal? a? 
+ extend-enforce-fns extend-reify-fns goal? a? bindm
  walk walk* var? lambdag@ mzerog unitg onceo fresh-aux
  conde conda condu ifa ifu project fresh succeed fail
  lambdaf@ inc enforce-constraints reify empty-a take
  format-source define-cvar-type reify-cvar var ext-s
- gen:mk-struct recur constructor mk-struct? unifiable?
+ gen:mk-struct recur constructor mk-struct? var-x
  lex<= sort-by-lex<= reify-with-colon occurs-check
  run-constraints build-attr-oc attr-oc? attr-oc-uw?
  get-attributes filter/rator filter-not/rator default-reify
+ override-occurs-check? same-default-type? default-mk-struct?
  (for-syntax build-srcloc))
 
 ;; == VARIABLES =================================================================
@@ -31,12 +32,13 @@
   #:methods gen:custom-write 
   [(define (write-proc . args) (apply write-var args))])
 
-(define-syntax-rule (define-cvar-type name str)
+(define-syntax-rule (define-cvar-type name str rest ...)
   (struct name var ()
     #:methods gen:cvar
     [(define (cvar->str x) str)]
     #:methods gen:custom-write
-    [(define (write-proc . args) (apply write-var args))]))
+    [(define (write-proc . args) (apply write-var args))]
+    rest ...))
 
 ;; write-var controls how variables are displayed
 (define (write-var var port mode)
@@ -259,18 +261,20 @@
   ;; arguments like the arguments to k
   (constructor mk-struct)
 
-  ;; determines whether mk-struct can unify with x
-  (unifiable? mk-struct x)
-
   ;; for reification 
   (mk-struct->sexp mk-struct)
+
+  ;; structs also have the option of overriding the occurs-check for
+  ;; variables if it's okay to unify a variable to a struct with the
+  ;; same variable inside (ex. sets)
+  (override-occurs-check? mk-struct)
 
   #:defaults
   ([pair?
     (define (recur p k)
       (k (car p) (cdr p)))
     (define (constructor p) cons)
-    (define (unifiable? p x) (pair? x))
+    (define (override-occurs-check? p) #f)
     (define (mk-struct->sexp v) v)]
    [vector?
     (define (recur v k)
@@ -278,8 +282,15 @@
         (k (car v) (cdr v))))
     (define (constructor v)
       (compose list->vector cons))
-    (define (unifiable? v x) (vector? x))
+    (define (override-occurs-check? v) #f)
     (define (mk-struct->sexp v) v)]))
+
+(define (default-mk-struct? x)
+  (or (pair? x) (vector? x)))
+
+(define (same-default-type? x y)
+  (or (and (pair? x) (pair? y))
+      (and (vector? x) (vector? y))))
 
 ;; == SUBSTITUTIONS ============================================================
 
@@ -310,9 +321,10 @@
     (let ((v (walk v s)))
       (cond
         ((var? v) (eq? v x))
-        ((pair? v) 
-         (or (occurs-check x (car v) s)
-             (occurs-check x (cdr v) s)))
+        ((mk-struct? v)
+         (recur v (lambda (a d)
+                    (or (occurs-check x a s)
+                        (occurs-check x d s)))))
         (else #f)))))
 
 ;; returns the size of a substitution
@@ -386,9 +398,9 @@
   (lambda (oc)
     (lambdam@ (a : s c)
       (cond
-        ((any/var? (oc-rands oc))
-         (make-a s (ext-c oc c)))
-        (else a)))))
+       (#t #;(any/var? (oc-rands oc))
+        (make-a s (ext-c oc c)))
+       (else a)))))
 
 ;; == PACKAGE ==================================================================
 
@@ -426,12 +438,17 @@
 (define identitym (lambdam@ (a) a))
 
 ;; composes two constraints together
-(define (composem fm f^m)
+(define (composem . fm*)
   (lambdam@ (a)
     (cond
-     [(fm a) => 
-      (lambda (a^) (f^m a^))]
+     [(null? fm*) a]
+     [((car fm*) a) => 
+      (lambda (a^) 
+        ((apply composem (cdr fm*)) a^))]
      [else #f])))
+
+(define (bindm a fm)
+  (fm a))
 
 ;; constructs a goal from a constraint
 (define-syntax-rule (goal-construct fm)
@@ -655,18 +672,18 @@
 
 ;; == HELPERS ========================================================
 
-(define (any/var? p)
+(define (any/var? x)
   (cond
-    ((pair? p)
-     (or (any/var? (car p)) (any/var? (cdr p))))
-    (else (var? p))))
+   ((mk-struct? x)
+    (recur x (lambda (a d) (or (any/var? a) (any/var? d)))))
+   (else (var? x))))
 
 (define (any-relevant/var? t x*)
   (cond
-    ((pair? t)
-     (or (any-relevant/var? (car t) x*)
-         (any-relevant/var? (cdr t) x*)))
-    (else (and (var? t) (memq t x*)))))
+   ((mk-struct? t)
+    (recur t (lambda (a d) (or (any-relevant/var? a x*)
+                               (any-relevant/var? d x*)))))
+   (else (and (var? t) (memq t x*)))))
 
 (define (prefix-s s s^)
   (define (loop s^) 
