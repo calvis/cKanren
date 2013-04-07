@@ -17,6 +17,7 @@
  run-constraints build-attr-oc attr-oc? attr-oc-uw?
  get-attributes filter/rator filter-not/rator default-reify
  override-occurs-check? same-default-type? default-mk-struct?
+ mk-struct->sexp
  (for-syntax build-srcloc))
 
 ;; == VARIABLES =================================================================
@@ -275,7 +276,8 @@
       (k (car p) (cdr p)))
     (define (constructor p) cons)
     (define (override-occurs-check? p) #f)
-    (define (mk-struct->sexp v) v)]
+    (define (mk-struct->sexp p)
+      (pair->sexp p))]
    [vector?
     (define (recur v k)
       (let ([v (vector->list v)])
@@ -283,7 +285,8 @@
     (define (constructor v)
       (compose list->vector cons))
     (define (override-occurs-check? v) #f)
-    (define (mk-struct->sexp v) v)]))
+    (define (mk-struct->sexp v)
+      (vector->sexp v))]))
 
 (define (default-mk-struct? x)
   (or (pair? x) (vector? x)))
@@ -291,6 +294,14 @@
 (define (same-default-type? x y)
   (or (and (pair? x) (pair? y))
       (and (vector? x) (vector? y))))
+
+(define (pair->sexp p)
+  (let ([a (car p)] [d (cdr p)])
+    (cons (if (mk-struct? a) (mk-struct->sexp a) a)
+          (if (mk-struct? d) (mk-struct->sexp d) d))))
+
+(define (vector->sexp v)
+  (vector-map (lambda (t) (if (mk-struct? t) (mk-struct->sexp t) t)) v))
 
 ;; == SUBSTITUTIONS ============================================================
 
@@ -464,10 +475,10 @@
 
 (define (write-oc oc port mode)
   (define fn (lambda (str) ((parse-mode mode) str port)))
-  (fn (format "(~a" (oc-rator oc)))
+  (fn (format "<~a" (oc-rator oc)))
   (for ([arg (oc-rands oc)])
     (fn (format " ~a" arg)))
-  (fn (format ")")))
+  (fn (format ">")))
 
 ;; creates an oc given the constraint operation and it's args
 (define-syntax (build-oc x)
@@ -545,7 +556,8 @@
 (define (reify x)
   (lambdag@ (a : s c)
     (define v (walk* x s))
-    (define-values (v^ r) (reify-s v empty-s))
+    (define r (reify-s v empty-s))
+    (define v^ (if (mk-struct? v) (mk-struct->sexp v) v))
     (define answer
       (cond
        ((null? r) v^)
@@ -559,17 +571,12 @@
   (let ((v (walk v s)))
     (cond
       ((var? v) 
-       (let ([v^ (reify-n v (size-s s))])
-         (values v^ `((,v . ,v^) . ,s))))
+       `((,v . ,(reify-n v (size-s s))) . ,s))
       ((mk-struct? v) 
        (recur v
         (lambda (a d)
-          (define-values (a^ r) (reify-s a s))
-          (define-values (d^ r^) (reify-s d r))
-          (values (mk-struct->sexp
-                   ((constructor v) a^ d^))
-                  r^))))
-      (else (values v s)))))
+          (reify-s d (reify-s a s)))))
+      (else s))))
 
 ;; creates a reified symbol
 (define (reify-n cvar n)
@@ -594,10 +601,10 @@
 
 (define ((default-reify sym cs fn) v r c)
   (let ((c (filter (lambda (oc) (memq (oc-rator oc) cs)) c)))
-    (let ((rands (filter-not any/var? (walk* (map oc-rands c) r))))
+    (let ((rands (filter-not any/var? (walk* (fn (map oc-rands c)) r))))
       (cond
        ((null? rands) `())
-       (else `((,sym . ,(sort (fn rands) lex<=))))))))
+       (else `((,sym . ,(sort rands lex<=))))))))
 
 (define (sort-store c) (sort c lex<= #:key car))
 

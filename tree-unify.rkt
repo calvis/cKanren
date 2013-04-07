@@ -66,7 +66,7 @@
        [else (lambdam@ (a) #f)]))
     (define (gen-unify u v)
       (mk-struct-unify u v))]
-   ;; mostly for constants: stings, numbers, booleans, etc.
+   ;; mostly for constants: strings, numbers, booleans, etc.
    ;; they unify if they are eq? or equal?
    [(lambda (x) #t)
     (define (compatible u v)
@@ -87,13 +87,13 @@
       ((update-s v u) a)]
      [else
       (recur u 
-       (lambda (ua vd)
+       (lambda (ua ud)
          (recur v
           (lambda (va vd)
             (bindm a
               (composem
                (unify-two ua va)
-               (unify `((,va . ,vd)))))))))])))
+               (unify `((,ud . ,vd)))))))))])))
 
 ;; returns #t if attributes are ok
 (define (check-attributes u v)
