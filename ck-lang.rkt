@@ -16,7 +16,7 @@
 (define-syntax trace-define
   (syntax-rules ()
     [(_ (name a* ...) body)
-     (trace-define-mk name (lambda (a* ...) body))]
+     (trace-define name (lambda (a* ...) body))]
     [(_ name (λ (a* ...) body))
      (define name
        (λ (a* ...)

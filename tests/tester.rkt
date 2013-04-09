@@ -6,19 +6,26 @@
 (define max-ticks 10000000)
 
 (define-syntax (test x)
+  (define (test-syntax te er)
+    (quasisyntax/loc x
+      (let ([expected #,er] [produced #,te])
+        (cond
+         [(equal? expected produced) (void)] 
+         [else
+          (make-error #,(build-srcloc x)
+                      (string-append
+                       "error while running tests\n"
+                       "expression: ~a~%Expected: ~a~%Computed: ~a~%")
+                      '#,te expected produced)]))))
   (syntax-case x ()
     ((_ title tested-expression expected-result)
      (quasisyntax/loc x
       (begin
         (printf "Testing ~a\n" title)
-        (let ([expected expected-result]
-              [produced tested-expression])
-          (cond
-           [(equal? expected produced) (void)] 
-           [else
-            (make-error #,(build-srcloc x)
-                        "error while running tests\nExpression: ~a~%Expected: ~a~%Computed: ~a~%"
-                        'tested-expression expected produced)])))))))
+        #,(test-syntax #'tested-expression #'expected-result))))
+    ((_ tested-expression expected-result)
+     (quasisyntax/loc x
+       #,(test-syntax #'tested-expression #'expected-result)))))
 
 (define (make-error src msg . exprs)
   (cond

@@ -1,7 +1,7 @@
 #lang racket
 
 (require "ck.rkt")
-(provide == unify)
+(provide == ==-c unify)
 
 ;; ---UNIFICATION--------------------------------------------------
 
