@@ -10,33 +10,35 @@
     ((update-c (build-oc append-c ls1 ls2 out)) a)))
 
 (define (enforce-appendo oc)
-  (let ([ls1 (car (oc-rands oc))]
-        [ls2 (cadr (oc-rands oc))]
-        [out (caddr (oc-rands oc))])
-    (conde
-     ((== ls1 '()) 
-      (== ls2 out))
-     ((fresh (a d res)
-        (appendo d ls2 res)
-        (== ls1 `(,a . , d))
-        (== out `(,a . ,res)))))))
+  (lambdag@ (a : s c)
+    (let ([ls1 (walk* (car (oc-rands oc)) s)]
+          [ls2 (walk* (cadr (oc-rands oc)) s)]
+          [out (walk* (caddr (oc-rands oc)) s)])
+      ((conde
+        ((== ls1 '()) 
+         (== ls2 out))
+        ((fresh (a d res)
+           (appendo d ls2 res)
+           (== ls1 `(,a . , d))
+           (== out `(,a . ,res)))))
+       a))))
 
 (define (do-enforce-appendo x)
   (lambdag@ (a : s c)
-    ((let ([ocs (filter/rator 'append-c c)])
-       (let loop ([ocs ocs])
-         (cond
-          [(null? ocs) succeed]
-          [else 
-           (fresh () 
-             (enforce-appendo (car ocs))
-             (loop (cdr ocs)))])))
-     a)))
-
-(define (append l s)
-  (cond
-   [(null? l) s]
-   [else (cons (car l) (append (cdr l s)))]))
-
+    (let ([ocs (filter/rator 'append-c c)])
+      (cond
+        [(null? ocs) a]
+        [else
+         ((let loop ([ocs ocs])
+            (cond
+              [(null? ocs)
+               (do-enforce-appendo x)]
+              [else 
+               (lambdag@ (a : s c)
+                 ((fresh () 
+                    (enforce-appendo (car ocs))
+                    (loop (cdr ocs)))
+                  (make-a s (remq (car ocs) c))))]))
+          a)]))))
 
 (extend-enforce-fns 'appendo do-enforce-appendo)
