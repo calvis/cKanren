@@ -107,7 +107,8 @@
     (let loop ([c c-old] [c^ '()])
       (cond
        [(null? c) 
-        (make-a s (ext-c (build-oc absent-c (car p) (cdr p)) c^))]
+        ((replace-c (ext-c (build-oc absent-c (car p) (cdr p)) c^))
+         a)]
        [(eq? (oc-rator (car c)) 'absent-c)
         (let ([u (car (oc-rands (car c)))]
               [v (cadr (oc-rands (car c)))])
@@ -162,7 +163,7 @@
           [rest (filter-not/rator '=/=neq-c c)])
       (let ([neqs^ (map (lambda (oc) (filter-subsumed-prefixes oc absentos s c)) neqs)])
         (let ([neqs^ (filter-not (compose null? oc-prefix) neqs^)])
-          (make-a s (append rest neqs^)))))))
+          ((replace-c (append rest neqs^)) a))))))
 
 (define (filter-subsumed-prefixes oc absentos s c)
   (define absento-pairs (map oc-rands absentos))

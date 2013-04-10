@@ -6,6 +6,11 @@
 (define (test-mk)
   (parameterize ([reify-prefix-dot #f]
                  [reify-with-colon #f])
+
+    (test-check "0"
+                (run* (q) succeed)
+                '(_.0))
+
     (test-check "1"
               (run 1 (q) (== 5 q))
               '(5))
@@ -163,7 +168,8 @@
                 (fresh (x a d)
                   (== `(,a . ,d) x)
                   (absento 'intval x)
-                  (== 'intval a)))
+                  (== 'intval a)
+                  prt))
               '())
 
   (test-check "push-down problems 4"

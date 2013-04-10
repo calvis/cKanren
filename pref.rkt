@@ -33,29 +33,30 @@
 
 (define pick-prefs
   (lambda ()
-    (lambdag@ (a : s c)
-              ((letrec
-                   ((loop
-                     (lambda (c^)
-                       (cond
-                         ((null? c^) unitg)
-                         (else
-                          (let ((x (walk (caar c^) s)))
-                            (cond
-                              ((var? x)
-                               (fresh ()
-                                      (== x (cadar c^))
-                                      (loop (cdr c^))))
-                              (else (loop (cdr c^))))))))))
-                 (loop
-                  (map
-                   (lambda (oc)
-                     (let ((p (oc-rands oc)))
-                       (cons (car p) (cadr p))))
-                   (filter
-                    (lambda (oc) (eq? (oc-rator oc) 'prefo-c))
-                    c))))
-               a))))
+    (fresh ()
+      (lambdag@ (a : s c)
+        ((letrec
+             ((loop
+               (lambda (c^)
+                 (cond
+                  ((null? c^) unitg)
+                  (else
+                   (let ((x (walk (caar c^) s)))
+                     (cond
+                      ((var? x)
+                       (fresh ()
+                         (== x (cadar c^))
+                         (loop (cdr c^))))
+                      (else (loop (cdr c^))))))))))
+           (loop
+            (map
+             (lambda (oc)
+               (let ((p (oc-rands oc)))
+                 (cons (car p) (cadr p))))
+             (filter
+              (lambda (oc) (eq? (oc-rator oc) 'prefo-c))
+              c))))
+         a)))))
 
 (define enforce-constraintspref
   (lambda (x)

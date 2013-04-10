@@ -46,20 +46,21 @@
 ;;; 
 
 ;; gives x the domain dom in the constraint store c
-(define (ext-d x dom c)
-  (let ((oc (build-oc domfd-c x dom))
-        (pred (existing-domain x)))
-    (cond
-      ((findf pred c) 
-       (cons oc (filter (compose not pred) c)))
-      (else (cons oc c)))))
+(define (ext-d x dom)
+  (lambdam@ (a : s c)
+    (let ((oc (build-oc domfd-c x dom))
+          (pred (existing-domain x)))
+      (cond
+       ((findf pred c) 
+        ((replace-c (ext-c oc (filter (compose not pred) c))) a))
+       (else ((update-c oc) a))))))
 
 (define get-dom
   (lambda (x c)
     (cond
-      ((findf (existing-domain x) c)
-       => (lambda (oc) (cadr (oc-rands oc))))
-      (else #f))))
+     ((findf (existing-domain x) c)
+      => (lambda (oc) (cadr (oc-rands oc))))
+     (else #f))))
 
 (define process-dom
   (lambda (v dom)
@@ -88,7 +89,7 @@
        [(singleton-dom? dom)
         (let ([n (singleton-element-dom dom)])
           ((update-s x n) a))]
-       [else (make-a s (ext-d x dom c))]))))
+       [else ((ext-d x dom) a)]))))
 
 (define (force-ans x)
   (lambdag@ (a : s c)

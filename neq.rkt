@@ -80,15 +80,15 @@
         (cond
           ((null? c)
            (let ((c^ (ext-c (build-oc =/=neq-c p) c^)))
-             (make-a s c^)))
+             ((replace-c c^) a)))
           ((eq? (oc-rator (car c)) '=/=neq-c)
            (let* ((oc (car c))
                   (p^ (oc-prefix oc)))
              (cond
                ((subsumes? p^ p c-old) a)
                ((subsumes? p p^ c-old) (loop (cdr c) c^))
-               (else (loop (cdr c) (cons oc c^))))))
-          (else (loop (cdr c) (cons (car c) c^))))))))
+               (else (loop (cdr c) (ext-c oc c^))))))
+          (else (loop (cdr c) (ext-c (car c) c^))))))))
 
 (define subsumes?
   (lambda (p s c)

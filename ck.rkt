@@ -1,10 +1,12 @@
 #lang racket
 
-(require racket/generic) 
+(require racket/generic 
+         (for-syntax syntax/parse racket/syntax)
+         (prefix-in pfds: pfds/catenable-list)) 
 
 (provide
  ;; framework for defining constraints
- update-s update-c make-a any/var? prefix-s prtm
+ update-s update-c any/var? prefix-s prtm
  lambdam@ identitym composem goal-construct ext-c
  build-oc oc-proc oc-rands oc-rator run run* prt
  extend-enforce-fns extend-reify-fns goal? a? 
@@ -16,7 +18,25 @@
  lex<= sort-by-lex<= reify-with-colon occurs-check
  run-constraints build-attr-oc attr-oc? attr-oc-uw?
  get-attributes filter/rator filter-not/rator default-reify
+ extend-fixpoint-enforce-fns filter-memq/rator
+ define-lazy-goal trace-define max-length-ocs
+ cycle-times replace-c
  (for-syntax build-srcloc))
+
+(define-syntax trace-define
+  (syntax-rules ()
+    [(_ (name a* ...) body)
+     (trace-define name (lambda (a* ...) body))]
+    [(_ name (λ (a* ...) body))
+     (define name
+       (λ (a* ...)
+          (fresh ()
+            (project (a* ...)
+              (begin
+                (display (list 'name a* ...))
+                (newline)
+                succeed))
+            body)))]))
 
 ;; == VARIABLES =================================================================
 
@@ -53,6 +73,12 @@
 ;; macro to return a goal with the specified function
 (define-syntax lambdag@
   (syntax-rules (:)
+    [(_ (a : s c q) e ...)
+     (lambdag@ (a) 
+       (let ([s (substitution-s (a-s a))]
+             [c (constraint-store-c (a-c a))]
+             [q (a-q a)])
+         e ...))]
     [(_ (a : s c) e ...)
      (lambdag@ (a) 
        (let ([s (substitution-s (a-s a))]
@@ -124,7 +150,7 @@
 (define-syntax-rule (fresh-aux constructor (x ...) g g* ...)
   (lambdag@ (a) 
     (inc 
-     (let ((x (constructor 'x)) ...) 
+     (let ((x (constructor (gensym 'x))) ...) 
        (bindg* (app-goal g a) g* ...)))))
 
 (define-syntax-rule (fresh (x ...) g g* ...)
@@ -165,7 +191,8 @@
        (inc 
         (mplusg* 
          (bindg* (app-goal g0 a) g ...)
-         (bindg* (app-goal g1 a) g^ ...) ...))))))
+         (bindg* (app-goal g1 a) g^ ...)
+         ...))))))
 
 (define-syntax-rule (conda (g0 g ...) (g1 g^ ...) ...)
   (lambdag@ (a)
@@ -341,22 +368,22 @@
 ;; a function that will safely extend the subsitution with
 ;; a binding of x to v
 (define (update-s-check x v)
-  (lambdam@ (a : s c)
+  (lambdam@ (a : s c q)
     (let ((x (walk x s))
           (v (walk v s)))
       (cond
-        ((or (var? x) (var? v))
-         ((run-constraints (if (var? v) `(,x ,v) `(,x)) c)
-          (make-a (ext-s x v s) c)))
-        ((equal? x v) a)
-        (else #f)))))
+       ((or (var? x) (var? v))
+        ((run-constraints (if (var? v) `(,x ,v) `(,x)) c)
+         (make-a (ext-s x v s) c q)))
+       ((equal? x v) a)
+       (else #f)))))
 
 ;; a function that will insecurely extend the substitution 
 ;; with a binding of x to v 
 (define (update-s-nocheck x v)
-  (lambdam@ (a : s c)
+  (lambdam@ (a : s c q)
     ((run-constraints (if (var? v) `(,x ,v) `(,x)) c)
-     (make-a (ext-s x v s) c))))
+     (make-a (ext-s x v s) c q))))
 
 (define update-s update-s-check)
 
@@ -371,38 +398,54 @@
 
 ;; extends the constraint store c with oc
 (define (ext-c oc c) (cons oc c))
+(define (remq-c oc c) (remq oc c))
 
 (define (write-constraint-store constraint-store port mode)
-  ((parse-mode mode) (format "~a" (constraint-store-c constraint-store)) port))
+  ((parse-mode mode) (format "#c<~a>" (constraint-store-c constraint-store)) port))
 
 (define (filter/rator sym c)
   (filter (lambda (oc) (eq? (oc-rator oc) sym)) c))
 
 (define (filter-not/rator sym c)
-  (filter-not (lambda (oc) (eq? (oc-rator oc) sym)) c))
+  (filter (lambda (oc) (not (eq? (oc-rator oc) sym))) c))
+
+(define (filter-memq/rator symls c)
+  (filter (lambda (oc) (and (memq (oc-rator oc) symls) #t)) c))
+
+(define (filter-not-memq/rator symls c)
+  (filter (lambda (oc) (not (memq (oc-rator oc) symls))) c))
 
 ;; adds oc to the constraint store if it contains a non-ground var
 (define update-c
   (lambda (oc)
-    (lambdam@ (a : s c)
+    (lambdam@ (a : s c q)
       (cond
-        ((any/var? (oc-rands oc))
-         (make-a s (ext-c oc c)))
-        (else a)))))
+       ((lazy-goal-oc? oc)
+        (make-a s c (ext-q oc q)))
+       ((any/var? (oc-rands oc))
+        (make-a s (ext-c oc c) q))
+       (else a)))))
+
+(define (replace-c c^)
+  (lambdam@ (a : s c q)
+    (make-a s c^ q)))
 
 ;; == PACKAGE ==================================================================
 
 ;; a package is a structure containing a substitution and
 ;; a constraint store
-(struct a (s c) 
+(struct a (s c q) 
   #:methods gen:custom-write 
   [(define (write-proc . args) (apply write-package args))])
 
-(define (make-a s c) 
-  (a (substitution s) (constraint-store c)))
+(define (make-a s c q)
+  (a (substitution s) (constraint-store c) q))
+
+(define empty-q (pfds:list))
+(define ext-q pfds:cons)
 
 ;; the empty package
-(define empty-a (make-a empty-s empty-c))
+(define empty-a (make-a empty-s empty-c empty-q))
 
 ;; controls how packages are displayed
 (define (write-package a port mode)
@@ -420,6 +463,12 @@
      (lambdam@ (a) 
        (let ([s (substitution-s (a-s a))] 
              [c (constraint-store-c (a-c a))]) 
+         e ...))]
+    [(_ (a : s c q) e ...)
+     (lambdam@ (a) 
+       (let ([s (substitution-s (a-s a))] 
+             [c (constraint-store-c (a-c a))]
+             [q (a-q a)]) 
          e ...))]))
 
 ;; the identity constraint
@@ -469,11 +518,21 @@
      (let ((x^ x))
        (make-attr-oc (op x^) 'op `(,x^) uw?)))))
 
-(define (get-attributes x c)
+(define (get-attributes x ocs)
   (define (x-attr-oc? oc) 
     (and (attr-oc? oc) (eq? (car (oc-rands oc)) x)))
-  (let ((attrs (filter x-attr-oc? c)))
+  (let ((attrs (filter x-attr-oc? ocs)))
     (and (not (null? attrs)) attrs)))
+
+(struct lazy-goal-oc oc ()
+  #:extra-constructor-name make-lazy-goal-oc)
+
+(define-syntax (build-lazy-goal-oc x)
+  (syntax-case x ()
+    ((_ op arg ...)
+     (with-syntax ([(arg^ ...) (generate-temporaries #'(arg ...))])
+       #'(let ((arg^ arg) ...)
+           (make-lazy-goal-oc (op arg^ ...) 'op `(,arg^ ...)))))))
 
 ;; == FIXPOINT =================================================================
 
@@ -483,19 +542,20 @@
 (define (run-constraints x* c)
   (for/fold ([rest identitym])
             ([oc c]
-             #:when (any-relevant/var? (oc-rands oc) x*))
+             #:when (and (not (lazy-goal-oc? oc))
+                         (any-relevant/var? (oc-rands oc) x*)))
     (composem rest (rem/run oc))))
 
 ;; removes a constraint from the constraint store and then 
 ;; reruns it as if it was just being introduced (will add itself
 ;; back to the constraint store if it still is waiting on info)
 (define (rem/run oc)
-  (lambdam@ (a : s c)
+  (lambdam@ (a : s c q)
     (cond
-      ((memq oc c)
-       ((oc-proc oc)
-        (make-a s (remq oc c))))
-      (else a))))
+     ((memq oc c)
+      ((oc-proc oc)
+       (make-a s (remq-c oc c) q)))
+     (else a))))
 
 ;; == PARAMETERS ===============================================================
 
@@ -510,11 +570,98 @@
 (define enforce-fns (make-parameter '()))
 (define extend-enforce-fns (extend-parameter enforce-fns))
 
+(define fixpoint-enforce-fns (make-parameter '()))
+(define extend-fixpoint-enforce-fns (extend-parameter fixpoint-enforce-fns))
+
 ;; runs all the enforce-constraint functions in enforce-fns
 (define (enforce-constraints x)
-  (for/fold ([f unitg])
-            ([fn (map cdr (enforce-fns))])
-    (fresh () (fn x) f)))
+  (fresh ()
+    (fixpoint-enforce x (fixpoint-enforce-fns))
+    (for/fold ([f unitg])
+              ([fn (map cdr (enforce-fns))])
+      (fresh () (fn x) f))))
+
+(define (fixpoint-enforce x fns)
+  (fresh ()
+    (lambdag@ (a : s c q)
+      (cond
+       [(null? q) a]
+       [else 
+        (set! cycle-times (add1 cycle-times))
+        ((cycle x q fns) 
+         (make-a s c empty-q))]))))
+
+(define (ground-terms oc)
+  (foldl + 0 (map (lambda (x) (if (var? x) 0 1)) (oc-rands oc))))
+
+#;
+(define (cycle x ocs fns)
+  (fresh ()
+    (let loop ([ocs  
+                (sort ocs (lambda (oc1 oc2)
+                            (or (> (ground-terms oc1)
+                                   (ground-terms oc2)))))])
+      (cond
+       [(null? ocs) succeed]
+       [else
+        (let ([oc (car ocs)])
+          (fresh ()
+            ((cdr (assq (oc-rator oc) fns)) x oc)
+            (lambdam@ (a : s c)
+              (loop (cdr ocs)))))]))
+    (lambdag@ (a : s c)
+      (let ([ocs (filter-memq/rator (map car fns) c)]
+            [rest (filter-not-memq/rator (map car fns) c)])
+        (cond
+         [(null? ocs) a]
+         [else ((cycle x ocs fns) (make-a s rest))])))))
+
+(define max-length-ocs 0)
+(define cycle-times 0)
+
+(define (cycle x ocs fns)
+  (fresh ()
+    (cond
+     [(null? ocs) succeed]
+     [else
+      (let ([oc (pfds:first ocs)])
+        (fresh ()
+          ((cdr (assq (oc-rator oc) fns)) x oc)
+          (lambdag@ (a : s c q)
+            (make-a s c (pfds:append (pfds:rest ocs) q)))))])
+    (lambdag@ (a : s c q)
+      (cond
+       [(null? q) a]
+       [else 
+        (set! cycle-times (add1 cycle-times))
+        ((cycle x ocs fns) 
+         (make-a s c empty-q))]))))
+
+(define-syntax (define-lazy-goal stx)
+  (syntax-parse stx
+    [(define-lazy-goal (name args ...) body)
+     (with-syntax ([lazy-name (format-id #'name "lazy-~a" (syntax-e #'name))]
+                   [enforce-name (format-id #'name "enforce-~a" (syntax-e #'name))])
+       #'(begin
+           (define (name args ...)
+             (goal-construct (lazy-name args ...)))
+           (define (lazy-name args ...)
+             (lambdam@ (a : s c)
+               ((update-c (build-lazy-goal-oc lazy-name (walk* args s) ...)) a)
+               ;;((update-c (build-lazy-goal-oc lazy-name args ...)) a)
+               ))
+           (define (enforce-name x oc)
+             (match (oc-rands oc)
+               [`(,args ...) 
+                body
+                #;
+                (lambdag@ (a : s c)
+                  (let ([args (walk* args s)] ...)
+                    (body a)))]
+               [_ (error "internal error, won't get here")]))
+           (extend-fixpoint-enforce-fns 'lazy-name enforce-name)))]
+    [(define-lazy-goal name (lambda (args ...) body))
+     #'(define-lazy-goal (name args ...) body)]))
 
 ;; == REIFICATION ==============================================================
 
@@ -559,30 +706,30 @@
   (string->symbol (format "~a.~a" (cvar->str cvar) (number->string n))))
 
 ;; reifies the constraint store by running all the reification fns
-(define (reify-constraints v r c)
+(define (reify-constraints v r ocs)
   (cond
-    ((null? c) v)
+    ((null? ocs) v)
     (else
-     (let ((c^ (run-reify-fns v r c)))
+     (let ((ocs^ (run-reify-fns v r ocs)))
        (cond
-        [(null? c^) v] 
-        [(reify-with-colon) `(,v : . ,(sort-store c^))]
-        [else `(,v . ,(sort-store c^))])))))
+        [(null? ocs^) v] 
+        [(reify-with-colon) `(,v : . ,(sort-store ocs^))]
+        [else `(,v . ,(sort-store ocs^))])))))
 
 ;; runs all the reification functions
-(define (run-reify-fns v r c)
-  (for/fold ([c^ `()])
+(define (run-reify-fns v r ocs)
+  (for/fold ([ocs^ `()])
             ([fn (map cdr (reify-fns))])
-    (append (fn v r c) c^)))
+    (append (fn v r ocs) ocs^)))
 
-(define ((default-reify sym cs fn) v r c)
-  (let ((c (filter (lambda (oc) (memq (oc-rator oc) cs)) c)))
-    (let ((rands (filter-not any/var? (walk* (map oc-rands c) r))))
+(define ((default-reify sym cs fn) v r ocs)
+  (let ((ocs (filter-memq/rator cs ocs)))
+    (let ((rands (filter-not any/var? (walk* (map oc-rands ocs) r))))
       (cond
        ((null? rands) `())
        (else `((,sym . ,(sort (fn rands) lex<=))))))))
 
-(define (sort-store c) (sort c lex<= #:key car))
+(define (sort-store ocs) (sort ocs lex<= #:key car))
 
 (define (sort-by-lex<= l) (sort l lex<=))
 

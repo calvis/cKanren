@@ -9,30 +9,29 @@
 
 (provide test-quines test-quines-long)
 
-(define eval-expo
-  (lambda (exp env val)
-    (conde
-      ((fresh (v)
-         (== `(quote ,v) exp)
-         (not-in-envo 'quote env)
-         (absento 'closure v)
-         (== v val)))
-      ((fresh (a*)
-         (== `(list . ,a*) exp)
-         (not-in-envo 'list env)
-         (absento 'closure a*)
-         (proper-listo a* env val)))
-      ((symbolo exp) (lookupo exp env val))
-      ((fresh (rator rand x body env^ a)
-         (== `(,rator ,rand) exp)
-         (eval-expo rator env `(closure ,x ,body ,env^))
-         (eval-expo rand env a)
-         (eval-expo body `((,x . ,a) . ,env^) val)))
-      ((fresh (x body)
-         (== `(lambda (,x) ,body) exp)
-         (symbolo x)
-         (not-in-envo 'lambda env)
-         (== `(closure ,x ,body ,env) val))))))
+(define (eval-expo exp env val)
+  (conde
+   ((fresh (v)
+      (== `(quote ,v) exp)
+      (not-in-envo 'quote env)
+      (absento 'closure v)
+      (== v val)))
+   ((fresh (a*)
+      (== `(list . ,a*) exp)
+      (not-in-envo 'list env)
+      (absento 'closure a*)
+      (proper-listo a* env val)))
+   ((symbolo exp) (lookupo exp env val))
+   ((fresh (rator rand x body env^ a)
+      (== `(,rator ,rand) exp)
+      (eval-expo rator env `(closure ,x ,body ,env^))
+      (eval-expo rand env a)
+      (eval-expo body `((,x . ,a) . ,env^) val)))
+   ((fresh (x body)
+      (== `(lambda (,x) ,body) exp)
+      (symbolo x)
+      (not-in-envo 'lambda env)
+      (== `(closure ,x ,body ,env) val)))))
 
 (define not-in-envo
   (lambda (x env)
@@ -65,13 +64,16 @@
 (define (test-quines)
   (parameterize ([reify-with-colon #f]
                  [reify-prefix-dot #f])
-    (test-check "1 quine"
-                (run 1 (q) (eval-expo q '() q))
-                '((((lambda (_.0) (list _.0 (list 'quote _.0)))
-                    '(lambda (_.0) (list _.0 (list 'quote _.0))))
-                   (=/= ((_.0 closure)) ((_.0 list)) ((_.0 quote)))
-                   (sym _.0))))
+    
+    (time 
+     (test-check "1 quine"
+                 (run 1 (q) (eval-expo q '() q))
+                 '((((lambda (_.0) (list _.0 (list 'quote _.0)))
+                     '(lambda (_.0) (list _.0 (list 'quote _.0))))
+                    (=/= ((_.0 closure)) ((_.0 list)) ((_.0 quote)))
+                    (sym _.0)))))
 
+    #;
     (test-check "2 quines"
                 (run 2 (q) (eval-expo q '() q))
                 '((((lambda (_.0) (list _.0 (list 'quote _.0)))
@@ -87,6 +89,7 @@
                    (absento (closure _.2))
                    (sym _.0 _.1))))
 
+    #;
     (test-check "3 quines"
                 (run 3 (q) (eval-expo q '() q))
                 '((((lambda (_.0) (list _.0 (list 'quote _.0)))
@@ -756,4 +759,5 @@
                    (sym _.0 _.1))))))
 
 (module+ main
-  (test-quines-long))
+  (test-quines)
+#;(test-quines-long))

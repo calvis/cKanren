@@ -20,6 +20,8 @@
 )
 
 (define (run-all)
+  (test-mk)
+
   (test-absento)
   (test-ak)
   (test-comp)
@@ -27,7 +29,6 @@
   (test-infer)
   (test-interp)
   (test-mk-struct)
-  (test-mk)
   (test-neq)
   (test-nevertrue)
   (test-numbero)
@@ -39,6 +40,8 @@
 )
 
 (define (run-all-long)
+  (test-mk-long)
+
   (test-absento-long)
   (test-ak-long)
   (test-comp-long)
@@ -46,7 +49,6 @@
   (test-infer-long)
   (test-interp-long)
   (test-mk-struct-long)
-  (test-mk-long)
   (test-neq-long)
   (test-nevertrue-long)
   (test-numbero-long)
