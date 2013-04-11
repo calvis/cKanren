@@ -1,8 +1,7 @@
 #lang racket
 
 (require racket/generic 
-         (for-syntax syntax/parse racket/syntax)
-         (prefix-in pfds: pfds/catenable-list)) 
+         (for-syntax syntax/parse racket/syntax)) 
 
 (provide
  ;; framework for defining constraints
@@ -430,6 +429,15 @@
   (lambdam@ (a : s c q)
     (make-a s c^ q)))
 
+;; == QUEUE ====================================================================
+
+(require (prefix-in fq: "functional-queue.rkt"))
+(define empty-q (fq:make-queue))
+(define empty-q? fq:queue-empty?)
+(define (ext-q x q) (fq:enqueue q x))
+(define de-q fq:dequeue)
+(define append-q fq:queue-append)
+
 ;; == PACKAGE ==================================================================
 
 ;; a package is a structure containing a substitution and
@@ -441,9 +449,6 @@
 (define (make-a s c q)
   (a (substitution s) (constraint-store c) q))
 
-(define empty-q (pfds:list))
-(define ext-q pfds:cons)
-
 ;; the empty package
 (define empty-a (make-a empty-s empty-c empty-q))
 
@@ -452,7 +457,7 @@
   ((parse-mode mode)
    (format "(~a . ~a)" (a-s a) (a-c a)) port))
 
-;; == CONSTRAINTS ========================================================================
+;; == CONSTRAINTS ==============================================================
 
 ;; special lambda for defining constraints
 (define-syntax lambdam@
@@ -594,47 +599,34 @@
 (define (ground-terms oc)
   (foldl + 0 (map (lambda (x) (if (var? x) 0 1)) (oc-rands oc))))
 
-#;
-(define (cycle x ocs fns)
-  (fresh ()
-    (let loop ([ocs  
-                (sort ocs (lambda (oc1 oc2)
-                            (or (> (ground-terms oc1)
-                                   (ground-terms oc2)))))])
-      (cond
-       [(null? ocs) succeed]
-       [else
-        (let ([oc (car ocs)])
-          (fresh ()
-            ((cdr (assq (oc-rator oc) fns)) x oc)
-            (lambdam@ (a : s c)
-              (loop (cdr ocs)))))]))
-    (lambdag@ (a : s c)
-      (let ([ocs (filter-memq/rator (map car fns) c)]
-            [rest (filter-not-memq/rator (map car fns) c)])
-        (cond
-         [(null? ocs) a]
-         [else ((cycle x ocs fns) (make-a s rest))])))))
-
 (define max-length-ocs 0)
 (define cycle-times 0)
 
-(define (cycle x ocs fns)
+(define (cycle x q fns)
   (fresh ()
     (cond
-     [(null? ocs) succeed]
+     [(empty-q? q) succeed]
      [else
-      (let ([oc (pfds:first ocs)])
+      #;
+      (let* ([oc (first-q q)]
+             [rest (rest-q q)]
+             [fn (cdr (assq (oc-rator oc) fns))])
+        (fresh ()
+          (fn x oc)
+          (lambdag@ (a : s c q)
+            (make-a s c (append rest q)))))
+      (let-values ([(oc rest) (de-q q)])
         (fresh ()
           ((cdr (assq (oc-rator oc) fns)) x oc)
           (lambdag@ (a : s c q)
-            (make-a s c (pfds:append (pfds:rest ocs) q)))))])
+            (make-a s c (append-q rest q)))))
+     ])
     (lambdag@ (a : s c q)
       (cond
-       [(null? q) a]
+       [(empty-q? q) a]
        [else 
         (set! cycle-times (add1 cycle-times))
-        ((cycle x ocs fns) 
+        ((cycle x q fns) 
          (make-a s c empty-q))]))))
 
 (define-syntax (define-lazy-goal stx)

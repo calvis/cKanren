@@ -9,7 +9,7 @@
 
 (provide test-quines test-quines-long)
 
-(define (eval-expo exp env val)
+(define-lazy-goal (eval-expo exp env val)
   (conde
    ((fresh (v)
       (== `(quote ,v) exp)
@@ -17,16 +17,16 @@
       (absento 'closure v)
       (== v val)))
    ((fresh (a*)
+      (proper-listo a* env val)
       (== `(list . ,a*) exp)
       (not-in-envo 'list env)
-      (absento 'closure a*)
-      (proper-listo a* env val)))
+      (absento 'closure a*)))
    ((symbolo exp) (lookupo exp env val))
    ((fresh (rator rand x body env^ a)
-      (== `(,rator ,rand) exp)
       (eval-expo rator env `(closure ,x ,body ,env^))
       (eval-expo rand env a)
-      (eval-expo body `((,x . ,a) . ,env^) val)))
+      (eval-expo body `((,x . ,a) . ,env^) val)
+      (== `(,rator ,rand) exp)))
    ((fresh (x body)
       (== `(lambda (,x) ,body) exp)
       (symbolo x)
@@ -42,16 +42,16 @@
          (not-in-envo x rest)))
       ((== '() env)))))
 
-(define proper-listo
+(define-lazy-goal proper-listo
   (lambda (exp env val)
     (conde
       ((== '() exp)
        (== '() val))
       ((fresh (a d t-a t-d)
-         (== `(,a . ,d) exp)
-         (== `(,t-a . ,t-d) val)
          (eval-expo a env t-a)
-         (proper-listo d env t-d))))))
+         (proper-listo d env t-d)
+         (== `(,a . ,d) exp)
+         (== `(,t-a . ,t-d) val))))))
 
 (define lookupo
   (lambda (x env t)
@@ -65,29 +65,27 @@
   (parameterize ([reify-with-colon #f]
                  [reify-prefix-dot #f])
     
-    (time 
-     (test-check "1 quine"
-                 (run 1 (q) (eval-expo q '() q))
-                 '((((lambda (_.0) (list _.0 (list 'quote _.0)))
-                     '(lambda (_.0) (list _.0 (list 'quote _.0))))
-                    (=/= ((_.0 closure)) ((_.0 list)) ((_.0 quote)))
-                    (sym _.0)))))
-
-    #;
-    (test-check "2 quines"
-                (run 2 (q) (eval-expo q '() q))
-                '((((lambda (_.0) (list _.0 (list 'quote _.0)))
-                    '(lambda (_.0) (list _.0 (list 'quote _.0))))
-                   (=/= ((_.0 closure)) ((_.0 list)) ((_.0 quote)))
-                   (sym _.0))
-                  (((lambda (_.0)
-                      (list ((lambda (_.1) _.0) '_.2) (list 'quote _.0)))
-                    '(lambda (_.0)
-                       (list ((lambda (_.1) _.0) '_.2) (list 'quote _.0))))
-                   (=/= ((_.0 _.1)) ((_.0 closure)) ((_.0 lambda)) ((_.0 list))
-                        ((_.0 quote)) ((_.1 closure)))
-                   (absento (closure _.2))
-                   (sym _.0 _.1))))
+    (test "1 quine"
+          (time (run 1 (q) (eval-expo q '() q)))
+          '((((lambda (_.0) (list _.0 (list 'quote _.0)))
+              '(lambda (_.0) (list _.0 (list 'quote _.0))))
+             (=/= ((_.0 closure)) ((_.0 list)) ((_.0 quote)))
+             (sym _.0))))
+    
+    (test "2 quines"
+          (time (run 2 (q) (eval-expo q '() q)))
+          '((((lambda (_.0) (list _.0 (list 'quote _.0)))
+              '(lambda (_.0) (list _.0 (list 'quote _.0))))
+             (=/= ((_.0 closure)) ((_.0 list)) ((_.0 quote)))
+             (sym _.0))
+            (((lambda (_.0)
+                (list ((lambda (_.1) _.0) '_.2) (list 'quote _.0)))
+              '(lambda (_.0)
+                 (list ((lambda (_.1) _.0) '_.2) (list 'quote _.0))))
+             (=/= ((_.0 _.1)) ((_.0 closure)) ((_.0 lambda)) ((_.0 list))
+                  ((_.0 quote)) ((_.1 closure)))
+             (absento (closure _.2))
+             (sym _.0 _.1))))
 
     #;
     (test-check "3 quines"
