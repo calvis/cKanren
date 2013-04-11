@@ -11,8 +11,8 @@
 
 ;; (search-strategy 'dfs)
 
-;; (define-lazy-goal (eval-expo exp env val)
-(define (eval-expo exp env val)
+(define-lazy-goal (eval-expo exp env val)
+;; (define (eval-expo exp env val)
   (conde
    ((fresh (v)
       (== `(quote ,v) exp)
@@ -45,8 +45,8 @@
          (not-in-envo x rest)))
       ((== '() env)))))
 
-;; (define-lazy-goal proper-listo
-(define proper-listo
+(define-lazy-goal proper-listo
+;; (define proper-listo
   (lambda (exp env val)
     (conde
       ((== '() exp)

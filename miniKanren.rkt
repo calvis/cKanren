@@ -97,7 +97,7 @@
     (fresh (a d)
       (conso a d p))))
 
-(define membero
+(define-lazy-goal membero
   (lambda (x l)
     (conde      
      ((fresh (a)
@@ -107,7 +107,7 @@
         (cdro l d)
         (membero x d))))))
 
-(define rembero
+(define-lazy-goal rembero
   (lambda (x l out)
     (conde
      ((nullo l) (== '() out))
@@ -117,7 +117,7 @@
         (rembero x d res)
         (conso a res out))))))
 
-(define appendo
+(define-lazy-goal appendo
   (lambda (l s out)
     (conde
      ((nullo l) (== s out))
@@ -126,7 +126,7 @@
         (conso a res out)
         (appendo d s res))))))
 
-(define flatteno
+(define-lazy-goal flatteno
   (lambda (s out)
     (conde
      ((nullo s) (== '() out))
@@ -138,7 +138,7 @@
         (appendo res-a res-d out)))
      ((conso s '() out)))))
 
-(define anyo
+(define-lazy-goal anyo
   (lambda (g)
     (conde
      (g)
@@ -184,7 +184,7 @@
      ((== 0 b) (== 1 x) (== 1 y) (== 0 r) (== 1 c))
      ((== 1 b) (== 1 x) (== 1 y) (== 1 r) (== 1 c)))))
 
-(define addero
+(define-lazy-goal addero
   (lambda (d n m r)
     (conde
      ((== 0 d) (== '() m) (== n r))
@@ -203,7 +203,7 @@
                   (addero d '(1) n r))
      ((>1o n) (gen-addero d n m r)))))
 
-(define gen-addero
+(define-lazy-goal gen-addero
   (lambda (d n m r)
     (fresh (a b c e x y z)
       (== `(,a . ,x) n)
@@ -220,7 +220,7 @@
   (lambda (n m k)
     (pluso m k n)))
 
-(define *o
+(define-lazy-goal *o
   (lambda (n m p)
     (conde
      ((== '() n) (== '() p))
@@ -241,14 +241,14 @@
         (== `(1 . ,y) m) (poso y)
         (odd-*o x n m p))))))
 
-(define odd-*o
+(define-lazy-goal odd-*o
   (lambda (x n m p)
     (fresh (q)
       (bound-*o q p n m)
       (*o x m q)
       (pluso `(0 . ,q) m p))))
 
-(define bound-*o
+(define-lazy-goal bound-*o
   (lambda (q p n m)
     (conde
      ((nullo q) (pairo p))
@@ -262,7 +262,7 @@
          ((cdro n z) 
           (bound-*o x y z m))))))))
 
-(define =lo
+(define-lazy-goal =lo
   (lambda (n m)
     (conde
      ((== '() n) (== '() m))
@@ -272,7 +272,7 @@
         (== `(,b . ,y) m) (poso y)
         (=lo x y))))))
 
-(define <lo
+(define-lazy-goal <lo
   (lambda (n m)
     (conde
      ((== '() n) (poso m))
@@ -282,13 +282,13 @@
         (== `(,b . ,y) m) (poso y)
         (<lo x y))))))
 
-(define <=lo
+(define-lazy-goal <=lo
   (lambda (n m)
     (conde
      ((=lo n m))
      ((<lo n m)))))
 
-(define <o
+(define-lazy-goal <o
   (lambda (n m)
     (conde
      ((<lo n m))
@@ -297,13 +297,13 @@
         (poso x)
         (pluso n x m))))))
 
-(define <=o
+(define-lazy-goal <=o
   (lambda (n m)
     (conde
      ((== n m))
      ((<o n m)))))
 
-(define /o
+(define-lazy-goal /o
   (lambda (n m q r)
     (conde
      ((== r n) (== '() q) (<o n m))
@@ -327,7 +327,7 @@
           (splito rr r '() rh)
           (/o nh m qh rh))))))))
 
-(define splito
+(define-lazy-goal splito
   (lambda (n r l h)
     (conde
      ((== '() n) (== '() h) (== '() l))
@@ -358,7 +358,7 @@
         (poso l^)
         (splito n^ r^ l^ h))))))
 
-(define logo
+(define-lazy-goal logo
   (lambda (n b q r)
     (conde
      ((== '(1) n) (poso b) (== '() q) (== '() r))
@@ -404,7 +404,7 @@
             (pluso bq r n)
             (<o n bq1))))))))
 
-(define exp2
+(define-lazy-goal exp2
   (lambda (n b q)
     (conde
      ((== '(1) n) (== '() q))
@@ -425,7 +425,7 @@
         (appendo b `(1 . ,b) b2)
         (exp2 nh b2 q1))))))
 
-(define repeated-mul
+(define-lazy-goal repeated-mul
   (lambda (n q nq)
     (conde
      ((poso n) (== '() q) (== '(1) nq))

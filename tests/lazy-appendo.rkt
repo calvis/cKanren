@@ -6,8 +6,8 @@
          "../neq.rkt"
          "tester.rkt")
 
-(search-strategy 'bfs)
-;; (search-strategy 'dfs)
+;; (search-strategy 'bfs)
+(search-strategy 'dfs)
 
 (define-lazy-goal (syms* t out)
   (conde
@@ -34,6 +34,11 @@
   (test "appendo"
         (run* (q) (appendo '(a b) '(c d) q))
         '((a b c d)))
-  (test "symb*"
+  
+  (test "symb* 1"
+        (run* (q) (syms* '(a) q))
+        '((a)))
+  
+  (test "symb* 2"
         (run* (q) (syms* '((a (b) c)) q))
         '((a b c))))
