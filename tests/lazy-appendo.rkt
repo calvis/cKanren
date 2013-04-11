@@ -1,6 +1,13 @@
 #lang racket
 
-(require "../ck.rkt" "../tree-unify.rkt" "../absento.rkt" "../neq.rkt")
+(require "../ck.rkt" 
+         "../tree-unify.rkt" 
+         "../absento.rkt" 
+         "../neq.rkt"
+         "tester.rkt")
+
+(search-strategy 'bfs)
+;; (search-strategy 'dfs)
 
 (define-lazy-goal (syms* t out)
   (conde
@@ -23,3 +30,10 @@
       (== ls1 `(,a . , d))
       (== out `(,a . ,res))))))
 
+(module+ test
+  (test "appendo"
+        (run* (q) (appendo '(a b) '(c d) q))
+        '((a b c d)))
+  (test "symb*"
+        (run* (q) (syms* '((a (b) c)) q))
+        '((a b c))))

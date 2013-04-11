@@ -9,7 +9,10 @@
 
 (provide test-quines test-quines-long)
 
-(define-lazy-goal (eval-expo exp env val)
+;; (search-strategy 'dfs)
+
+;; (define-lazy-goal (eval-expo exp env val)
+(define (eval-expo exp env val)
   (conde
    ((fresh (v)
       (== `(quote ,v) exp)
@@ -17,16 +20,16 @@
       (absento 'closure v)
       (== v val)))
    ((fresh (a*)
-      (proper-listo a* env val)
       (== `(list . ,a*) exp)
       (not-in-envo 'list env)
-      (absento 'closure a*)))
+      (absento 'closure a*)
+      (proper-listo a* env val)))
    ((symbolo exp) (lookupo exp env val))
    ((fresh (rator rand x body env^ a)
+      (== `(,rator ,rand) exp)
       (eval-expo rator env `(closure ,x ,body ,env^))
       (eval-expo rand env a)
-      (eval-expo body `((,x . ,a) . ,env^) val)
-      (== `(,rator ,rand) exp)))
+      (eval-expo body `((,x . ,a) . ,env^) val)))
    ((fresh (x body)
       (== `(lambda (,x) ,body) exp)
       (symbolo x)
@@ -42,16 +45,17 @@
          (not-in-envo x rest)))
       ((== '() env)))))
 
-(define-lazy-goal proper-listo
+;; (define-lazy-goal proper-listo
+(define proper-listo
   (lambda (exp env val)
     (conde
       ((== '() exp)
        (== '() val))
       ((fresh (a d t-a t-d)
-         (eval-expo a env t-a)
-         (proper-listo d env t-d)
+         (== `(,t-a . ,t-d) val)
          (== `(,a . ,d) exp)
-         (== `(,t-a . ,t-d) val))))))
+         (eval-expo a env t-a)
+         (proper-listo d env t-d))))))
 
 (define lookupo
   (lambda (x env t)
@@ -87,7 +91,6 @@
              (absento (closure _.2))
              (sym _.0 _.1))))
 
-    #;
     (test-check "3 quines"
                 (run 3 (q) (eval-expo q '() q))
                 '((((lambda (_.0) (list _.0 (list 'quote _.0)))
@@ -757,5 +760,4 @@
                    (sym _.0 _.1))))))
 
 (module+ main
-  (test-quines)
-#;(test-quines-long))
+  (test-quines-long))

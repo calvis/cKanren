@@ -18,8 +18,7 @@
  run-constraints build-attr-oc attr-oc? attr-oc-uw?
  get-attributes filter/rator filter-not/rator default-reify
  extend-fixpoint-enforce-fns filter-memq/rator
- define-lazy-goal trace-define max-length-ocs
- cycle-times replace-c
+ define-lazy-goal trace-define replace-c search-strategy
  (for-syntax build-srcloc))
 
 (define-syntax trace-define
@@ -579,56 +578,62 @@
 (define extend-fixpoint-enforce-fns (extend-parameter fixpoint-enforce-fns))
 
 ;; runs all the enforce-constraint functions in enforce-fns
+;; and all the fixpoint-enforce-fns in fixpoint-enforce-fns.. to a fixpoint
 (define (enforce-constraints x)
   (fresh ()
-    (fixpoint-enforce x (fixpoint-enforce-fns))
+    (let ([fns (fixpoint-enforce-fns)]
+          [strat (search-strategy)])
+      (fixpoint-enforce x (pick-strat strat) fns))
     (for/fold ([f unitg])
               ([fn (map cdr (enforce-fns))])
       (fresh () (fn x) f))))
 
-(define (fixpoint-enforce x fns)
-  (fresh ()
-    (lambdag@ (a : s c q)
-      (cond
-       [(null? q) a]
-       [else 
-        (set! cycle-times (add1 cycle-times))
-        ((cycle x q fns) 
-         (make-a s c empty-q))]))))
+;; default strategy is dfs, bfs also included
+(define search-strategy (make-parameter 'dfs))
 
-(define (ground-terms oc)
-  (foldl + 0 (map (lambda (x) (if (var? x) 0 1)) (oc-rands oc))))
+(define (pick-strat st)
+  (case st
+    [(dfs) cycle-dfs]
+    [(bfs) cycle-bfs]
+    [else (error 'pick-strat "unknown strategy ~s" st)]))
 
-(define max-length-ocs 0)
-(define cycle-times 0)
+;; runs the given search strategy on the queue of lazy goals
+(define (fixpoint-enforce x strat fns)
+  (lambdag@ (a : s c q)
+    (cond
+     [(empty-q? q) a]
+     [else ((strat x q fns) (make-a s c empty-q))])))
 
-(define (cycle x q fns)
+(define (cycle-dfs x q fns)
   (fresh ()
     (cond
      [(empty-q? q) succeed]
      [else
-      #;
-      (let* ([oc (first-q q)]
-             [rest (rest-q q)]
-             [fn (cdr (assq (oc-rator oc) fns))])
-        (fresh ()
-          (fn x oc)
-          (lambdag@ (a : s c q)
-            (make-a s c (append rest q)))))
       (let-values ([(oc rest) (de-q q)])
         (fresh ()
           ((cdr (assq (oc-rator oc) fns)) x oc)
           (lambdag@ (a : s c q)
-            (make-a s c (append-q rest q)))))
-     ])
-    (lambdag@ (a : s c q)
-      (cond
-       [(empty-q? q) a]
-       [else 
-        (set! cycle-times (add1 cycle-times))
-        ((cycle x q fns) 
-         (make-a s c empty-q))]))))
+            (make-a s c (append-q rest q)))))])
+    (fixpoint-enforce x cycle-dfs fns)))
 
+(define (cycle-bfs x q fns)
+  (fresh ()
+    (let loop ([ocs (sort (fq:queue->list q) >ground-terms)])
+      (cond
+       [(null? ocs) succeed]
+       [else 
+        (let-values ([(oc rest) (values (car ocs) (cdr ocs))])
+          (fresh ()
+            ((cdr (assq (oc-rator oc) fns)) x oc)
+            (loop rest)))]))
+    (fixpoint-enforce x cycle-dfs fns)))
+
+(define (ground-terms oc)
+  (foldl + 0 (map (lambda (x) (if (var? x) 0 1)) (oc-rands oc))))
+
+(define (>ground-terms oc1 oc2)
+  (> (ground-terms oc1) (ground-terms oc2)))
+  
 (define-syntax (define-lazy-goal stx)
   (syntax-parse stx
     [(define-lazy-goal (name args ...) body)
@@ -639,17 +644,10 @@
              (goal-construct (lazy-name args ...)))
            (define (lazy-name args ...)
              (lambdam@ (a : s c)
-               ((update-c (build-lazy-goal-oc lazy-name (walk* args s) ...)) a)
-               ;;((update-c (build-lazy-goal-oc lazy-name args ...)) a)
-               ))
+               ((update-c (build-lazy-goal-oc lazy-name (walk* args s) ...)) a)))
            (define (enforce-name x oc)
              (match (oc-rands oc)
-               [`(,args ...) 
-                body
-                #;
-                (lambdag@ (a : s c)
-                  (let ([args (walk* args s)] ...)
-                    (body a)))]
+               [`(,args ...) body]
                [_ (error "internal error, won't get here")]))
            (extend-fixpoint-enforce-fns 'lazy-name enforce-name)))]
     [(define-lazy-goal name (lambda (args ...) body))
