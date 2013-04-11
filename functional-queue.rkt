@@ -1,3 +1,5 @@
+;; Written by Tony Garnock-Jones (https://gist.github.com/tonyg/5357774)
+
 #lang racket/base
 
 (provide make-queue
