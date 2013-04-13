@@ -25,7 +25,7 @@ cKanren
 =======
 
 This library implements miniKanren (http://minikanren.org) with an
-exensible framework for defining constraints.
+extensible framework for defining constraints.
 
 How to install
 --------------
