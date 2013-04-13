@@ -1,0 +1,8 @@
+compiled/*
+cKanren/compiled/*
+cKanren/tests/compiled/*
+cKanren/tests/nominal/compiled*
+cKanren/doc/compiled/*
+cKanren/doc/*.js
+cKanren/doc/*.css
+cKanren/doc/manual/*
