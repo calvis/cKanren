@@ -12,7 +12,8 @@
 (provide
  ;; framework for defining constraints 
  (rename-out [lambdam@-external lambdam@]
-             [lambdag@-external lambdag@])
+             [lambdag@-external lambdag@]
+             [trace-define-mk trace-define])
  var? define-var-type goal? make-a
  update-s update-c any/var?  prefix-s prtm identitym composem
  goal-construct ext-c build-oc oc-proc oc-rands oc-rator run run* prt
@@ -23,9 +24,10 @@
  mk-struct? unifiable?  lex<= sort-by-lex<= reify-with-colon
  occurs-check run-constraints build-attr-oc attr-oc?  attr-oc-uw?
  get-attributes filter/rator filter-not/rator default-reify
- filter-memq/rator define-lazy-goal replace-c search-strategy
- filter-not-memq/rator #%app-safe use-constraints debug
- (rename-out [trace-define-mk trace-define]))
+ filter-memq/rator define-lazy-goal replace-c
+ filter-not-memq/rator #%app-safe use-constraints debug)
+
+(provide (for-syntax search-strategy))
 
 ;; == VARIABLES =================================================================
 
@@ -51,9 +53,6 @@
 (define (write-var var port mode)
   ((parse-mode mode) (format "#~a(~s)" (cvar->str var) (var-x var)) port))
 
-(define (parse-mode mode)
-  (case mode [(#t) display] [(#f) display] [else display]))
-
 ;; == GOALS ====================================================================
 
 ;; a goal is just a function that can be applied to a's
@@ -78,6 +77,7 @@
              [c (constraint-store-c (a-c a))])
          e ...))]))
 
+;; internal macro that can also divide the package into the queue and the tree
 (define-syntax lambdag@
   (syntax-rules (:)
     [(_ (a) e ...)
@@ -157,6 +157,7 @@
 
 ;; =============================================================================
 
+;; defines a macro to create new unconstrained variables
 (define-syntax-rule 
   (fresh-aux constructor (x ...) g g* ...)
   (lambdag@ (a) 
@@ -164,15 +165,18 @@
      (let ((x (constructor 'x)) ...) 
        (bindg* (app-goal g a) g* ...)))))
 
+;; miniKanren's "fresh" defined in terms of fresh-aux over var
 (define-syntax-rule (fresh (x ...) g g* ...)
   (fresh-aux var (x ...) g g* ...))
 
+;; performs a conjunction over goals
 (define-syntax bindg*
   (syntax-rules ()
     [(_ e) e]
     [(_ e g g* ...)
      (bindg* (bindg e g) g* ...)]))
 
+;; applies a goal to an a-inf
 (define bindg
   (lambda (a-inf g)
     (case-inf a-inf
@@ -281,10 +285,9 @@
 ;; =============================================================================
 
 (define-generics mk-struct
-  ;; recur allows generic traversing of mk-structs (for example,
-  ;; this is used during unification).  k should be a procedure
-  ;; expecting two arguments, the first thing to process, and a 
-  ;; list of remaining things to process.  
+  ;; recur allows generic traversing of mk-structs.  k should be a
+  ;; procedure expecting two arguments, the first thing to process,
+  ;; and a list of remaining things to process.
   (recur mk-struct k)
 
   ;; returns a function that will create a new mk-struct given
@@ -315,10 +318,12 @@
 
 ;; == SUBSTITUTIONS ============================================================
 
+;; wraps a substitution
 (struct substitution (s)
   #:methods gen:custom-write
   [(define (write-proc . args) (apply write-substitution args))])
 
+;; writes a substitution
 (define (write-substitution substitution port mode)
   (define fn (lambda (s) ((parse-mode mode) s port)))
   (define s (substitution-s substitution))
@@ -358,6 +363,7 @@
     => (lambda (a) (walk (cdr a) s)))
    (else v)))
 
+;; walks a possibly nested structure
 (define (walk* w s)
   (let ((v (walk w s)))
     (cond
@@ -396,17 +402,12 @@
 
 ;; == CONSTRAINT STORE =========================================================
 
+;; wrapper for a constraint store
 (struct constraint-store (c)
   #:methods gen:custom-write
   [(define (write-proc . args) (apply write-constraint-store args))])
 
-;; an empty constraint store
-(define empty-c '())
-
-;; extends the constraint store c with oc
-(define (ext-c oc c) (cons oc c))
-(define (remq-c oc c) (remq oc c))
-
+;; writes a constraint store
 (define (write-constraint-store constraint-store port mode)
   (define fn (lambda (s) ((parse-mode mode) s port)))
   (define c (constraint-store-c constraint-store))
@@ -415,15 +416,20 @@
   (unless (null? c) (fn " "))
   (fn "]"))
 
+;; an empty constraint store
+(define empty-c '())
+
+;; extends the constraint store c with oc
+(define (ext-c oc c) (cons oc c))
+(define (remq-c oc c) (remq oc c))
+
+;; filters the constraint store
 (define (filter/rator sym c)
   (filter (lambda (oc) (eq? (oc-rator oc) sym)) c))
-
 (define (filter-not/rator sym c)
   (filter (lambda (oc) (not (eq? (oc-rator oc) sym))) c))
-
 (define (filter-memq/rator symls c)
   (filter (lambda (oc) (and (memq (oc-rator oc) symls) #t)) c))
-
 (define (filter-not-memq/rator symls c)
   (filter (lambda (oc) (not (memq (oc-rator oc) symls))) c))
 
@@ -437,12 +443,14 @@
           (make-a s new-c q t)))
        (else a)))))
 
+;; replaces the current constraint store with c^
 (define (replace-c c^)
   (lambdam@ (a : s c q t)
     (make-a s (constraint-store c^) q t)))
 
 ;; == QUEUE ====================================================================
 
+;; an empty queue 
 (define empty-q (lambda (x) unitg))
 (define empty-q? ((curry eq?) empty-q))
 
@@ -477,19 +485,14 @@
   (lambdam@ (a : s c q-old t)
     (make-a s c (ext-q q-old new-enforce) t)))
 
-
 ;; == TREE =====================================================================
 
+;; wrapper for the tree
 (struct path (t)
   #:methods gen:custom-write
   [(define (write-proc . args) (apply write-path args))])
 
-(define empty-t (path '()))
-(define (add-level p l) 
-  (cond
-   [l (path (cons l (path-t p)))]
-   [else (path (cons (gensym 'tr) (path-t p)))]))
-
+;; writes a path
 (define (write-path path port mode)
   (let ([fn (lambda (s) ((parse-mode mode) s port))])
     (fn "#path[" )
@@ -497,6 +500,15 @@
     (for ([br (reverse (path-t path))])
          (fn (format "~s " br)))
     (fn "]")))
+
+;; an empty tree
+(define empty-t (path '()))
+
+;; adds a level to the tree with label l if it exists, a gensym otherwise
+(define (add-level p l) 
+  (cond
+   [l (path (cons l (path-t p)))]
+   [else (path (cons (gensym 'tr) (path-t p)))]))
 
 ;; == PACKAGE ==================================================================
 
@@ -514,6 +526,7 @@
           empty-q
           empty-t))
 
+;; when debug?ging is turned on, print out the path as well
 (define debug? (make-parameter #f))
 
 ;; controls how packages are displayed
@@ -526,6 +539,18 @@
 ;; == CONSTRAINTS ==============================================================
 
 ;; special lambda for defining constraints
+(define-syntax lambdam@
+  (syntax-rules (:)
+    [(_ (a) e ...)
+     (lambda (a) e ...)]
+    [(_ (a : s c q t) e ...)
+     (lambdam@ (a) 
+       (let ([s (a-s a)] 
+             [c (a-c a)]
+             [q (a-q a)]
+             [t (a-t a)])
+         e ...))]))
+
 (define-syntax lambdam@-external
   (syntax-rules (:)
     [(_ (a) e ...) 
@@ -540,24 +565,13 @@
              [c (constraint-store-c (a-c a))]) 
          e ...))]))
 
-(define-syntax lambdam@
-  (syntax-rules (:)
-    [(_ (a) e ...)
-     (lambda (a) e ...)]
-    [(_ (a : s c q t) e ...)
-     (lambdam@ (a) 
-       (let ([s (a-s a)] 
-             [c (a-c a)]
-             [q (a-q a)]
-             [t (a-t a)])
-         e ...))]))
-
 ;; the identity constraint
 (define identitym (lambdam@ (a) a))
 
 ;; the simplest failing constraint
 (define mzerom (lambdam@ (a) #f))
 
+;; applies a constraint to a package
 (define (bindm a fm) (fm a))
 
 ;; composes two constraints together
@@ -581,6 +595,7 @@
   #:methods gen:custom-write 
   [(define (write-proc . args) (apply write-oc args))])
 
+;; displays an oc
 (define (write-oc oc port mode)
   (define fn (lambda (str) ((parse-mode mode) str port)))
   (fn (format "#oc<~a" (oc-rator oc)))
@@ -596,24 +611,29 @@
        #'(let ((arg^ arg) ...)
            (make-oc (op arg^ ...) 'op `(,arg^ ...)))))))
 
+;; defines an attributed constraint (for attributed variables)
 (struct attr-oc oc (uw?) ;; for "unifies with?"
   #:extra-constructor-name make-attr-oc)
 
+;; builds an attributed constraint
 (define-syntax build-attr-oc
   (syntax-rules ()
     ((_ op x uw?)
      (let ((x^ x))
        (make-attr-oc (op x^) 'op `(,x^) uw?)))))
 
+;; gets the attributes of variable x in the constraint store
 (define (get-attributes x ocs)
   (define (x-attr-oc? oc) 
     (and (attr-oc? oc) (eq? (car (oc-rands oc)) x)))
   (let ((attrs (filter x-attr-oc? ocs)))
     (and (not (null? attrs)) attrs)))
 
+;; defines a lazy-goal oc
 (struct lazy-goal-oc oc ()
   #:extra-constructor-name make-lazy-goal-oc)
 
+;; builds a lazy-goal oc
 (define-syntax (build-lazy-goal-oc x)
   (syntax-case x ()
     ((_ op arg ...)
@@ -667,21 +687,18 @@
               ([fn (map cdr (enforce-fns))])
       (fresh () (fn x) f))))
 
-(define search-strategy (make-parameter 'dfs))
+(define-for-syntax search-strategy (make-parameter 'hybrid))
 
 ;; runs the given search strategy on the queue of lazy goals
 (define (fixpoint-enforce x)
   (lambdag@ (a : s c q t)
     (cond
-     [(eq? q empty-q) a]
-     [else ((fresh () (q x) (fixpoint-enforce x)) (make-a s c empty-q t))])))
+     [(empty-q? q) a]
+     [else 
+      ((fresh () (q x) (fixpoint-enforce x)) 
+       (make-a s c empty-q t))])))
 
-(define (ground-terms oc)
-  (foldl + 0 (map (lambda (x) (if (var? x) 0 1)) (oc-rands oc))))
-
-(define (>ground-terms oc1 oc2)
-  (> (ground-terms oc1) (ground-terms oc2)))
-  
+;; useful for printing out information during debugging, not exported atm
 (define gensym
   (let ([counter 0])
     (lambda ([x 'g])
@@ -691,19 +708,26 @@
                  (format "~a~a" x counter))
           (set! counter (add1 counter)))))))
 
+;; convenience macro for defining lazy goals
 (define-syntax (define-lazy-goal stx)
   (syntax-parse stx
     [(define-lazy-goal (name args ...) body)
      (with-syntax ([lazy-name (format-id #'name "lazy-~a" (syntax-e #'name))]
                    [enforce-name (format-id #'name "enforce-~a" (syntax-e #'name))])
-       #'(begin
+       #`(begin
            (define (name args ...)
              (goal-construct (lazy-name args ...)))
            (define (lazy-name args ...)
              ;; (printf "+ ~s ~s\n" t `(,num ,args ...))
              (lambdam@ (a) ;; do not eta
                (let ([enforce-this (lambda (x) (enforce-name x args ...))])
-                 ((update-q-dfs enforce-this) a))))
+                 (bindm a
+                   (#,(case (search-strategy)
+                        [(dfs) #'update-q-dfs]
+                        [(bfs) #'update-q-bfs]
+                        [(hybrid) #'update-q-hybrid]
+                        [else (error 'define-lazy-goal "unknown search strategy ~s" (search-strategy))])
+                    enforce-this)))))
            (define (enforce-name x args ...) 
              ;; (printf "- ~s ~s\n" t `(,num ,(walk* args s) ...))
              body)))]
@@ -716,6 +740,8 @@
 (define reify-fns        (make-parameter '()))
 (define extend-reify-fns (extend-parameter reify-fns))
 
+;; defines whether the constraint store should be printed out
+;; with a : inbetween the answer and the constraints on the answer
 (define reify-with-colon (make-parameter #t))
 
 ;; reifies the constraint store with respect to x
@@ -731,6 +757,7 @@
          (else (reify-constraints (walk* v^ r) r c))))
       (choiceg answer empty-f))))
 
+;; reifies a cvar
 (define (reify-cvar cvar r) (walk cvar r))
 
 ;; reifies the substitution, returning the reified substitution
@@ -771,6 +798,7 @@
             ([fn (map cdr (reify-fns))])
     (append (fn v r ocs) ocs^)))
 
+;; defines a "default" reify function
 (define ((default-reify sym cs fn) v r ocs)
   (let ((ocs (filter-memq/rator cs ocs)))
     (let ((rands (filter-not any/var? (walk* (map oc-rands ocs) r))))
@@ -778,8 +806,10 @@
        ((null? rands) `())
        (else `((,sym . ,(sort (fn rands) lex<=))))))))
 
+;; sorts the constraint store by lex<=
 (define (sort-store ocs) (sort ocs lex<= #:key car))
 
+;; sorts a list by lex<=
 (define (sort-by-lex<= l) (sort l lex<=))
 
 ;; for pretty reification
@@ -851,12 +881,14 @@
 
 ;; == HELPERS ========================================================
 
+;; returns #t if p contains any variables
 (define (any/var? p)
   (cond
     ((pair? p)
      (or (any/var? (car p)) (any/var? (cdr p))))
     (else (var? p))))
 
+;; returns #t if t constains variables in x*
 (define (any-relevant/var? t x*)
   (cond
     ((pair? t)
@@ -864,6 +896,7 @@
          (any-relevant/var? (cdr t) x*)))
     (else (and (var? t) (memq t x*)))))
 
+;; returns the part of s^ that is a prefix of s
 (define (prefix-s s s^)
   (define (loop s^) 
     (cond
@@ -891,9 +924,12 @@
 
 ;; Should be able to think of importing constraint files as using
 ;; constraints, not as requiring files.  Abstractiiooonnnnn.
-
 (define-syntax-rule (use-constraints file ...) 
   (require file ...))
+
+;; parses the input to a write-proc
+(define (parse-mode mode)
+  (case mode [(#t) display] [(#f) display] [else display]))
 
 ;; =============================================================================
 
