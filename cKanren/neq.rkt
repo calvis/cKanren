@@ -75,20 +75,23 @@
 
 (define normalize-store
   (lambda (p)
-    (lambdam@ (a : s c-old)
-      (let loop ((c c-old) (c^ '()))
-        (cond
-          ((null? c)
-           (let ((c^ (ext-c (build-oc =/=neq-c p) c^)))
-             ((replace-c c^) a)))
-          ((eq? (oc-rator (car c)) '=/=neq-c)
-           (let* ((oc (car c))
-                  (p^ (oc-prefix oc)))
-             (cond
-               ((subsumes? p^ p c-old) a)
-               ((subsumes? p p^ c-old) (loop (cdr c) c^))
-               (else (loop (cdr c) (ext-c oc c^))))))
-          (else (loop (cdr c) (ext-c (car c) c^))))))))
+    (lambdam@ (a : s c)
+      (let ([ncs (filter/rator '=/=neq-c c)])
+        (let loop ((ncs ncs) (ncs^ '()))
+          (cond
+           [(null? ncs)
+            (let ([oc (build-oc =/=neq-c p)])
+              (bindm a
+                (composem
+                 (replace-ocs '=/=neq-c ncs^)
+                 (update-c oc))))]
+           (else
+            (let* ((oc (car ncs))
+                   (p^ (oc-prefix oc)))
+              (cond
+               ((subsumes? p^ p c) a)
+               ((subsumes? p p^ c) (loop (cdr ncs) ncs^))
+               (else (loop (cdr ncs) (cons oc ncs^))))))))))))
 
 (define subsumes?
   (lambda (p s c)

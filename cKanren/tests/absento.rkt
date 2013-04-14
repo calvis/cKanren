@@ -55,7 +55,8 @@
                     (numbero b)
                     (absento '(3 3) `(,a ,b))
                     (=/= a b)
-                    (== `(,a ,b) q)))
+                    (== `(,a ,b) q)
+                    prt))
                 '(((_.0 _.1) (=/= ((_.0 _.1))) (num _.0 _.1))))
 
     (test-check "test 6"

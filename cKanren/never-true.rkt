@@ -35,8 +35,7 @@
   (lambda (x)
     (goal-construct
       (lambdam@ (a : s c)
-        (and (not (findf (lambda (oc) (eq? 'required-c (oc-rator oc))) c))
-             a)))))
+        (and (null? (filter/rator 'required-c c)) a)))))
 
 (define allowedo
   (lambda (pred? x)
@@ -52,7 +51,7 @@
 
 (define reified-allowed
   (lambda (v r c)
-    (let ((c (filter (lambda (oc) (eq? (oc-rator oc) 'allowed-c)) c)))
+    (let ((c (filter/rator 'allowed-c c)))
       (let ((c (walk* (map oc-rands c) r)))
         (if (null? c) `() `((allowed . ,c)))))))
 

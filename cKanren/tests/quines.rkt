@@ -5,12 +5,14 @@
  "../absento.rkt"
  "../tree-unify.rkt"
  "../neq.rkt"
- "../tester.rkt")
+ "../tester.rkt"
+ (for-syntax "../ck.rkt"))
 
 (provide test-quines test-quines-long)
 
-(define strat 'dfs)
-(search-strategy strat)
+(begin-for-syntax
+ (define strat 'dfs)
+ (search-strategy strat))
 
 (define-lazy-goal (eval-expo exp env val)
 ;; (define (eval-expo exp env val)
@@ -79,27 +81,17 @@
     
     (test "2 quines"
           (time (run 2 (q) (eval-expo q '() q)))
-          (case strat
-            [(dfs)
-             '((((lambda (_.0) (list _.0 (list (quote quote) _.0))) 
-                 (quote (lambda (_.0) (list _.0 (list (quote quote) _.0)))))
-                (=/= ((_.0 closure)) ((_.0 list)) ((_.0 quote))) 
-                (sym _.0)) 
-               (((lambda (_.0) 
-                   (list (list (quote lambda) (quote (_.0)) _.0)
-                         (list (quote quote) _.0))) 
-                 (quote (list (list (quote lambda) (quote (_.0)) _.0) 
-                              (list (quote quote) _.0)))) 
-                (=/= ((_.0 closure)) ((_.0 list)) ((_.0 quote))) 
-                (sym _.0)))]
-            [(hybrid)
-             '((((lambda (_.0) (list _.0 (list (quote quote) _.0)))
-                 (quote (lambda (_.0) (list _.0 (list (quote quote) _.0))))) 
-                (=/= ((_.0 closure)) ((_.0 list)) ((_.0 quote))) (sym _.0)) 
-               (((lambda (_.0) (list _.0 (list ((lambda (_.1) (quote quote)) (quote _.2)) _.0)))
-                 (quote (lambda (_.0) (list _.0 (list ((lambda (_.1) (quote quote)) (quote _.2)) _.0))))) 
-                (=/= ((_.0 closure)) ((_.0 lambda)) ((_.0 list)) ((_.0 quote)) ((_.1 closure)) ((_.1 quote)))
-                (absento (closure _.2)) (sym _.0 _.1)))]))
+          '((((lambda (_.0) (list _.0 (list (quote quote) _.0))) 
+              (quote (lambda (_.0) (list _.0 (list (quote quote) _.0)))))
+             (=/= ((_.0 closure)) ((_.0 list)) ((_.0 quote))) 
+             (sym _.0)) 
+            (((lambda (_.0) 
+                (list (list (quote lambda) (quote (_.0)) _.0)
+                      (list (quote quote) _.0))) 
+              (quote (list (list (quote lambda) (quote (_.0)) _.0) 
+                           (list (quote quote) _.0)))) 
+             (=/= ((_.0 closure)) ((_.0 list)) ((_.0 quote))) 
+             (sym _.0))))
 
     (test-check "3 quines"
                 (run 3 (q) (eval-expo q '() q))

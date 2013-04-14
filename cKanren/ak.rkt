@@ -21,8 +21,9 @@
   (and (pair? x) (eq? (car x) 'sus)))
 
 (define (get-sus x c)
-  (let ((oc (findf (lambda (oc) (sus-constrained? x oc)) c)))
-    (and oc (cons 'sus (oc-rands oc)))))
+  (let ([ocs (filter/rator 'sus-c c)])
+    (let ([oc (findf (lambda (oc) (eq? (sus-constraint-v oc) x)) ocs)])
+      (and oc (cons 'sus (oc-rands oc))))))
 
 (define (sus-v s)  (cadr s))
 (define (sus-pi s) (caddr s))
@@ -271,11 +272,8 @@
      ((pair? t) (cons (rec (car t)) (rec (cdr t))))
      (else t))))
 
-(define (alpha-constraint? oc)
-  (memq (oc-rator oc) '(sus-c hash-c)))
-
 (define (reify-alpha-constraints v r c)
-  (let ((c (filter alpha-constraint? c)))
+  (let ((c (filter-memq/rator '(sus-c hash-c) c)))
     (let ((c (reify-alpha r c)))
       (if (null? c) c `((alpha . ,c))))))
 

@@ -26,13 +26,15 @@
 (define (symbol-uw? x attrs)
   (define incompatible '(number-c))
   (and (not (pair? x)) (not (number? x))
-       (or (not attrs) (andmap (lambda (aoc) (not (memq (oc-rator aoc) incompatible)))
-                               attrs))))
+       (or (not attrs)
+           (andmap (lambda (aoc) 
+                     (not (memq (oc-rator aoc) incompatible)))
+                   attrs))))
 
 (define symbol-constrained?
   (lambda (v c)
-    (findf (lambda (oc) (and (eq? (oc-rator oc) 'symbol-c) 
-                             (eq? (car (oc-rands oc)) v))) c)))
+    (let ([symocs (filter/rator 'symbol-c c)])
+      (ormap (lambda (oc) (eq? (car (oc-rands oc)) v)) symocs))))
  
 (define reify-symbol-cs
   (default-reify 'sym '(symbol-c)
@@ -48,8 +50,10 @@
   (define incompatible '(symbol-c))
   (and (not (pair? x)) 
        (not (symbol? x))
-       (or (not attrs) (andmap (lambda (aoc) (not (memq (oc-rator aoc) incompatible)))
-                               attrs))))
+       (or (not attrs) 
+           (andmap (lambda (aoc) 
+                     (not (memq (oc-rator aoc) incompatible)))
+                   attrs))))
 
 (define number-c
   (lambda (u)
@@ -64,8 +68,8 @@
 
 (define number-constrained?
   (lambda (v c)
-    (findf (lambda (oc) (and (eq? (oc-rator oc) 'number-c) 
-                             (eq? (car (oc-rands oc)) v))) c)))
+    (let ([numocs (filter/rator 'number-c c)])
+      (ormap (lambda (oc) (eq? (car (oc-rands oc)) v)) numocs))))
  
 (define remove-duplicates
   (lambda (l)
@@ -104,20 +108,23 @@
 
 (define (normalize-store p)
   (lambdam@ (a : s c-old)
-    (let loop ([c c-old] [c^ '()])
-      (cond
-       [(null? c) 
-        ((replace-c (ext-c (build-oc absent-c (car p) (cdr p)) c^))
-         a)]
-       [(eq? (oc-rator (car c)) 'absent-c)
-        (let ([u (car (oc-rands (car c)))]
-              [v (cadr (oc-rands (car c)))])
-          (cond
-           [(subsumes? p (cons u v) s c)
-            (loop (cdr c) c^)]
-           [(subsumes? (cons u v) p s c) a]
-           [else (loop (cdr c) (cons (car c) c^))]))]
-       [else (loop (cdr c) (cons (car c) c^))]))))
+    (let ([acs (filter/rator 'absent-c c-old)])
+      (let loop ([acs acs] [acs^ '()])
+        (cond
+         [(null? acs) 
+          (let ([oc (build-oc absent-c (car p) (cdr p))])
+            (bindm a 
+              (composem 
+               (replace-ocs 'absent-c acs^)
+               (update-c oc))))]
+         [else
+          (let ([u (car (oc-rands (car acs)))]
+                [v (cadr (oc-rands (car acs)))])
+            (cond
+             [(subsumes? p (cons u v) s c-old)
+              (loop (cdr acs) acs^)]
+             [(subsumes? (cons u v) p s c-old) a]
+             [else (loop (cdr acs) (cons (car acs) acs^))]))])))))
 
 (define (subsumes? p p^ s c)
   (and (mem-check (car p) (car p^) s c)
@@ -143,27 +150,24 @@
 (define (absento-split u v)
   (composem
    (absent-c u (car v))
-   (composem
-    (absent-c u (cdr v))
-    (=/=-c u v))))
+   (absent-c u (cdr v))
+   (=/=-c u v)))
 
 (define type-cs '(number-c symbol-c))
 (define (rerun-type-cs x)
   (fresh ()
     (elim-diseqs)
     (lambdag@ (a : s c)
-      (let ([c^ (filter (lambda (oc) (memq (oc-rator oc) type-cs)) c)])
-        ((run-constraints (map (compose car oc-rands) c^) c)
-         a)))))
+      (let ([ocs (filter-memq/rator type-cs c)])
+        ((run-constraints (map (compose car oc-rands) ocs) c) a)))))
 
 (define (elim-diseqs)
   (lambdag@ (a : s c)
     (let ([neqs (filter/rator '=/=neq-c c)]
-          [absentos (filter/rator 'absent-c c)]
-          [rest (filter-not/rator '=/=neq-c c)])
+          [absentos (filter/rator 'absent-c c)])
       (let ([neqs^ (map (lambda (oc) (filter-subsumed-prefixes oc absentos s c)) neqs)])
         (let ([neqs^ (filter-not (compose null? oc-prefix) neqs^)])
-          ((replace-c (append rest neqs^)) a))))))
+          ((replace-ocs '=/=neq-c neqs^) a))))))
 
 (define (filter-subsumed-prefixes oc absentos s c)
   (define absento-pairs (map oc-rands absentos))

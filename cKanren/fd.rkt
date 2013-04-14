@@ -45,22 +45,28 @@
 
 ;;; 
 
+(define ((existing-domain x) oc)
+  (eq? (car (oc-rands oc)) x))
+
 ;; gives x the domain dom in the constraint store c
 (define (ext-d x dom)
   (lambdam@ (a : s c)
-    (let ((oc (build-oc domfd-c x dom))
-          (pred (existing-domain x)))
-      (cond
-       ((findf pred c) 
-        ((replace-c (ext-c oc (filter (compose not pred) c))) a))
-       (else ((update-c oc) a))))))
+    (let ([oc (build-oc domfd-c x dom)]
+          [ocs (filter/rator 'domfd-c c)]
+          [pred (existing-domain x)])
+      (let-values ([(x-doms other-doms)
+                    (partition (existing-domain x) ocs)])
+        (cond
+         ((null? x-doms) ((update-c oc) a))
+         (else ((replace-ocs 'domfd-c (append (list oc) other-doms)) a)))))))
 
 (define get-dom
   (lambda (x c)
-    (cond
-     ((findf (existing-domain x) c)
-      => (lambda (oc) (cadr (oc-rands oc))))
-     (else #f))))
+    (let ([domocs (filter/rator 'domfd-c c)])
+      (cond
+       ((findf (existing-domain x) domocs)
+        => (lambda (oc) (cadr (oc-rands oc))))
+       (else #f)))))
 
 (define process-dom
   (lambda (v dom)
@@ -256,14 +262,18 @@
             (process-dom v new-v-dom))))))))
 
 (define (enforce-constraintsfd x)
-  (define (domfd-c? oc) (eq? (oc-rator oc) 'domfd-c))
-  (define (domfd-c->var domfd-c) (car (oc-rands domfd-c)))
+  (define (domfd-c->var domfd-c) 
+    (car (oc-rands domfd-c)))
   (fresh ()
     (force-ans x)
     (lambdag@ (a : s c)
-      (let ((bound-x* (map domfd-c->var (filter domfd-c? c))))
-        (verify-all-bound s c bound-x*)
-        ((onceo (force-ans bound-x*)) a)))))
+      (let ([domains (filter/rator 'domfd-c c)])
+        (let ([bound-x* (map domfd-c->var domains)])
+          (verify-all-bound s c bound-x*)
+          ((fresh ()
+             (onceo (force-ans bound-x*))
+             (lambdag@ (a^) a)) 
+           a))))))
 
 (define fd-cs '(=/=fd-c distinctfd-c distinct/fd-c 
                 <=fd-c =fd-c plusfd-c timesfd-c))
@@ -271,7 +281,7 @@
 
 (define (verify-all-bound s c bound-x*)
   (define (bound? x) (memq x bound-x*))
-  (for ([oc c] #:when (fd-c? oc))
+  (for ([oc (c->list c)] #:when (fd-c? oc))
     (define oc-vars (filter var? (oc-rands oc)))
     (cond
      ((findf (compose not bound?) oc-vars)
@@ -294,10 +304,6 @@
    ((null? ls) (cons x '()))
    ((pred x (car ls)) (cons x ls))
    (else (cons (car ls) (list-insert pred x (cdr ls))))))
-
-(define ((existing-domain x) oc)
-  (and (eq? (oc-rator oc) 'domfd-c)
-       (eq? (car (oc-rands oc)) x)))
 
 ;;; 
 

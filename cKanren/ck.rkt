@@ -2,7 +2,8 @@
 
 (require racket/generic 
          racket/stxparam
-         "src/errors.rkt") 
+         "src/errors.rkt"
+         (only-in rackunit check-equal?))
 
 (require (for-syntax 
           syntax/parse
@@ -14,7 +15,7 @@
  (rename-out [lambdam@-external lambdam@]
              [lambdag@-external lambdag@]
              [trace-define-mk trace-define])
- var? define-var-type goal? make-a
+ var? define-var-type goal? make-a c->list
  update-s update-c any/var?  prefix-s prtm identitym composem
  goal-construct ext-c build-oc oc-proc oc-rands oc-rator run run* prt
  extend-enforce-fns extend-reify-fns goal? a?  walk walk*
@@ -24,10 +25,14 @@
  mk-struct? unifiable?  lex<= sort-by-lex<= reify-with-colon
  occurs-check run-constraints build-attr-oc attr-oc?  attr-oc-uw?
  get-attributes filter/rator filter-not/rator default-reify
- filter-memq/rator define-lazy-goal replace-c
+ filter-memq/rator define-lazy-goal replace-ocs
  filter-not-memq/rator #%app-safe use-constraints debug)
 
 (provide (for-syntax search-strategy))
+
+;; parses the input to a write-proc
+(define (parse-mode mode)
+  (case mode [(#t) display] [(#f) display] [else display]))
 
 ;; == VARIABLES =================================================================
 
@@ -404,34 +409,73 @@
 
 ;; wrapper for a constraint store
 (struct constraint-store (c)
+  #:guard (lambda args (apply constraint-store-guard args))
   #:methods gen:custom-write
   [(define (write-proc . args) (apply write-constraint-store args))])
+
+(define (constraint-store-guard c name)
+  (unless (hash? c) (error 'constraint-store "not a hash ~s\n" c))
+  (values c))
 
 ;; writes a constraint store
 (define (write-constraint-store constraint-store port mode)
   (define fn (lambda (s) ((parse-mode mode) s port)))
   (define c (constraint-store-c constraint-store))
   (fn "#c[")
-  (for ([oc c]) (fn " ") (fn oc))
+  (hash-for-each c (lambda (key oc) (fn " ") (fn oc)))
   (unless (null? c) (fn " "))
   (fn "]"))
 
 ;; an empty constraint store
-(define empty-c '())
+(define empty-c (hasheq))
 
 ;; extends the constraint store c with oc
-(define (ext-c oc c) (cons oc c))
-(define (remq-c oc c) (remq oc c))
+(define (ext-c oc c) 
+  (hash-update c (oc-rator oc) (lambda (ocs) (cons oc ocs)) '()))
+
+;; checks if oc is in c
+(define (memq-c oc c)
+  (let ([ocs (filter/rator (oc-rator oc) c)])
+    (memq oc ocs)))
+
+;; removes oc from c
+(define (remq-c oc c) 
+  (hash-update c (oc-rator oc) (lambda (ocs) (remq oc ocs)) '()))
 
 ;; filters the constraint store
-(define (filter/rator sym c)
-  (filter (lambda (oc) (eq? (oc-rator oc) sym)) c))
+(define (filter/rator key c)
+  (hash-ref c key '()))
+
+(module+ test
+  (check-equal? (filter/rator 'key (hasheq)) '())
+  (check-equal? (filter/rator 'key (hasheq 'key '(oc1 oc2))) '(oc1 oc2)))
+
 (define (filter-not/rator sym c)
-  (filter (lambda (oc) (not (eq? (oc-rator oc) sym))) c))
+  (apply append (for/list ([key (remq sym (hash-keys c))]) (hash-ref c key '()))))
+
+(module+ test
+  (check-equal? (filter-not/rator 'key1 (hasheq)) '())
+  (check-equal? (filter-not/rator 'key1 (hasheq 'key1 '(oc1 oc2))) '())
+  (check-equal? (filter-not/rator 'key1 (hasheq 'key2 '(oc2) 'key3 '(oc3))) '(oc2 oc3)))
+
 (define (filter-memq/rator symls c)
-  (filter (lambda (oc) (and (memq (oc-rator oc) symls) #t)) c))
+  (apply append (for/list ([key symls]) (hash-ref c key '()))))
+
+(module+ test
+  (check-equal? (filter-memq/rator '(key) (hasheq)) '())
+  (check-equal? (filter-memq/rator '(key) (hasheq 'key '(oc1 oc2))) '(oc1 oc2)))
+
 (define (filter-not-memq/rator symls c)
-  (filter (lambda (oc) (not (memq (oc-rator oc) symls))) c))
+  (apply append (for/list ([key (hash-keys c)])
+                          (cond
+                           [(memq key symls) '()]
+                           [else (hash-ref c key '())]))))
+
+(module+ test
+  (check-equal? (filter-not-memq/rator '(key1) (hasheq)) '())
+  (check-equal? (filter-not-memq/rator '(key1) (hasheq 'key1 '(oc1 oc2))) '())
+  (check-equal? (filter-not-memq/rator '(key1) (hasheq 'key2 '(oc2) 'key3 '(oc3))) 
+                '(oc2 oc3)))
 
 ;; adds oc to the constraint store if it contains a non-ground var
 (define update-c
@@ -443,10 +487,16 @@
           (make-a s new-c q t)))
        (else a)))))
 
-;; replaces the current constraint store with c^
-(define (replace-c c^)
+;; replaces all ocs with a rator equal to key with ocs^
+(define (replace-ocs key ocs^)
   (lambdam@ (a : s c q t)
-    (make-a s (constraint-store c^) q t)))
+    (let* ([old-store (constraint-store-c c)]
+           [new-c (hash-update old-store key (lambda (ocs) ocs^) '())]
+           [new-store (constraint-store new-c)])
+      (make-a s new-store q t))))
+
+(define (c->list c)
+  (apply append (hash-values c)))
 
 ;; == QUEUE ====================================================================
 
@@ -519,13 +569,6 @@
   #:methods gen:custom-write 
   [(define (write-proc . args) (apply write-package args))])
 
-;; the empty package
-(define empty-a 
-  (make-a (substitution empty-s)
-          (constraint-store empty-c)
-          empty-q
-          empty-t))
-
 ;; when debug?ging is turned on, print out the path as well
 (define debug? (make-parameter #f))
 
@@ -535,6 +578,13 @@
     (if (debug?)
         (fn (format "#a{ ~s ~a ~a }" (a-t a) (a-s a) (a-c a)))
         (fn (format "#a{ ~a ~a }" (a-s a) (a-c a))))))
+
+;; the empty package
+(define empty-a 
+  (make-a (substitution empty-s)
+          (constraint-store empty-c)
+          empty-q
+          empty-t))
 
 ;; == CONSTRAINTS ==============================================================
 
@@ -623,10 +673,10 @@
        (make-attr-oc (op x^) 'op `(,x^) uw?)))))
 
 ;; gets the attributes of variable x in the constraint store
-(define (get-attributes x ocs)
+(define (get-attributes x c)
   (define (x-attr-oc? oc) 
     (and (attr-oc? oc) (eq? (car (oc-rands oc)) x)))
-  (let ((attrs (filter x-attr-oc? ocs)))
+  (let ((attrs (filter x-attr-oc? (c->list c))))
     (and (not (null? attrs)) attrs)))
 
 ;; defines a lazy-goal oc
@@ -648,7 +698,7 @@
 ;; mention x*
 (define (run-constraints x* c)
   (for/fold ([rest identitym])
-            ([oc c]
+            ([oc (c->list c)]
              #:when (any-relevant/var? (oc-rands oc) x*))
     (composem rest (rem/run oc))))
 
@@ -659,7 +709,7 @@
   (lambdam@ (a : s c q t)
     (let ([ocs (constraint-store-c c)])
       (cond
-       ((memq oc ocs)
+       ((memq-c oc ocs)
         ((oc-proc oc)
          (let ([new-c (constraint-store (remq-c oc ocs))])
            (make-a s new-c q t))))
@@ -926,10 +976,6 @@
 ;; constraints, not as requiring files.  Abstractiiooonnnnn.
 (define-syntax-rule (use-constraints file ...) 
   (require file ...))
-
-;; parses the input to a write-proc
-(define (parse-mode mode)
-  (case mode [(#t) display] [(#f) display] [else display]))
 
 ;; =============================================================================
 

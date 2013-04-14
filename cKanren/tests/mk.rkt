@@ -173,8 +173,7 @@
                 (fresh (x a d)
                   (== `(,a . ,d) x)
                   (absento 'intval x)
-                  (== 'intval a)
-                  prt))
+                  (== 'intval a)))
               '())
 
   (test-check "push-down problems 4"

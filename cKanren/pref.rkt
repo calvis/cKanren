@@ -53,9 +53,7 @@
              (lambda (oc)
                (let ((p (oc-rands oc)))
                  (cons (car p) (cadr p))))
-             (filter
-              (lambda (oc) (eq? (oc-rator oc) 'prefo-c))
-              c))))
+             (filter/rator 'prefo-c c))))
          a)))))
 
 (define enforce-constraintspref
