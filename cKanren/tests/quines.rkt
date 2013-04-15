@@ -52,13 +52,13 @@
 ;; (define proper-listo
   (lambda (exp env val)
     (conde
-      ((== '() exp)
-       (== '() val))
-      ((fresh (a d t-a t-d)
-         (== `(,t-a . ,t-d) val)
-         (== `(,a . ,d) exp)
-         (eval-expo a env t-a)
-         (proper-listo d env t-d))))))
+     ((== '() exp)
+      (== '() val))
+     ((fresh (a d t-a t-d)
+        (== `(,t-a . ,t-d) val)
+        (== `(,a . ,d) exp)
+        (eval-expo a env t-a)
+        (proper-listo d env t-d))))))
 
 (define lookupo
   (lambda (x env t)

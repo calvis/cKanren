@@ -9,6 +9,14 @@
 (provide test-mk-struct test-mk-struct-long)
 
 (define (test-mk-struct)
+  (test "sanity test 1"
+        (run* (q) succeed)
+        '(_.0))
+  
+  (test "sanity test 2"
+        (run* (q) (== 5 5))
+        '(_.0))
+
   (test-check "1" 
               (run* (q) 
                     (fresh (x y)
@@ -32,15 +40,34 @@
     #:methods gen:mk-struct
     [(define (recur my k) (k (my-struct-a my) `()))
      (define (constructor my) (lambda (a d) (my-struct a)))
-     (define (unifiable? my x) #t)
-     (define (mk-struct->sexp my) `(my-struct ,(my-struct-a my)))])
+     (define (mk-struct->sexp my) `(my-struct ,(my-struct-a my)))
+     (define (override-occurs-check? my) #f)]
+    #:methods gen:unifiable
+    [(define (compatible? my x s c)
+       (or (var? x) (my-struct? x)))
+     (define (gen-unify my x e s c)
+       (cond
+        [(var? x) (unify e (ext-s x my s) c)]
+        [else (unify-two (my-struct-a my) x e s c)]))])
   
   (struct my-other-struct my-struct (b)
     #:methods gen:mk-struct
     [(define (recur my k) (k (my-struct-a my) `(,(my-other-struct-b my))))
      (define (constructor my) (lambda (a d) (my-other-struct a (car d))))
-     (define (unifiable? my x) (my-other-struct? x))
-     (define (mk-struct->sexp my) `(my-struct ,(my-struct-a my)))])
+     (define (mk-struct->sexp my) `(my-struct ,(my-struct-a my)))
+     (define (override-occurs-check? my) #f)]
+    #:methods gen:unifiable
+    [(define (compatible? my x s c)
+       (or (var? x) (my-other-struct? x)))
+     (define (gen-unify my x e s c)
+       (cond
+        [(var? x) (unify e (ext-s x my s) c)]
+        [else 
+         (let ([my-a (my-struct-a my)]
+               [x-a  (my-struct-a x)]
+               [my-b (my-other-struct-b my)]
+               [x-b  (my-other-struct-b x)])
+           (unify-two my-a x-a `((,my-b . ,x-b) . ,e) s c))]))])
   
   (test-check "4" (run* (q) (== q (my-struct 'x))) `((my-struct x)))
   (test-check "5" (run* (q) (== q (my-other-struct 'x 'y))) `((my-struct x)))

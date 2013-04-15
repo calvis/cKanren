@@ -55,8 +55,8 @@
   (default-reify 
     '=/=
     '(=/=neq-c)
-    (lambda (rands)
-      (let ([p* (map car rands)])
+    (lambda (rands r)
+      (let ([p* (walk* (map car rands) r)])
         (map remove-dots (sort-ps p*))))))
 
 (define =/=neq-c
@@ -64,10 +64,10 @@
     (lambdam@ (a : s c)
       (let ([p (walk* p s)])
         (cond
-         (((unify p) a)
+         ((unify p s c)
           =>
-          (lambdam@ (a^ : s^)
-            (let ((p (prefix-s s s^)))
+          (lambdam@ (s/c)
+            (let ((p (prefix-s s (car s/c))))
               (cond
                ((null? p) #f)
                (else ((normalize-store p) a))))))
@@ -95,10 +95,10 @@
 
 (define subsumes?
   (lambda (p p^)
-    (lambdam@ (a : s)
+    (lambdam@ (a : s c)
       (cond
-       (((unify p) a) => 
-        (lambdam@ (a^ : s^) (eq? s s^)))
+       ((unify p p^ c) => 
+        (lambda (s/c) (eq? (car s/c) p^)))
        (else #f)))))
 
 ;;; goals
@@ -111,9 +111,9 @@
   (lambda (u v)
     (lambdam@ (a : s c)
       (cond
-       (((unify `((,u . ,v))) a)
-        => (lambdam@ (a^ : s^)
-             ((=/=neq-c (prefix-s s s^)) a)))
+       ((unify `((,u . ,v)) s c)
+        => (lambda (s/c)
+             ((=/=neq-c (prefix-s s (car s/c))) a)))
        (else a)))))
 
 (extend-reify-fns 'neq reify-constraintsneq)

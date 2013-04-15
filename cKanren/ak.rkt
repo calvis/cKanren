@@ -45,7 +45,16 @@
    (define (unifiable? tie x) 
      (tie? x))
    (define (mk-struct->sexp tie)
-     `(tie ,(tie-a tie) ,(tie-t tie)))])
+     (tie->sexp tie))])
+
+(define (tie->sexp t)
+  (cond
+   [(tie? t)
+    `(tie ,(tie->sexp (tie-a t)) 
+          ,(tie->sexp (tie-t t)))]
+   [(mk-struct? t)
+    (mk-struct->sexp t)]
+   [else t]))
 
 (define (sus x pi)
   (goal-construct (sus-c x pi)))

@@ -25,20 +25,26 @@
  
 (define (symbol-uw? x attrs)
   (define incompatible '(number-c))
-  (and (not (pair? x)) (not (number? x))
+  (and (not (pair? x)) 
+       (not (number? x))
        (or (not attrs)
            (andmap (lambda (aoc) 
-                     (not (memq (oc-rator aoc) incompatible)))
+                     (not (memq (attr-oc-type aoc) incompatible)))
                    attrs))))
 
 (define symbol-constrained?
   (lambda (v c)
-    (let ([symocs (filter/rator 'symbol-c c)])
-      (ormap (lambda (oc) (eq? (car (oc-rands oc)) v)) symocs))))
+    (cond
+     [(get-attributes v c)
+      => (lambda (attrs) (findf symbol-attr? attrs))]
+     [else #f])))
+
+(define (symbol-attr? oc)
+  (eq? (attr-oc-type oc) 'symbol-c))
  
 (define reify-symbol-cs
-  (default-reify 'sym '(symbol-c)
-    (lambda (rands) (remove-duplicates (map car rands)))))
+  (default-reify-attr 'sym 'symbol-c
+    (lambda (x* r) (remove-duplicates x*))))
 
 ;; numbero
 
@@ -68,8 +74,10 @@
 
 (define number-constrained?
   (lambda (v c)
-    (let ([numocs (filter/rator 'number-c c)])
-      (ormap (lambda (oc) (eq? (car (oc-rands oc)) v)) numocs))))
+    (cond
+     [(get-attributes v c)
+      => (lambda (attrs) (findf number-attr? attrs))]
+     [else #f])))
  
 (define remove-duplicates
   (lambda (l)
@@ -77,9 +85,12 @@
               ([x l])
       (if (member x s) s (cons x s)))))
 
+(define (number-attr? oc)
+  (eq? (attr-oc-type oc) 'number-c))
+
 (define reify-number-cs
-  (default-reify 'num '(number-c) 
-    (lambda (rands) (remove-duplicates (map car rands)))))
+  (default-reify-attr 'num 'number-c
+    (lambda (x* r) (remove-duplicates x*))))
 
 ;; absento
 
@@ -102,8 +113,8 @@
            [else ((=/=-c u v) a)]))
          ((pair? v) ((absento-split u v) a))
          ((not (var? v)) ((=/=-c u v) a))
-         ((mem-check u v s c) #f)
-         ((mem-check v u s c) a)
+         ((mem-check u v a) #f)
+         ((mem-check v u a) a)
          (else ((normalize-store (cons u v)) a)))))))
 
 (define (normalize-store p)
@@ -121,31 +132,34 @@
           (let ([u (car (oc-rands (car acs)))]
                 [v (cadr (oc-rands (car acs)))])
             (cond
-             [(subsumes? p (cons u v) s c-old)
+             [(subsumes? p (cons u v) a)
               (loop (cdr acs) acs^)]
-             [(subsumes? (cons u v) p s c-old) a]
+             [(subsumes? (cons u v) p a) a]
              [else (loop (cdr acs) (cons (car acs) acs^))]))])))))
 
-(define (subsumes? p p^ s c)
-  (and (mem-check (car p) (car p^) s c)
-       (mem-check (cdr p) (cdr p^) s c)))
+(define (subsumes? p p^ a)
+  (and (mem-check (car p) (car p^) a)
+       (mem-check (cdr p) (cdr p^) a)))
 
 (define mem-check
-  (lambda (u t s c)
-    (or (term= u t s c)
+  (lambda (u t a)
+    (or ((term= u t) a)
         (and (pair? t)
-             (or (mem-check u (car t) s c)
-                 (mem-check u (cdr t) s c))))))
+             (or (mem-check u (car t) a)
+                 (mem-check u (cdr t) a))))))
  
 (define term=
-  (lambda (u t s c)
-    (cond
-     ((unify `((,u . ,t)) s c) =>
-      (lambda (s^) (eq? s s^)))
-     (else #f))))
+  (lambda (u t)
+    (lambdam@ (a : s c)
+      (cond
+       ((unify `((,u . ,t)) s c) =>
+        (lambda (s/c) (eq? (car s/c) s)))
+       (else #f)))))
 
 (define reify-absent-cs
-  (default-reify 'absento '(absent-c) remove-duplicates))
+  (default-reify 'absento '(absent-c) 
+    (lambda (rands r)
+      (remove-duplicates rands))))
 
 (define (absento-split u v)
   (composem
@@ -158,18 +172,19 @@
   (fresh ()
     (elim-diseqs)
     (lambdag@ (a : s c)
-      (let ([ocs (filter-memq/rator type-cs c)])
+      (let ([ocs (filter (lambda (oc) (memq (attr-oc-type oc) type-cs))
+                         (filter/rator attr-tag c))])
         ((run-constraints (map (compose car oc-rands) ocs) c) a)))))
 
 (define (elim-diseqs)
   (lambdag@ (a : s c)
     (let ([neqs (filter/rator '=/=neq-c c)]
           [absentos (filter/rator 'absent-c c)])
-      (let ([neqs^ (map (lambda (oc) (filter-subsumed-prefixes oc absentos s c)) neqs)])
+      (let ([neqs^ (map (lambda (oc) (filter-subsumed-prefixes oc absentos a)) neqs)])
         (let ([neqs^ (filter-not (compose null? oc-prefix) neqs^)])
           ((replace-ocs '=/=neq-c neqs^) a))))))
 
-(define (filter-subsumed-prefixes oc absentos s c)
+(define (filter-subsumed-prefixes oc absentos a)
   (define absento-pairs (map oc-rands absentos))
   (let ([p (oc-prefix oc)])
     (let ([p^
@@ -178,8 +193,8 @@
               (findf
                (lambda (abs)
                  (cond
-                  [(term= abs u/v s c)]
-                  [(term= abs (list (cdr u/v) (car u/v)) s c)]
+                  [((term= abs u/v) a)]
+                  [((term= abs (list (cdr u/v) (car u/v))) a)]
                   [else #f]))
                absento-pairs))
             p)])

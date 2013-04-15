@@ -15,6 +15,7 @@
  "tests/no-closure.rkt"
  "tests/pref.rkt"
  "tests/quines.rkt"
+ "tests/sets.rkt"
  "tests/symbolo-numbero.rkt"
  "tests/symbolo.rkt"
 )
@@ -35,6 +36,7 @@
   (test-no-closure)
   (test-pref)
   (test-quines)
+  (test-sets)
   (test-symbolo)
   (test-symbolo-numbero)
 )
@@ -55,6 +57,7 @@
   (test-no-closure-long)
   (test-pref-long)
   (test-quines-long)
+  (test-sets-long)
   (test-symbolo-long)
   (test-symbolo-numbero-long)
 )

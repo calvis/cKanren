@@ -47,16 +47,27 @@
                     (absento `(3 ,a) `(,q ,a))
                     (== 3 b)))
                 '((_.0 (=/= ((_.0 3))))))
+    
+    (test "test 5.1"
+          (run* (q)
+            (numbero q)
+            (absento '(3) q))
+          '((_.0 (num _.0))))
 
-    (test-check "test 5"
+    (test "test 5.2"
+          (run* (q)
+            (symbolo q)
+            (absento '(3) q))
+          '((_.0 (sym _.0))))
+
+    (test-check "test 5.3"
                 (run* (q)
                   (fresh (a b)
                     (numbero a)
                     (numbero b)
                     (absento '(3 3) `(,a ,b))
                     (=/= a b)
-                    (== `(,a ,b) q)
-                    prt))
+                    (== `(,a ,b) q)))
                 '(((_.0 _.1) (=/= ((_.0 _.1))) (num _.0 _.1))))
 
     (test-check "test 6"
@@ -136,7 +147,16 @@
                             ((_.0 (3 . (4 . 5))))
                             ((_.0 (4 . 5)))))))
 
-    (test-check "test 16"
+    (test "test 16.0"
+          (run* (q)
+            (fresh (x y)
+              (symbolo x)
+              (numbero y)
+              (== x y)
+              (== q `(,x ,y))))
+          '())
+
+    (test-check "test 16.5"
                 (run* (q)
                   (fresh (a b x)
                     (absento a b)

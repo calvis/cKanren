@@ -11,7 +11,7 @@
           "src/errors.rkt"))
 
 (provide
- var? define-var-type goal? make-a c->list
+ var? define-var-type goal? make-a c->list empty-s empty-c
  update-s update-c any/var?  prefix-s prtm identitym composem
  goal-construct ext-c build-oc oc-proc oc-rands oc-rator run run* prt
  extend-enforce-fns extend-reify-fns goal? a?  walk walk*
@@ -20,10 +20,12 @@
  format-source reify-cvar var ext-s gen:mk-struct recur constructor
  mk-struct?  lex<= sort-by-lex<= reify-with-colon default-mk-struct?
  occurs-check run-constraints build-attr-oc attr-oc?  attr-oc-uw?
- get-attributes filter/rator filter-not/rator default-reify
+ get-attributes filter/rator filter-not/rator default-reify attr-oc-type
  filter-memq/rator define-lazy-goal replace-ocs same-default-type?
  override-occurs-check? mk-struct->sexp var-x update-c-nocheck
- filter-not-memq/rator #%app-safe use-constraints debug)
+ filter-not-memq/rator #%app-safe use-constraints debug replace-s
+ update-s-nocheck update-s-prefix update-c-prefix attr-tag
+ default-reify-attr)
 
 (provide
  (rename-out 
@@ -37,6 +39,8 @@
 ;; parses the input to a write-proc
 (define (parse-mode mode)
   (case mode [(#t) display] [(#f) display] [else display]))
+
+(define attr-tag 'attr)
 
 ;; == VARIABLES =================================================================
 
@@ -171,7 +175,7 @@
   (fresh-aux constructor (x ...) g g* ...)
   (lambdag@ (a) 
     (inc 
-     (let ((x (constructor 'x)) ...) 
+     (let ((x (constructor (gensym 'x))) ...) 
        (bindg* (app-goal g a) g* ...)))))
 
 ;; miniKanren's "fresh" defined in terms of fresh-aux over var
@@ -422,11 +426,29 @@
 ;; with a binding of x to v 
 (define (update-s-nocheck x v)
   (lambdam@ (a : s c q t)
-    ((run-constraints (if (var? v) `(,x ,v) `(,x)) c)
-     (let ([new-s (substitution (ext-s x v (substitution-s s)))])
-       (make-a new-s c q t)))))
+    (let ([ocs (constraint-store-c c)])
+      ((run-constraints (if (var? v) `(,x ,v) `(,x)) ocs)
+       (let ([new-s (substitution (ext-s x v (substitution-s s)))])
+         (make-a new-s c q t))))))
 
 (define update-s update-s-check)
+
+;; for subsumption checks
+(define (replace-s s^)
+  (lambdam@ (a : s c q t)
+    (make-a (substitution s^) c q t)))
+
+(define (update-s-prefix s^)
+  (lambdam@ (a : s c q t)
+    (let ([s (substitution-s s)])
+      (bindm a
+        (let loop ([s^ s^])
+          (cond
+           [(eq? s s^) identitym]
+           [else 
+            (composem
+             (update-s (caar s^) (cdar s^))
+             (loop (cdr s^)))]))))))
 
 ;; == CONSTRAINT STORE =========================================================
 
@@ -522,6 +544,22 @@
            [new-c (hash-update old-store key (lambda (ocs) ocs^) '())]
            [new-store (constraint-store new-c)])
       (make-a s new-store q t))))
+
+(define (update-c-prefix c^)
+  (lambdam@ (a : s c q t)
+    (let ([c (constraint-store-c c)])
+      (bindm a
+        (for/fold 
+         ([fn identitym])
+         ([key (hash-keys c^)])
+         (let ([ocs (hash-ref c key '())])
+           (let loop ([ocs^ (hash-ref c^ key)])
+             (cond
+              [(eq? ocs ocs^) fn]
+              [else
+               (composem 
+                (update-c-nocheck (car ocs^))
+                (loop (cdr ocs^)))]))))))))
 
 (define (c->list c)
   (apply append (hash-values c)))
@@ -690,21 +728,28 @@
            (make-oc (op arg^ ...) 'op `(,arg^ ...)))))))
 
 ;; defines an attributed constraint (for attributed variables)
-(struct attr-oc oc (uw?) ;; for "unifies with?"
-  #:extra-constructor-name make-attr-oc)
+(struct attr-oc oc (type uw?) ;; for "unifies with?"
+  #:extra-constructor-name make-attr-oc
+  #:methods gen:custom-write
+  [(define (write-proc attr-oc port mode)
+     (define fn (lambda (str) ((parse-mode mode) str port)))
+     (fn (format "#oc<~a ~s" (oc-rator attr-oc) (attr-oc-type attr-oc)))
+     (for ([arg (oc-rands attr-oc)])
+          (fn (format " ~a" arg)))
+     (fn (format ">")))])
 
 ;; builds an attributed constraint
 (define-syntax build-attr-oc
   (syntax-rules ()
-    ((_ op x uw?)
+    [(_ op x uw?)
      (let ((x^ x))
-       (make-attr-oc (op x^) 'op `(,x^) uw?)))))
+       (make-attr-oc (op x^) 'attr `(,x^) 'op uw?))]))
 
 ;; gets the attributes of variable x in the constraint store
 (define (get-attributes x c)
-  (define (x-attr-oc? oc) 
-    (and (attr-oc? oc) (eq? (car (oc-rands oc)) x)))
-  (let ((attrs (filter x-attr-oc? (c->list c))))
+  (define (x-attr? oc) 
+    (eq? (car (oc-rands oc)) x))
+  (let ((attrs (filter x-attr? (filter/rator 'attr c))))
     (and (not (null? attrs)) attrs)))
 
 ;; defines a lazy-goal oc
@@ -875,7 +920,15 @@
 ;; defines a "default" reify function
 (define ((default-reify sym cs fn) v r ocs)
   (let ((ocs (filter-memq/rator cs ocs)))
-    (let ((rands (filter-not any/var? (walk* (fn (map oc-rands ocs)) r))))
+    (let ((rands (filter-not any/var? (walk* (fn (map oc-rands ocs) r) r))))
+      (cond
+       ((null? rands) `())
+       (else `((,sym . ,(sort rands lex<=))))))))
+
+(define ((default-reify-attr sym type fn) v r ocs)
+  (let ((ocs (filter (lambda (oc) (eq? (attr-oc-type oc) type))
+                     (filter/rator attr-tag ocs))))
+    (let ((rands (filter-not any/var? (walk* (fn (map (compose car oc-rands) ocs) r) r))))
       (cond
        ((null? rands) `())
        (else `((,sym . ,(sort rands lex<=))))))))

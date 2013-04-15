@@ -1,109 +1,105 @@
 #lang racket
 
 (require "ck.rkt" racket/generic)
-(provide == unify gen:unifiable gen-unify compatible unify-two)
+(provide == ==-c unify gen:unifiable gen-unify compatible? unify-two unify-walked update-package)
+(require racket/trace)
 
 ;; a generic that defines when things are unifiable!
 (define-generics unifiable
-  (compatible unifiable v)
-  (gen-unify unifiable v)
+  (compatible? unifiable v s c)
+  (gen-unify unifiable v e s c)
   #:defaults 
   (;; vars are compatible with structs that it does not appear in, or
    ;; structs that override the occurs check (ex. sets).
    [var?
-    (define (compatible u v)
-      (lambdam@ (a : s c)
-        (cond
-         [(var? v)
-          ((check-attributes u v) a)]
-         [(and (mk-struct? v)
-               (not (override-occurs-check? v))
-               (occurs-check u v s))
-          #f]
-         [else a])))
-    (define (gen-unify u v)
-      (lambdam@ (a)
-        (cond
-         [(var? v) ((update-s u v) a)]
-         [else ((unify-two v u) a)])))]
+    (define (compatible? u v s c)
+      (var-compatible? u v s c))
+    (define (gen-unify u v e s c)
+      (cond
+       [(var? v) (unify e (ext-s u v s) c)]
+       [else (unify-walked v u e s c)]))]
    ;; anything that is a default mk-struct will unify just fine if
    ;; unified with something of the same type
    [default-mk-struct?
-    (define (compatible p v)
-      (cond
-       [(or (var? v) (same-default-type? p v))
-        identitym]
-       [else (lambdam@ (a) #f)]))
-    (define (gen-unify u v)
-      (mk-struct-unify u v))]
+    (define (compatible? p v s c)
+      (or (var? v) (same-default-type? p v)))
+    (define (gen-unify u v e s c)
+      (mk-struct-unify u v e s c))]
    ;; mostly for constants: strings, numbers, booleans, etc.
    ;; they unify if they are eq? or equal?
    [(lambda (x) #t)
-    (define (compatible u v)
+    (define (compatible? u v s c)
+      (or (var? v) (eq? u v) (equal? u v)))
+    (define (gen-unify u v e s c)
       (cond
-       [(or (var? v) (eq? u v) (equal? u v))
-        identitym]
-       [else (lambdam@ (a) #f)]))
-    (define (gen-unify u v)
-      (cond
-       [(var? v) (update-s v u)]
-       [else identitym]))]))
+       [(var? v) (unify e (ext-s v u s) c)]
+       [else (unify e s c)]))]))
+
+(define (var-compatible? u v s c)
+  (and (check-attributes u v s c)
+       (cond
+        [(mk-struct? v)
+         (or (override-occurs-check? v)
+             (not (occurs-check u v s)))]
+        [else #t])))
 
 (define (== u v)
-  (goal-construct (unify `((,u . ,v)))))
+  (goal-construct (==-c u v)))
+
+(define (==-c u v)
+  (lambdam@ (a : s c)
+    (cond
+     [(unify `((,u . ,v)) s c)
+      => (lambda (s/c)
+           ((update-package s/c) a))]
+     [else #f]) ))
 
 ;; oops unify is a constraint
-(define (unify e)
+(define (unify e s c)
   (cond
-   [(null? e) 
-    identitym]
-   [else
-    (composem
-     (unify-two (caar e) (cdar e))
-     (unify (cdr e)))]))
+   [(null? e) (cons s c)]
+   [else (unify-two (caar e) (cdar e) (cdr e) s c)]))
+
+(define (update-package s/c)
+  (composem
+   (update-c-prefix (cdr s/c))
+   (update-s-prefix (car s/c))))
 
 ;; unifies two things, u and v
-(define (unify-two u v)
-  (lambdam@ (a : s c)
-    (let ([u (walk u s)]
-          [v (walk v s)])
-      (cond
-       [(eq? u v) a]
-       [(and (unifiable? u)
-             (unifiable? v))
-        (bindm a 
-         (composem
-          (compatible u v)
-          (compatible v u)
-          (gen-unify u v)))]
-       [else #f]))))
+(define (unify-two u v e s c)
+  (let ([u (walk u s)] [v (walk v s)])
+    (cond
+     [(and (var? u) (not (var? u)))
+      (unify-walked v u e s c)]
+     [else (unify-walked u v e s c)])))
+
+(define (unify-walked u v e s c)
+  (cond
+   [(eq? u v) (unify e s c)]
+   [else
+    (and (unifiable? u)
+         (unifiable? v)
+         (compatible? u v s c)
+         (compatible? v u s c)
+         (gen-unify u v e s c))]))
 
 ;; unifies mk-structs that are the same type
-(define (mk-struct-unify u v)
-  (lambdam@ (a)
-    (cond
-     [(var? v) 
-      ((update-s v u) a)]
-     [else
-      (recur u 
-       (lambda (ua ud)
-         (recur v
-          (lambda (va vd)
-            (bindm a
-              (composem
-               (unify-two ua va)
-               (unify `((,ud . ,vd)))))))))])))
+(define (mk-struct-unify u v e s c)
+  (cond
+   [(var? v) (unify e (ext-s v u s) c)]
+   [else
+    (recur u 
+     (lambda (ua ud)
+       (recur v
+        (lambda (va vd)
+          (unify-two ua va `((,ud . ,vd) . ,e) s c)))))]))
 
 ;; returns #t if attributes are ok
-(define (check-attributes u v)
-  (lambdam@ (a : s c)
-    (let ([ua (get-attributes u c)]
-          [va (get-attributes v c)])
-      (cond
-       [(and (or (not ua) (no-conflicts? v va ua))
-             (or (not va) (no-conflicts? u ua va)))
-        a]
-       [else #f]))))
+(define (check-attributes u v s c)
+  (let ([ua (get-attributes u c)]
+        [va (get-attributes v c)])
+    (and (or (not ua) (no-conflicts? v va ua))
+         (or (not va) (no-conflicts? u ua va)))))
 
 (define (no-conflicts? u ua va)
   (andmap (lambda (aoc) ((attr-oc-uw? aoc) u ua)) va))
