@@ -64,9 +64,9 @@
     (lambdam@ (a : s c)
       (let ([p (walk* p s)])
         (cond
-         ((unify p s c)
+         (((unify p) a)
           =>
-          (lambda (s^)
+          (lambdam@ (a^ : s^)
             (let ((p (prefix-s s s^)))
               (cond
                ((null? p) #f)
@@ -89,15 +89,17 @@
             (let* ((oc (car ncs))
                    (p^ (oc-prefix oc)))
               (cond
-               ((subsumes? p^ p c) a)
-               ((subsumes? p p^ c) (loop (cdr ncs) ncs^))
+               (((subsumes? p^ p) a) a)
+               (((subsumes? p p^) a) (loop (cdr ncs) ncs^))
                (else (loop (cdr ncs) (cons oc ncs^))))))))))))
 
 (define subsumes?
-  (lambda (p s c)
-    (cond
-      ((unify p s c) => (lambda (s^) (eq? s s^)))
-      (else #f))))
+  (lambda (p p^)
+    (lambdam@ (a : s)
+      (cond
+       (((unify p) a) => 
+        (lambdam@ (a^ : s^) (eq? s s^)))
+       (else #f)))))
 
 ;;; goals
 
@@ -109,10 +111,10 @@
   (lambda (u v)
     (lambdam@ (a : s c)
       (cond
-        ((unify `((,u . ,v)) s c)
-         => (lambda (s^)
-              ((=/=neq-c (prefix-s s s^)) a)))
-        (else a)))))
+       (((unify `((,u . ,v))) a)
+        => (lambdam@ (a^ : s^)
+             ((=/=neq-c (prefix-s s s^)) a)))
+       (else a)))))
 
 (extend-reify-fns 'neq reify-constraintsneq)
 

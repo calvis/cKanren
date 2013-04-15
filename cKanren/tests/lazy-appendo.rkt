@@ -5,10 +5,12 @@
  "../tree-unify.rkt" 
  "../absento.rkt" 
  "../neq.rkt"
- "../tester.rkt")
+ "../tester.rkt"
+ (for-syntax "../ck.rkt"))
 
 ;; (search-strategy 'bfs)
-(search-strategy 'dfs)
+(begin-for-syntax
+ (search-strategy 'dfs))
 
 (define-lazy-goal (syms* t out)
   (conde

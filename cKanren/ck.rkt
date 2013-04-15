@@ -11,10 +11,6 @@
           "src/errors.rkt"))
 
 (provide
- ;; framework for defining constraints 
- (rename-out [lambdam@-external lambdam@]
-             [lambdag@-external lambdag@]
-             [trace-define-mk trace-define])
  var? define-var-type goal? make-a c->list
  update-s update-c any/var?  prefix-s prtm identitym composem
  goal-construct ext-c build-oc oc-proc oc-rands oc-rator run run* prt
@@ -22,13 +18,21 @@
  mzerog unitg onceo fresh-aux conde conda condu ifa ifu project fresh
  succeed fail inc enforce-constraints reify empty-a take mzerom bindm
  format-source reify-cvar var ext-s gen:mk-struct recur constructor
- mk-struct? unifiable?  lex<= sort-by-lex<= reify-with-colon
+ mk-struct?  lex<= sort-by-lex<= reify-with-colon default-mk-struct?
  occurs-check run-constraints build-attr-oc attr-oc?  attr-oc-uw?
  get-attributes filter/rator filter-not/rator default-reify
- filter-memq/rator define-lazy-goal replace-ocs
+ filter-memq/rator define-lazy-goal replace-ocs same-default-type?
+ override-occurs-check? mk-struct->sexp var-x update-c-nocheck
  filter-not-memq/rator #%app-safe use-constraints debug)
 
-(provide (for-syntax search-strategy))
+(provide
+ (rename-out 
+  [lambdam@-external lambdam@]
+  [lambdag@-external lambdag@]
+  [trace-define-mk   trace-define]))
+
+(provide 
+ (for-syntax search-strategy))
 
 ;; parses the input to a write-proc
 (define (parse-mode mode)
@@ -47,8 +51,8 @@
   #:methods gen:custom-write 
   [(define (write-proc . args) (apply write-var args))])
 
-(define-syntax-rule (define-var-type name str)
-  (struct name var ()
+(define-syntax-rule (define-var-type name str rest ...)
+  (struct name var () rest ...
     #:methods gen:cvar
     [(define (cvar->str x) str)]
     #:methods gen:custom-write
@@ -299,27 +303,46 @@
   ;; arguments like the arguments to k
   (constructor mk-struct)
 
-  ;; determines whether mk-struct can unify with x
-  (unifiable? mk-struct x)
-
   ;; for reification 
   (mk-struct->sexp mk-struct)
+
+  ;; structs also have the option of overriding the occurs-check for
+  ;; variables if it's okay to unify a variable to a struct with the
+  ;; same variable inside (ex. sets)
+  (override-occurs-check? mk-struct)
 
   #:defaults
   ([pair?
     (define (recur p k)
       (k (car p) (cdr p)))
     (define (constructor p) cons)
-    (define (unifiable? p x) (pair? x))
-    (define (mk-struct->sexp v) v)]
+    (define (override-occurs-check? p) #f)
+    (define (mk-struct->sexp p)
+      (pair->sexp p))]
    [vector?
     (define (recur v k)
       (let ([v (vector->list v)])
         (k (car v) (cdr v))))
     (define (constructor v)
       (compose list->vector cons))
-    (define (unifiable? v x) (vector? x))
-    (define (mk-struct->sexp v) v)]))
+    (define (override-occurs-check? v) #f)
+    (define (mk-struct->sexp v)
+      (vector->sexp v))]))
+
+(define (default-mk-struct? x)
+  (or (pair? x) (vector? x)))
+
+(define (same-default-type? x y)
+  (or (and (pair? x) (pair? y))
+      (and (vector? x) (vector? y))))
+
+(define (pair->sexp p)
+  (let ([a (car p)] [d (cdr p)])
+    (cons (if (mk-struct? a) (mk-struct->sexp a) a)
+          (if (mk-struct? d) (mk-struct->sexp d) d))))
+
+(define (vector->sexp v)
+  (vector-map (lambda (t) (if (mk-struct? t) (mk-struct->sexp t) t)) v))
 
 ;; == SUBSTITUTIONS ============================================================
 
@@ -422,7 +445,8 @@
   (define fn (lambda (s) ((parse-mode mode) s port)))
   (define c (constraint-store-c constraint-store))
   (fn "#c[")
-  (hash-for-each c (lambda (key oc) (fn " ") (fn oc)))
+  (hash-for-each 
+   c (lambda (key ocs)(for ([oc ocs]) (fn " ") (fn oc))))
   (unless (null? c) (fn " "))
   (fn "]"))
 
@@ -478,14 +502,18 @@
                 '(oc2 oc3)))
 
 ;; adds oc to the constraint store if it contains a non-ground var
-(define update-c
-  (lambda (oc)
-    (lambdam@ (a : s c q t)
-      (cond
-       ((any/var? (oc-rands oc))
-        (let ([new-c (constraint-store (ext-c oc (constraint-store-c c)))])
-          (make-a s new-c q t)))
-       (else a)))))
+(define (update-c oc)
+  (lambdam@ (a : s c q t)
+    (cond
+     ((any/var? (oc-rands oc))
+      (let ([new-c (constraint-store (ext-c oc (constraint-store-c c)))])
+        (make-a s new-c q t)))
+     (else a))))
+
+(define (update-c-nocheck oc)
+  (lambdam@ (a : s c q t)
+    (let ([new-c (constraint-store (ext-c oc (constraint-store-c c)))])
+      (make-a s new-c q t))))
 
 ;; replaces all ocs with a rator equal to key with ocs^
 (define (replace-ocs key ocs^)
@@ -800,7 +828,8 @@
     (let ([s (substitution-s s)]
           [c (constraint-store-c c)])
       (define v (walk* x s))
-      (define-values (v^ r) (reify-s v empty-s))
+      (define r (reify-s v empty-s))
+      (define v^ (if (mk-struct? v) (mk-struct->sexp v) v))
       (define answer
         (cond
          ((null? r) v^)
@@ -815,17 +844,12 @@
   (let ((v (walk v s)))
     (cond
       ((var? v) 
-       (let ([v^ (reify-n v (size-s s))])
-         (values v^ `((,v . ,v^) . ,s))))
+       `((,v . ,(reify-n v (size-s s))) . ,s))
       ((mk-struct? v) 
        (recur v
         (lambda (a d)
-          (define-values (a^ r) (reify-s a s))
-          (define-values (d^ r^) (reify-s d r))
-          (values (mk-struct->sexp
-                   ((constructor v) a^ d^))
-                  r^))))
-      (else (values v s)))))
+          (reify-s d (reify-s a s)))))
+      (else s))))
 
 ;; creates a reified symbol
 (define (reify-n cvar n)
@@ -851,10 +875,10 @@
 ;; defines a "default" reify function
 (define ((default-reify sym cs fn) v r ocs)
   (let ((ocs (filter-memq/rator cs ocs)))
-    (let ((rands (filter-not any/var? (walk* (map oc-rands ocs) r))))
+    (let ((rands (filter-not any/var? (walk* (fn (map oc-rands ocs)) r))))
       (cond
        ((null? rands) `())
-       (else `((,sym . ,(sort (fn rands) lex<=))))))))
+       (else `((,sym . ,(sort rands lex<=))))))))
 
 ;; sorts the constraint store by lex<=
 (define (sort-store ocs) (sort ocs lex<= #:key car))
@@ -932,19 +956,19 @@
 ;; == HELPERS ========================================================
 
 ;; returns #t if p contains any variables
-(define (any/var? p)
+(define (any/var? x)
   (cond
-    ((pair? p)
-     (or (any/var? (car p)) (any/var? (cdr p))))
-    (else (var? p))))
+   ((mk-struct? x)
+    (recur x (lambda (a d) (or (any/var? a) (any/var? d)))))
+   (else (var? x))))
 
 ;; returns #t if t constains variables in x*
 (define (any-relevant/var? t x*)
   (cond
-    ((pair? t)
-     (or (any-relevant/var? (car t) x*)
-         (any-relevant/var? (cdr t) x*)))
-    (else (and (var? t) (memq t x*)))))
+   ((mk-struct? t)
+    (recur t (lambda (a d) (or (any-relevant/var? a x*)
+                               (any-relevant/var? d x*)))))
+   (else (and (var? t) (memq t x*)))))
 
 ;; returns the part of s^ that is a prefix of s
 (define (prefix-s s s^)
