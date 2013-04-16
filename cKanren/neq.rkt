@@ -70,9 +70,23 @@
             (let ((p (prefix-s s (car s/c))))
               (cond
                ((null? p) #f)
-               (else ((normalize-store p) a))))))
+               (else (bindm a (update-c (build-oc =/=neq-c p)))
+                     #;((normalize-store p) a)
+                     )))))
          (else a))))))
 
+;; how to read this: 
+;; neq-subsume defines an interaction between =/=neq-c constraints
+;; if there are two =/=neq-c constraints with prefixes p and p^
+;; in the constraint store, if the first subsumes the second, keep
+;; only the first constraint.  this is reflexive by default.
+(define-constraint-interaction
+  neq-subsume
+  ((=/=neq-c ,p) (=/=neq-c ,p^))
+  #:package (a : s c)
+  [(subsumes? p p^ c) ((=/=neq-c p))])
+
+#;
 (define normalize-store
   (lambda (p)
     (lambdam@ (a : s c)
@@ -94,12 +108,11 @@
                (else (loop (cdr ncs) (cons oc ncs^))))))))))))
 
 (define subsumes?
-  (lambda (p p^)
-    (lambdam@ (a : s c)
-      (cond
-       ((unify p p^ c) => 
-        (lambda (s/c) (eq? (car s/c) p^)))
-       (else #f)))))
+  (lambda (p p^ c)
+    (cond
+     ((unify p p^ c) => 
+      (lambda (s/c) (eq? (car s/c) p^)))
+     (else #f))))
 
 ;;; goals
 

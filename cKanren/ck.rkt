@@ -25,7 +25,7 @@
  override-occurs-check? mk-struct->sexp var-x update-c-nocheck
  filter-not-memq/rator #%app-safe use-constraints debug replace-s
  update-s-nocheck update-s-prefix update-c-prefix attr-tag
- default-reify-attr)
+ default-reify-attr : define-constraint-interaction)
 
 (provide
  (rename-out 
@@ -41,6 +41,8 @@
   (case mode [(#t) display] [(#f) display] [else display]))
 
 (define attr-tag 'attr)
+
+(define-syntax : (syntax-rules ()))
 
 ;; == VARIABLES =================================================================
 
@@ -175,7 +177,7 @@
   (fresh-aux constructor (x ...) g g* ...)
   (lambdag@ (a) 
     (inc 
-     (let ((x (constructor (gensym 'x))) ...) 
+     (let ((x (constructor 'x)) ...) 
        (bindg* (app-goal g a) g* ...)))))
 
 ;; miniKanren's "fresh" defined in terms of fresh-aux over var
@@ -488,6 +490,10 @@
 (define (remq-c oc c) 
   (hash-update c (oc-rator oc) (lambda (ocs) (remq oc ocs)) '()))
 
+;; removes all ocs in oc* from c
+(define (remq*-c oc* c)
+  (for/fold ([c c]) ([oc oc*]) (remq-c oc c)))
+
 ;; filters the constraint store
 (define (filter/rator key c)
   (hash-ref c key '()))
@@ -528,14 +534,24 @@
   (lambdam@ (a : s c q t)
     (cond
      ((any/var? (oc-rands oc))
-      (let ([new-c (constraint-store (ext-c oc (constraint-store-c c)))])
-        (make-a s new-c q t)))
+      ((run-constraint-interactions oc) a))
      (else a))))
 
 (define (update-c-nocheck oc)
   (lambdam@ (a : s c q t)
-    (let ([new-c (constraint-store (ext-c oc (constraint-store-c c)))])
-      (make-a s new-c q t))))
+    ((run-constraint-interactions oc) a)))
+
+(define (run-constraint-interactions oc)
+  (lambdam@ (a : s c q t)
+    (let ([fns (constraint-interactions)])
+      (let loop ([fns fns])
+        (cond
+         [(null? fns) 
+          (let ([old-c (constraint-store-c c)])
+            (let ([new-store (constraint-store (ext-c oc old-c))])
+              (make-a s new-store q t)))]
+         [(((cdar fns) oc) a)]
+         [else (loop (cdr fns))])))))
 
 ;; replaces all ocs with a rator equal to key with ocs^
 (define (replace-ocs key ocs^)
@@ -1090,4 +1106,103 @@
             (cond
              [valid-app? (#%app fn^ arg^ ...)]
              [else (raise-goal-as-fn-exn src)])))))]))
+
+
+;; CHR
+
+(define constraint-interactions
+  (make-parameter '()))
+
+(define extend-constraint-interactions
+  (extend-parameter constraint-interactions))
+
+(define-syntax (define-constraint-interaction stx)
+  (syntax-parse stx 
+    [(define-constraint-interaction 
+       name
+       (constraint-exprs ...)
+       (~or (~optional (~seq #:package (a:id : s:id c:id))))
+       ...
+       clauses ...)
+     (define a-name (or (attribute a) (generate-temporaries #'(?a))))
+     (define s-name (or (attribute s) (generate-temporaries #'(?s))))
+     (define c-name (or (attribute c) (generate-temporaries #'(?c))))
+     (with-syntax*
+       ([(a s c) (list a-name s-name c-name)]
+        [constraint-interaction-expr
+         #`(parse-constraint-interaction
+            name (constraint-exprs ...) (clauses ...)
+            (a s c))])
+       #'(extend-constraint-interactions
+          'name constraint-interaction-expr))]))
+
+;; a constraint-interaction is a constraint on constraints.. yo dawg
+(define-syntax (parse-constraint-interaction stx)
+  (syntax-parse stx
+    [(parse-constraint-interaction 
+      name
+      ((rator rands ...) ...)
+      ([pred? (constraints ...)] ...)
+      (a s c))
+     (with-syntax 
+       ([(arg ...) (generate-temporaries #'(rator ...))]
+        [bad-pattern-error 
+         #'(error 'name "bad pattern ~s" '((rator rands ...) ...))])
+       #`(let ()
+           (define (run-all . arg*)
+             (lambdam@ (a : ?s ?c ?q ?t)
+               (let ([s (substitution-s ?s)]
+                     [c (constraint-store-c ?c)])
+                 (match (map oc-rands arg*)
+                   [`((rands ...) ...)
+                    (cond
+                     [pred? 
+                      (let ([new-c (remq*-c arg* c)])
+                        (let ([new-a (make-a ?s (constraint-store new-c) ?q ?t)])
+                          ((composem constraints ...) new-a)))]
+                     ...
+                     [else #f])]
+                   [_ bad-pattern-error]))))
+           (define (name oc)
+             (let ([this-rator (oc-rator oc)])
+               (lambdam@-external (a : s c)
+                 (generate-cond run-all (a s c) oc this-rator 
+                                () ((rator rands ...) ...)))))
+           name))]))
+
+(define-syntax (generate-cond stx)
+  (syntax-parse stx 
+    [(generate-cond run-all (a s c) oc this-rator (pattern ...) ()) #'#f]
+    [(generate-cond 
+      run-all (a s c) oc this-rator
+      ((rator-pre rand-pre) ...)
+      ((rator rand ...) (rator-post rand-post) ...))
+     (with-syntax
+      ([(pre ...) (generate-temporaries #'(rator-pre ...))]
+       [(post ...) (generate-temporaries #'(rand-post ...))])
+      (with-syntax*
+       ([(pre-ocs ...)  #'((filter/rator 'rator-pre c) ...)]
+        [(post-ocs ...) #'((filter/rator 'rator-post c) ...)]
+        [pattern-applies? #'(eq? 'rator this-rator)]
+        [run-rule
+         #'(bindm a
+             (for*/fold
+              ([fn mzerom])
+              ([pre    pre-ocs] ...
+               [this (list oc)]
+               [post  post-ocs] ...)
+              (lambdam@-external (a : s c)
+                (cond
+                 [((run-all pre ... this post ...) a)]
+                 [else (fn a)]))))]
+        [rest-formatted 
+         #'(generate-cond 
+            run-all (a s c) oc this-rator
+            ((rator-pre rand-pre) ... (rator rand ...))
+            ((rator-post rand-post) ...))])
+       #'(cond
+          [(and pattern-applies? run-rule)]
+          [else rest-formatted])))]))
+
+
 

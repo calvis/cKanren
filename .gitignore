@@ -7,3 +7,4 @@ cKanren/doc/*.js
 cKanren/doc/*.css
 cKanren/doc/manual/*
 cKanren/src/compiled/*
+cKanren/lang/compiled*
