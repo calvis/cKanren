@@ -214,11 +214,21 @@
       ((a) (choiceg a f))
       ((a f^) (choiceg a (lambdaf@ () (mplusg (f) f^)))))))
 
+(begin-for-syntax
+ (define expand-debug? (make-parameter #f)))
+
 (define-syntax-parameter conde
   (lambda (stx)
     (syntax-parse stx
       [(_ ((~optional (~seq #:name branch-name)) g g* ...) ...+)
-       #'(lambdag@ (a) (inc (mplusg* (bindg* (app-goal g a) g* ...) ...)))])))
+       (cond
+         [(expand-debug?)
+          (with-syntax ([(branches ...) (attribute branch-name)])
+            #'(debug-conde [#:name branches g g* ...] ...))]
+         [else 
+          #'(lambdag@ (a) 
+              (inc 
+               (mplusg* (bindg* (app-goal g a) g* ...) ...)))])])))
 
 (define-syntax (debug-conde stx)
   (syntax-parse stx
@@ -233,6 +243,10 @@
 
 (define-syntax (debug stx)
   (syntax-parse stx
+    [(debug #:on)
+     (begin (expand-debug? #t) #'(debug? #t))]
+    [(debug #:off)
+     (begin (expand-debug? #f) #'(debug? #f))]
     [(debug expr ...)
      #'(syntax-parameterize 
         ([conde (... (syntax-rules ()
