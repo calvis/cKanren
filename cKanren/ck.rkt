@@ -428,13 +428,12 @@
 (define (update-s-check x v)
   (lambdam@ (a : s c q t)
     (let ([s (substitution-s s)]
-          [ocs (constraint-store-c c)])
+          [c (constraint-store-c c)])
       (let ((x (walk x s))
             (v (walk v s)))
         (cond
          ((or (var? x) (var? v))
-          ((run-constraints (if (var? v) `(,x ,v) `(,x)) ocs)
-           (make-a (substitution (ext-s x v s)) c q t)))
+          (update-s-internal x v s c q t))
          ((equal? x v) a)
          (else #f))))))
 
@@ -442,12 +441,16 @@
 ;; with a binding of x to v 
 (define (update-s-nocheck x v)
   (lambdam@ (a : s c q t)
-    (let ([ocs (constraint-store-c c)])
-      ((run-constraints (if (var? v) `(,x ,v) `(,x)) ocs)
-       (let ([new-s (substitution (ext-s x v (substitution-s s)))])
-         (make-a new-s c q t))))))
+    (let ([s (substitution-s s)]
+          [c (constraint-store-c c)])
+      (update-s-internal s c q t))))
 
 (define update-s update-s-check)
+
+;; s and c should be unwrapped
+(define (update-s-internal x v s c q t)
+  ((run-constraints (if (var? v) `(,x ,v) `(,x)) c)
+   (make-a (substitution (ext-s x v s)) (constraint-store c) q t)))
 
 ;; for subsumption checks
 (define (replace-s s^)
@@ -1150,7 +1153,6 @@
        #'(extend-constraint-interactions
           'name constraint-interaction-expr))]))
 
-;; a constraint-interaction is a constraint on constraints.. yo dawg
 (define-syntax (parse-constraint-interaction stx)
   (syntax-parse stx
     [(parse-constraint-interaction 
