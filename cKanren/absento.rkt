@@ -174,7 +174,7 @@
     (lambdag@ (a : s c)
       (let ([ocs (filter (lambda (oc) (memq (attr-oc-type oc) type-cs))
                          (filter/rator attr-tag c))])
-        ((run-constraints (map (compose car oc-rands) ocs) c) a)))))
+        ((run-relevant-constraints (map (compose car oc-rands) ocs) c) a)))))
 
 (define (elim-diseqs)
   (lambdag@ (a : s c)

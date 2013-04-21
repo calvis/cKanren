@@ -1,7 +1,7 @@
 #lang racket
 
 (require "ck.rkt" racket/generic)
-(provide == ==-c unify gen:unifiable gen-unify compatible? unify-two unify-walked update-package)
+(provide == ==-c unify gen:unifiable gen-unify compatible? unify-two unify-walked)
 (require racket/trace)
 
 ;; a generic that defines when things are unifiable!
@@ -13,7 +13,12 @@
    ;; structs that override the occurs check (ex. sets).
    [var?
     (define (compatible? u v s c)
-      (var-compatible? u v s c))
+      (and (check-attributes u v s c)
+           (cond
+            [(mk-struct? v)
+             (or (override-occurs-check? v)
+                 (not (occurs-check u v s)))]
+            [else #t])))
     (define (gen-unify u v e s c)
       (cond
        [(var? v) (unify e (ext-s u v s) c)]
@@ -35,14 +40,6 @@
        [(var? v) (unify e (ext-s v u s) c)]
        [else (unify e s c)]))]))
 
-(define (var-compatible? u v s c)
-  (and (check-attributes u v s c)
-       (cond
-        [(mk-struct? v)
-         (or (override-occurs-check? v)
-             (not (occurs-check u v s)))]
-        [else #t])))
-
 (define (== u v)
   (goal-construct (==-c u v)))
 
@@ -54,16 +51,10 @@
            ((update-package s/c) a))]
      [else #f]) ))
 
-;; oops unify is a constraint
 (define (unify e s c)
   (cond
    [(null? e) (cons s c)]
    [else (unify-two (caar e) (cdar e) (cdr e) s c)]))
-
-(define (update-package s/c)
-  (composem
-   (update-c-prefix (cdr s/c))
-   (update-s-prefix (car s/c))))
 
 ;; unifies two things, u and v
 (define (unify-two u v e s c)
