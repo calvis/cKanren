@@ -25,7 +25,6 @@
 
   (test-absento)
   (test-ak)
-  (test-comp)
   (test-fd)
   (test-infer)
   (test-interp)
@@ -39,6 +38,8 @@
   (test-sets)
   (test-symbolo)
   (test-symbolo-numbero)
+
+  (test-comp)
 )
 
 (define (run-all-long)
@@ -46,7 +47,6 @@
 
   (test-absento-long)
   (test-ak-long)
-  (test-comp-long)
   (test-fd-long)
   (test-infer-long)
   (test-interp-long)
@@ -60,6 +60,8 @@
   (test-sets-long)
   (test-symbolo-long)
   (test-symbolo-numbero-long)
+
+  (test-comp-long)
 )
 
 (module+ main
