@@ -104,8 +104,9 @@
         [(and (var? x) (get-dom x c))
          => (map-sum 
              (lambda (v) 
-               (lambdag@ (a)
-                 ((update-s x v) a))))]
+               (goal-construct
+                (lambdam@ (a)
+                  ((update-s x v) a)))))]
         [(pair? x)
          (fresh ()
            (force-ans (car x))
