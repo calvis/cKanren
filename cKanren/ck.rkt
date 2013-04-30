@@ -2,8 +2,10 @@
 
 (require racket/generic 
          racket/stxparam
+         racket/generator
          "src/errors.rkt"
-         (only-in rackunit check-equal?))
+         (only-in rackunit check-equal?)
+         optimization-coach)
 
 (require (for-syntax 
           syntax/parse
@@ -16,7 +18,7 @@
  goal-construct ext-c build-oc oc-proc oc-rands oc-rator run run* prt
  extend-enforce-fns extend-reify-fns goal? a?  walk walk*
  mzerog unitg onceo fresh-aux conde conda condu ifa ifu project fresh
- succeed fail inc enforce-constraints reify empty-a take mzerom bindm
+ succeed fail enforce reify empty-a take mzerom bindm constraint?
  format-source reify-cvar var ext-s gen:mk-struct recur constructor
  mk-struct?  lex<= sort-by-lex<= reify-with-colon default-mk-struct?
  occurs-check run-relevant-constraints build-attr-oc attr-oc?  attr-oc-uw?
@@ -25,7 +27,9 @@
  override-occurs-check? mk-struct->sexp var-x update-c-nocheck
  filter-not-memq/rator #%app-safe use-constraints debug replace-s
  update-s-nocheck update-s-prefix update-c-prefix attr-tag update-package
- default-reify-attr : define-constraint-interaction run-constraints)
+ default-reify-attr : define-constraint-interaction run-constraints
+ run/lazy case/lazy run/interactive resume/interactive reify/interactive 
+ enforce/interactive exit/interactive)
 
 (provide
  (rename-out 
@@ -68,6 +72,26 @@
 (define (write-var var port mode)
   ((parse-mode mode) (format "#~a(~s)" (cvar->str var) (var-x var)) port))
 
+;; =============================================================================
+
+(struct a-inf ())
+
+(struct mzerof a-inf ())
+(struct choiceg a-inf (a f))
+(struct inc a-inf (e) #:property prop:procedure (struct-field-index e))
+
+;; macro that delays expressions
+(define-syntax lambdaf@
+  (syntax-rules ()
+    ((_ () e) (lambda () e))))
+
+;; delays an expression
+(define-syntax delay
+  (syntax-rules ()
+    [(_ e) (inc (lambdaf@ () e))]))
+
+(define empty-f (delay (mzerog)))
+
 ;; == GOALS ====================================================================
 
 ;; a goal is just a function that can be applied to a's
@@ -81,7 +105,7 @@
 (define-syntax lambdag@-external
   (syntax-rules (:)
     [(_ (a) e ...) 
-     (goal (lambda (a) e ...))]
+     (lambdag@ (a) e ...)]
     [(_ (a : s) e ...)
      (lambdag@ (a) 
        (let ([s (substitution-s (a-s a))])
@@ -106,7 +130,7 @@
          e ...))]))
 
 ;; the failure value
-(define (mzerog) #f)
+(define (mzerog) (mzerof))
 
 ;; the identity goal
 (define unitg (lambdag@ (a) a))
@@ -129,46 +153,42 @@
 
 ;; =============================================================================
 
-;; macro that delays expressions
-(define-syntax lambdaf@
-  (syntax-rules ()
-    ((_ () e) (lambda () e))))
-
-;; delays an expression
-(define-syntax inc 
-  (syntax-rules ()
-    ((_ e) (lambdaf@ () e))))
-
-;; =============================================================================
-
 ;; convenience macro for dispatching on the type of a-inf
 (define-syntax case-inf
   (syntax-rules ()
     ((_ e (() e0) ((f^) e1) ((a^) e2) ((a f) e3))
-     (let ((a-inf e))
+     (let ([a-inf e])
        (cond
-         ((not a-inf) e0)
-         ((procedure? a-inf)  (let ((f^ a-inf)) e1))
-         ((not (and (pair? a-inf)
-                    (procedure? (cdr a-inf))))
-          (let ((a^ a-inf)) e2))
-         (else (let ((a (car a-inf)) (f (cdr a-inf))) 
-                 e3)))))))
+        [(mzerof? a-inf) e0]
+        [(inc? a-inf) (let ([f^ (inc-e a-inf)]) e1)]
+        [(a? a-inf) (let ([a^ a-inf]) e2)]
+        [(choiceg? a-inf) (let ([a (choiceg-a a-inf)] [f (choiceg-f a-inf)]) e3)]
+        [else (error 'case-inf "not an a-inf ~s" e)])))))
 
-(define empty-f (lambdaf@ () (mzerog)))
-(define choiceg cons)
+(define-syntax case/lazy
+  (syntax-rules ()
+    [(_ gen [() no-answer-clause] [(x g) an-answer-clause])
+     (let ([g gen])
+       (call-with-values (lambda () (g))
+         (case-lambda
+          [() no-answer-clause]
+          [(x) an-answer-clause])))]))
 
-;; given a number n and a thunk containing an infinite stream f, takes
-;; n answers from f
-(define (take n f)
+;; given a number n and a stream, takes n answers from f
+(define (take n stream)
   (cond
-    ((and n (zero? n)) '())
-    (else
-     (case-inf (f)
-       (() '())
-       ((f) (take n f))
-       ((a) (cons a '()))
-       ((a f) (cons a (take (and n (- n 1)) f)))))))
+   [(and n (zero? n)) '()]
+   [else
+    (case/lazy stream
+     [() '()]
+     [(a _) (cons a (take (and n (- n 1)) stream))])]))
+
+(define (take/lazy f)
+  (case-inf (f)
+   [() (yield)]
+   [(f) (take/lazy f)]
+   [(a) (yield a)]
+   [(a f) (begin (yield a) (take/lazy f))]))
 
 ;; =============================================================================
 
@@ -176,9 +196,9 @@
 (define-syntax-rule 
   (fresh-aux constructor (x ...) g g* ...)
   (lambdag@ (a) 
-    (inc 
-     (let ((x (constructor 'x)) ...) 
-       (bindg* (app-goal g a) g* ...)))))
+    (delay 
+      (let ([x (constructor 'x)] ...)
+        (bindg* (app-goal g a) g* ...)))))
 
 ;; miniKanren's "fresh" defined in terms of fresh-aux over var
 (define-syntax-rule (fresh (x ...) g g* ...)
@@ -196,23 +216,23 @@
   (lambda (a-inf g)
     (case-inf a-inf
       (() (mzerog))
-      ((f) (inc (bindg (f) g)))
+      ((f) (delay (bindg (f) g)))
       ((a) (app-goal g a))
-      ((a f) (mplusg (app-goal g a) (lambdaf@ () (bindg (f) g)))))))
+      ((a f) (mplusg (app-goal g a) (delay (bindg (f) g)))))))
 
 (define-syntax mplusg*
   (syntax-rules ()
     ((_ e) e)
     ((_ e0 e ...)
-     (mplusg e0 (lambdaf@ () (mplusg* e ...))))))
+     (mplusg e0 (delay (mplusg* e ...))))))
 
 (define mplusg
   (lambda (a-inf f)
     (case-inf a-inf
       (() (f))
-      ((f^) (inc (mplusg (f) f^)))
+      ((f^) (delay (mplusg (f) f^)))
       ((a) (choiceg a f))
-      ((a f^) (choiceg a (lambdaf@ () (mplusg (f) f^)))))))
+      ((a f^) (choiceg a (delay (mplusg (f) f^)))))))
 
 (begin-for-syntax
  (define expand-debug? (make-parameter #f)))
@@ -227,15 +247,14 @@
             #'(debug-conde [#:name branches g g* ...] ...))]
          [else 
           #'(lambdag@ (a) 
-              (inc 
-               (mplusg* (bindg* (app-goal g a) g* ...) ...)))])])))
+              (delay (mplusg* (bindg* (app-goal g a) g* ...) ...)))])])))
 
 (define-syntax (debug-conde stx)
   (syntax-parse stx
     [(_ ((~optional (~seq #:name branch-name)) g g* ...) ...+)
      (with-syntax ([(labels ...) (attribute branch-name)])
        #'(lambdag@ (a : s c q t) 
-           (inc 
+           (delay 
             (mplusg* 
              (let ([a (make-a s c q (add-level t 'labels))])
                (bindg* (app-goal g a) g* ...))
@@ -247,7 +266,7 @@
      (begin (expand-debug? #t) #'(debug? #t))]
     [(debug #:off)
      (begin (expand-debug? #f) #'(debug? #f))]
-    [(debug expr ...)
+    [(debug expr ...+)
      #'(syntax-parameterize 
         ([conde (... (syntax-rules ()
                        ([_ clauses ...]
@@ -257,8 +276,8 @@
 
 (define-syntax-rule (conda (g0 g ...) (g1 g^ ...) ...)
   (lambdag@ (a)
-    (inc (ifa ((app-goal g0 a) g ...) 
-              ((app-goal g1 a) g^ ...) ...))))
+    (delay (ifa ((app-goal g0 a) g ...) 
+                ((app-goal g1 a) g^ ...) ...))))
 
 (define-syntax ifa
   (syntax-rules ()
@@ -267,13 +286,13 @@
      (let loop ((a-inf e))
        (case-inf a-inf
          (() (ifa b ...))
-         ((f) (inc (loop (f))))
+         ((f) (delay (loop (f))))
          ((a) (bindg* a-inf g ...))
          ((a f) (bindg* a-inf g ...)))))))
 
 (define-syntax-rule (condu (g0 g ...) (g1 g^ ...) ...)
   (lambdag@ (a)
-    (inc
+    (delay
      (ifu ((app-goal g0 a) g ...)
           ((app-goal g1 a) g^ ...) ...))))
 
@@ -284,7 +303,7 @@
      (let loop ((a-inf e))
        (case-inf a-inf
          (() (ifu b ...))
-         ((f) (inc (loop (f))))
+         ((f) (delay (loop (f))))
          ((a) (bindg* a-inf g ...))
          ((a f) (bindg* a g ...)))))))
 
@@ -458,16 +477,16 @@
     (make-a (substitution s^) c q t)))
 
 (define (update-s-prefix s^)
-  (lambdam@ (a : s c q t)
-    (let ([s (substitution-s s)])
-      (bindm a
-        (let loop ([s^ s^])
-          (cond
-           [(eq? s s^) identitym]
-           [else 
-            (composem
-             (update-s (caar s^) (cdar s^))
-             (loop (cdr s^)))]))))))
+  (lambdam@ (a)
+    (let ([s (substitution-s (a-s a))])
+      (bindm a (process-s-prefix s s^)))))
+
+(define (process-s-prefix s s^)
+  (cond
+   [(eq? s s^) identitym]
+   [else 
+    (let ([oc (update-s (caar s^) (cdar s^))])
+      (composem (process-s-prefix s (cdr s^)) oc))]))
 
 ;; returns the part of s^ that is a prefix of s
 (define (prefix-s s s^)
@@ -481,21 +500,16 @@
 
 ;; wrapper for a constraint store
 (struct constraint-store (c)
-  #:guard (lambda args (apply constraint-store-guard args))
   #:methods gen:custom-write
   [(define (write-proc . args) (apply write-constraint-store args))])
-
-(define (constraint-store-guard c name)
-  (unless (hash? c) (error 'constraint-store "not a hash ~s\n" c))
-  (values c))
 
 ;; writes a constraint store
 (define (write-constraint-store constraint-store port mode)
   (define fn (lambda (s) ((parse-mode mode) s port)))
   (define c (constraint-store-c constraint-store))
   (fn "#c[")
-  (hash-for-each 
-   c (lambda (key ocs)(for ([oc ocs]) (fn " ") (fn oc))))
+  (let ([f (lambda (key ocs) (for ([oc ocs]) (fn " ") (fn oc)))])
+    (hash-for-each c f))
   (unless (null? c) (fn " "))
   (fn "]"))
 
@@ -523,24 +537,11 @@
 (define (filter/rator key c)
   (hash-ref c key '()))
 
-(module+ test
-  (check-equal? (filter/rator 'key (hasheq)) '())
-  (check-equal? (filter/rator 'key (hasheq 'key '(oc1 oc2))) '(oc1 oc2)))
-
 (define (filter-not/rator sym c)
   (apply append (for/list ([key (remq sym (hash-keys c))]) (hash-ref c key '()))))
 
-(module+ test
-  (check-equal? (filter-not/rator 'key1 (hasheq)) '())
-  (check-equal? (filter-not/rator 'key1 (hasheq 'key1 '(oc1 oc2))) '())
-  (check-equal? (filter-not/rator 'key1 (hasheq 'key2 '(oc2) 'key3 '(oc3))) '(oc2 oc3)))
-
 (define (filter-memq/rator symls c)
   (apply append (for/list ([key symls]) (hash-ref c key '()))))
-
-(module+ test
-  (check-equal? (filter-memq/rator '(key) (hasheq)) '())
-  (check-equal? (filter-memq/rator '(key) (hasheq 'key '(oc1 oc2))) '(oc1 oc2)))
 
 (define (filter-not-memq/rator symls c)
   (apply append (for/list ([key (hash-keys c)])
@@ -548,23 +549,15 @@
                            [(memq key symls) '()]
                            [else (hash-ref c key '())]))))
 
-(module+ test
-  (check-equal? (filter-not-memq/rator '(key1) (hasheq)) '())
-  (check-equal? (filter-not-memq/rator '(key1) (hasheq 'key1 '(oc1 oc2))) '())
-  (check-equal? (filter-not-memq/rator '(key1) (hasheq 'key2 '(oc2) 'key3 '(oc3))) 
-                '(oc2 oc3)))
-
 ;; adds oc to the constraint store if it contains a non-ground var
 (define (update-c oc)
-  (lambdam@ (a : s c q t)
-    (cond
-     ((any/var? (oc-rands oc))
-      ((run-constraint-interactions oc) a))
-     (else a))))
+  (cond
+   [(any/var? (oc-rands oc))
+    (run-constraint-interactions oc)]
+   [else identitym]))
 
 (define (update-c-nocheck oc)
-  (lambdam@ (a : s c q t)
-    ((run-constraint-interactions oc) a)))
+  (run-constraint-interactions oc))
 
 (define (run-constraint-interactions oc)
   (lambdam@ (a : s c q t)
@@ -608,10 +601,10 @@
 ;; == QUEUE ====================================================================
 
 ;; an empty queue 
-(define empty-q (lambda () unitg))
+(define empty-q unitg)
 (define empty-q? ((curry eq?) empty-q))
 
-(define (ext-q q q^) (lambda () (fresh () (q) (q^))))
+(define (ext-q q q^) (fresh () q q^))
 
 ;; DFS: first do the continuation that was already in the store, then
 ;; do the continuation generated by running that goal, then finally do
@@ -619,20 +612,18 @@
 (define (update-q-dfs new-enforce)
   (lambdam@ (a : s c q-old t)
     (let ([q-new
-           (lambda ()
-             (lambdag@ (a : s c q-new t)
-               (((ext-q q-new new-enforce))
-                (make-a s c empty-q t))))])
+           (lambdag@ (a : s c q-new t)
+             ((ext-q q-new new-enforce)
+              (make-a s c empty-q t)))])
       (make-a s c (ext-q q-old q-new) t))))
 
 ;; this interweaves DFS and BFS somehow
 (define (update-q-hybrid new-enforce)
   (lambdam@ (a : s c q-old t)
     (let ([q-new
-           (lambda ()
-             (lambdag@ (a : s c q-new t)
-               (((ext-q new-enforce q-new))
-                (make-a s c empty-q t))))])
+           (lambdag@ (a : s c q-new t)
+             ((ext-q new-enforce q-new)
+              (make-a s c empty-q t)))])
       (make-a s c (ext-q q-old q-new) t))))
 
 ;; BFS: first do the continuation that was already in the store,
@@ -671,7 +662,7 @@
 
 ;; a package is a structure containing a substitution and
 ;; a constraint store
-(struct a (s c q t) 
+(struct a a-inf (s c q t)
   #:extra-constructor-name make-a
   #:methods gen:custom-write 
   [(define (write-proc . args) (apply write-package args))])
@@ -700,11 +691,17 @@
 
 ;; == CONSTRAINTS ==============================================================
 
+(struct constraint (fn)
+  #:property prop:procedure (struct-field-index fn)
+  #:methods gen:custom-write 
+  ([define (write-proc goal port mode)
+     ((parse-mode mode) "#<constraint>" port)]))
+
 ;; special lambda for defining constraints
 (define-syntax lambdam@
   (syntax-rules (:)
     [(_ (a) e ...)
-     (lambda (a) e ...)]
+     (constraint (lambda (a) e ...))]
     [(_ (a : s c q t) e ...)
      (lambdam@ (a) 
        (let ([s (a-s a)] 
@@ -747,7 +744,7 @@
 
 ;; constructs a goal from a constraint
 (define (goal-construct fm)
-  (lambdag@ (a) (fm a)))
+  (lambdag@ (a) (or (fm a) (mzerog))))
 
 ;; the representation of a constraint in the constraint store 
 ;; contains a closure waiting to be evaluated with a new package,
@@ -798,18 +795,6 @@
   (let ((attrs (filter x-attr? (filter/rator 'attr c))))
     (and (not (null? attrs)) attrs)))
 
-;; defines a lazy-goal oc
-(struct lazy-goal-oc oc ()
-  #:extra-constructor-name make-lazy-goal-oc)
-
-;; builds a lazy-goal oc
-(define-syntax (build-lazy-goal-oc x)
-  (syntax-case x ()
-    ((_ op arg ...)
-     (with-syntax ([(arg^ ...) (generate-temporaries #'(arg ...))])
-       #'(let ((arg^ arg) ...)
-           (make-lazy-goal-oc (op arg^ ...) 'op `(,arg^ ...)))))))
-
 ;; == FIXPOINT =================================================================
 
 ;; fixed point algorithm given some variables x* that have changed,
@@ -853,10 +838,10 @@
   (lambdam@ (a : s c q t)
     (let ([ocs (constraint-store-c c)])
       (cond
-       ((memq-c oc ocs)
+       [(memq-c oc ocs)
         ((oc-proc oc)
          (let ([new-c (constraint-store (remq-c oc ocs))])
-           (make-a s new-c q t))))
+           (make-a s new-c q t)))]
        (else a)))))
 
 ;; == PARAMETERS ===============================================================
@@ -868,65 +853,46 @@
 
 ;; == ENFORCE CONSTRAINTS ======================================================
 
-;; a list of functions to be run during enforce-constraints
+;; a list of functions to be run during enforce
 (define enforce-fns (make-parameter '()))
 (define extend-enforce-fns (extend-parameter enforce-fns))
 
 ;; runs all the enforce-constraint functions in enforce-fns
 ;; and all the fixpoint-enforce-fns in fixpoint-enforce-fns.. to a fixpoint
-(define (enforce-constraints x)
-  (fresh ()
-    (fixpoint-enforce)
-    (for/fold ([f unitg])
-              ([fn (map cdr (enforce-fns))])
-      (fresh () (fn x) f))))
+(define (enforce x)
+  (for/fold
+   ([f fixpoint-enforce])
+   ([fn (map cdr (enforce-fns))])
+   (fresh () f (fn x))))
 
 (define-for-syntax search-strategy (make-parameter 'hybrid))
 
 ;; runs the given search strategy on the queue of lazy goals
-(define (fixpoint-enforce)
+(define fixpoint-enforce
   (lambdag@ (a : s c q t)
     (cond
      [(empty-q? q) a]
      [else 
-      ((fresh () (q) (fixpoint-enforce)) 
+      ((ext-q q fixpoint-enforce) 
        (make-a s c empty-q t))])))
 
 ;; useful for printing out information during debugging, not exported atm
-(define gensym
-  (let ([counter 0])
-    (lambda ([x 'g])
-      (if (number? x)
-        (set! counter x)
-        (begin0 (string->unreadable-symbol
-                 (format "~a~a" x counter))
-          (set! counter (add1 counter)))))))
-
 ;; convenience macro for defining lazy goals
 (define-syntax (define-lazy-goal stx)
   (syntax-parse stx
     [(define-lazy-goal (name args ...) body)
-     (with-syntax ([lazy-name 
-                    (format-id #'name "lazy-~a" (syntax-e #'name))]
-                   [enforce-name 
-                    (format-id #'name "enforce-~a" (syntax-e #'name))])
-       #`(begin
-           (define (name args ...)
-             (goal-construct (lazy-name args ...)))
-           (define (lazy-name args ...)
-             (lambdam@ (a) ;; do not eta
-               (let ([enforce-this (lambda () (enforce-name args ...))])
-                 (bindm a
-                   (#,(case (search-strategy)
-                        [(dfs) #'update-q-dfs]
-                        [(bfs) #'update-q-bfs]
-                        [(hybrid) #'update-q-hybrid]
-                        [else (error 'define-lazy-goal 
-                                     "unknown search strategy ~s" 
-                                     (search-strategy))])
-                    enforce-this)))))
-           (define (enforce-name args ...) 
-             body)))]
+     (define (bad-search-strat-error st)
+       (error 'define-lazy-goal "unknown search strategy ~s" st))
+     (let ([st (search-strategy)])
+       (with-syntax 
+         ([update-q
+           (case st
+             [(dfs) #'update-q-dfs]
+             [(bfs) #'update-q-bfs]
+             [(hybrid) #'update-q-hybrid]
+             [else (bad-search-strat-error st)])])
+         #`(define (name args ...)
+             (goal-construct (update-q body)))))]
     [(define-lazy-goal name (lambda (args ...) body))
      #'(define-lazy-goal (name args ...) body)]))
 
@@ -961,13 +927,12 @@
 (define (reify-s v s)
   (let ((v (walk v s)))
     (cond
-      ((var? v) 
-       `((,v . ,(reify-n v (size-s s))) . ,s))
-      ((mk-struct? v) 
-       (recur v
-        (lambda (a d)
-          (reify-s d (reify-s a s)))))
-      (else s))))
+     [(var? v) 
+      `((,v . ,(reify-n v (size-s s))) . ,s)]
+     [(mk-struct? v) 
+      (let ([k (lambda (a d) (reify-s d (reify-s a s)))])
+        (recur v k))]
+     [else s])))
 
 ;; creates a reified symbol
 (define (reify-n cvar n)
@@ -1063,23 +1028,84 @@
 
 ;; == INTEGRATION ==============================================================
 
+(define-syntax run/lazy
+  (syntax-rules ()
+    ((_ (x) g ...) 
+     (let ([a-inf (bindg empty-a (fresh (x) g ... (enforce x) (reify x)))])
+       (generator () (take/lazy a-inf))))))
+
 ;; convenience macro to integrate Scheme and cKanren, 
 ;; returns n answers to the goals g0 g1 ... where x is fresh
 (define-syntax run
   (syntax-rules ()
     ((_ n (x) g0 g1 ...)
-     (take n (lambdaf@ ()
-               ((fresh (x) g0 g1 ...
-                  (enforce-constraints x) 
-                  (reify x))
-                empty-a))))))
+     (let ([stream (run/lazy (x) g0 g1 ...)])
+       (take n stream)))))
 
 ;; RUNS ALL THE THINGS
 (define-syntax run*
   (syntax-rules ()
     ((_ (x) g ...) (run #f (x) g ...))))
 
-;; == HELPERS ========================================================
+(struct running (x a-inf)
+  #:methods gen:custom-write 
+  [(define (write-proc ra port mode) 
+     ((parse-mode mode) "#<running/interactive>" port))])
+
+(struct enforced running ()
+  #:methods gen:custom-write 
+  [(define (write-proc ra port mode) 
+     ((parse-mode mode) "#<running/interactive>" port))])
+
+(define-syntax run/interactive
+  (syntax-rules ()
+    [(_ (x) g ...)
+     (let ([x (var 'x)])
+       (running x (bindg empty-a (fresh () succeed g ...))))]))
+
+(define-syntax resume/interactive
+  (syntax-rules ()
+    [(_ state g ...)
+     (let ([st state])
+       (let ([x (running-x st)]
+             [a-inf (running-a-inf st)])
+         (running x (bindg a-inf (fresh () succeed g ...)))))]))
+
+(define-syntax enforce/interactive
+  (syntax-rules ()
+    [(_ state)
+     (let ([st state])
+       (let ([x (running-x st)]
+             [a-inf (running-a-inf st)])
+         (enforced x (bindg a-inf (enforce x)))))]))
+
+(define-syntax reify/interactive
+  (syntax-rules ()
+    [(_ state)
+     (let ([st state])
+       (unless (enforced? st)
+         (error 'reify/interactive "trying to reify an unenforced state ~s" st))
+       (let ([x (running-x st)]
+             [a-inf (running-a-inf st)])
+         (bindg a-inf (reify x))))]))
+
+(define-syntax exit/interactive
+  (syntax-rules ()
+    [(_ state)
+     (let ([st state])
+       (reify/interactive
+        (cond
+         [(enforced? st) state]
+         [else (enforce/interactive state)])))]))
+
+(define-syntax take/interactive
+  (syntax-rules () 
+    [(_ state)
+     (take #f (generator () (take/lazy state)))]
+    [(_ n state)
+     (take n (generator () (take/lazy state)))]))
+
+;; == HELPERS ==================================================================
 
 ;; returns #t if p contains any variables
 (define (any/var? x)
@@ -1118,6 +1144,15 @@
 ;; constraints, not as requiring files.  Abstractiiooonnnnn.
 (define-syntax-rule (use-constraints file ...) 
   (require file ...))
+
+(define gensym
+  (let ([counter 0])
+    (lambda ([x 'g])
+      (if (number? x)
+          (set! counter x)
+          (begin0 (string->unreadable-symbol
+                   (format "~a~a" x counter))
+                  (set! counter (add1 counter)))))))
 
 ;; =============================================================================
 

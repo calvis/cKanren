@@ -17,11 +17,11 @@
     (lambdam@ (a : s c)
       (let ((u (walk u s)))
         (cond
-         ((symbol? u) a)
-         ((not (var? u)) #f)
-         ((symbol-uw? u (get-attributes u c))
-          ((update-c (build-attr-oc symbol-c u symbol-uw?)) a))
-         (else #f))))))
+         [(symbol? u) a]
+         [(not (var? u)) #f]
+         [(symbol-uw? u (get-attributes u c))
+          ((update-c (build-attr-oc symbol-c u symbol-uw?)) a)]
+         [else #f])))))
  
 (define (symbol-uw? x attrs)
   (define incompatible '(number-c))
@@ -33,11 +33,8 @@
                    attrs))))
 
 (define symbol-constrained?
-  (lambda (v c)
-    (cond
-     [(get-attributes v c)
-      => (lambda (attrs) (findf symbol-attr? attrs))]
-     [else #f])))
+  (lambda (v attrs)
+    (findf symbol-attr? attrs)))
 
 (define (symbol-attr? oc)
   (eq? (attr-oc-type oc) 'symbol-c))
@@ -73,11 +70,8 @@
          (else #f))))))
 
 (define number-constrained?
-  (lambda (v c)
-    (cond
-     [(get-attributes v c)
-      => (lambda (attrs) (findf number-attr? attrs))]
-     [else #f])))
+  (lambda (v attrs)
+    (findf number-attr? attrs)))
  
 (define remove-duplicates
   (lambda (l)
@@ -102,59 +96,65 @@
   (lambda (u v)
     (lambdam@ (a : s c)
       (let ([u (walk* u s)]
-            [v (walk* v s)])
+            [v (walk v s)])
         (cond
-         ((or (symbol? v) 
+         [(or (symbol? v) 
               (number? v)
-              (symbol-constrained? v c)
-              (number-constrained? v c))
+              (cond
+               [(get-attributes v c)
+                => (lambda (attrs)
+                     (or (symbol-constrained? v attrs)
+                         (number-constrained? v attrs)))]
+               [else #f]))
           (cond
            [(pair? u) a]
-           [else ((=/=-c u v) a)]))
-         ((pair? v) ((absento-split u v) a))
-         ((not (var? v)) ((=/=-c u v) a))
-         ((mem-check u v a) #f)
-         ((mem-check v u a) a)
-         (else ((normalize-store (cons u v)) a)))))))
+           [else ((=/=-c u v) a)])]
+         [(pair? v) ((absento-split u v) a)]
+         [(not (var? v)) ((=/=-c u v) a)]
+         [(eq? u v) #f]
+         [(mem-check v u s c) a]
+         [else ((normalize-store u v) a)])))))
 
-(define (normalize-store p)
-  (lambdam@ (a : s c-old)
-    (let ([acs (filter/rator 'absent-c c-old)])
-      (let loop ([acs acs] [acs^ '()])
-        (cond
-         [(null? acs) 
-          (let ([oc (build-oc absent-c (car p) (cdr p))])
-            (bindm a 
-              (composem 
-               (replace-ocs 'absent-c acs^)
-               (update-c oc))))]
-         [else
-          (let ([u (car (oc-rands (car acs)))]
-                [v (cadr (oc-rands (car acs)))])
-            (cond
-             [(subsumes? p (cons u v) a)
-              (loop (cdr acs) acs^)]
-             [(subsumes? (cons u v) p a) a]
-             [else (loop (cdr acs) (cons (car acs) acs^))]))])))))
+(define (normalize-store u v)
+  (lambdam@ (a : s c)
+    (define acs (filter/rator 'absent-c c))
+    ((remove-subsumed-absentos u v acs s c) a)))
 
-(define (subsumes? p p^ a)
-  (and (mem-check (car p) (car p^) a)
-       (mem-check (cdr p) (cdr p^) a)))
+(define (remove-subsumed-absentos u v acs s c)
+  (define p (cons u v))
+  (let loop ([acs acs] [acs^ '()])
+    (cond
+     [(null? acs) 
+      (define oc (build-oc absent-c u v))
+      (define new-acs (cons oc acs^))
+      (replace-ocs 'absent-c new-acs)]
+     [else
+      (define rands (oc-rands (car acs)))
+      (define p^ (cons (car rands) (cadr rands)))
+      (cond
+       [(subsumes? p p^ s c)
+        (loop (cdr acs) acs^)]
+       [(subsumes? p^ p s c)
+        identitym]
+       [else (loop (cdr acs) (cons (car acs) acs^))])])))
+
+(define (subsumes? p p^ s c)
+  (and (mem-check (car p) (car p^) s c)
+       (mem-check (cdr p) (cdr p^) s c)))
 
 (define mem-check
-  (lambda (u t a)
-    (or ((term= u t) a)
+  (lambda (u t s c)
+    (or (term= u t s c)
         (and (pair? t)
-             (or (mem-check u (car t) a)
-                 (mem-check u (cdr t) a))))))
+             (or (mem-check u (car t) s c)
+                 (mem-check u (cdr t) s c))))))
  
 (define term=
-  (lambda (u t)
-    (lambdam@ (a : s c)
-      (cond
-       ((unify `((,u . ,t)) s c) =>
-        (lambda (s/c) (eq? (car s/c) s)))
-       (else #f)))))
+  (lambda (u t s c)
+    (cond
+     [(unify `((,u . ,t)) s c) =>
+      (lambda (s/c) (eq? (car s/c) s))]
+     [else #f])))
 
 (define reify-absent-cs
   (default-reify 'absento '(absent-c) 
@@ -182,11 +182,11 @@
    (lambdam@ (a : s c)
      (let ([neqs (filter/rator '=/=neq-c c)]
            [absentos (filter/rator 'absent-c c)])
-       (let ([neqs^ (map (lambda (oc) (filter-subsumed-prefixes oc absentos a)) neqs)])
+       (let ([neqs^ (map (lambda (oc) (filter-subsumed-prefixes oc absentos s c)) neqs)])
          (let ([neqs^ (filter-not (compose null? oc-prefix) neqs^)])
            ((replace-ocs '=/=neq-c neqs^) a)))))))
 
-(define (filter-subsumed-prefixes oc absentos a)
+(define (filter-subsumed-prefixes oc absentos s c)
   (define absento-pairs (map oc-rands absentos))
   (let ([p (oc-prefix oc)])
     (let ([p^
@@ -194,10 +194,8 @@
             (lambda (u/v) ;; can I find u/v subsumed by abesntos
               (findf
                (lambda (abs)
-                 (cond
-                  [((term= abs u/v) a)]
-                  [((term= abs (list (cdr u/v) (car u/v))) a)]
-                  [else #f]))
+                 (or (term= abs u/v s c)
+                     (term= abs (list (cdr u/v) (car u/v)) s c)))
                absento-pairs))
             p)])
       (build-oc =/=neq-c p^))))
