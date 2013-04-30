@@ -171,18 +171,20 @@
 (define (rerun-type-cs x)
   (fresh ()
     (elim-diseqs)
-    (lambdag@ (a : s c)
-      (let ([ocs (filter (lambda (oc) (memq (attr-oc-type oc) type-cs))
-                         (filter/rator attr-tag c))])
-        ((run-relevant-constraints (map (compose car oc-rands) ocs) c) a)))))
+    (goal-construct
+     (lambdam@ (a : s c)
+       (let ([ocs (filter (lambda (oc) (memq (attr-oc-type oc) type-cs))
+                          (filter/rator attr-tag c))])
+         ((run-relevant-constraints (map (compose car oc-rands) ocs) c) a))))))
 
 (define (elim-diseqs)
-  (lambdag@ (a : s c)
-    (let ([neqs (filter/rator '=/=neq-c c)]
-          [absentos (filter/rator 'absent-c c)])
-      (let ([neqs^ (map (lambda (oc) (filter-subsumed-prefixes oc absentos a)) neqs)])
-        (let ([neqs^ (filter-not (compose null? oc-prefix) neqs^)])
-          ((replace-ocs '=/=neq-c neqs^) a))))))
+  (goal-construct
+   (lambdam@ (a : s c)
+     (let ([neqs (filter/rator '=/=neq-c c)]
+           [absentos (filter/rator 'absent-c c)])
+       (let ([neqs^ (map (lambda (oc) (filter-subsumed-prefixes oc absentos a)) neqs)])
+         (let ([neqs^ (filter-not (compose null? oc-prefix) neqs^)])
+           ((replace-ocs '=/=neq-c neqs^) a)))))))
 
 (define (filter-subsumed-prefixes oc absentos a)
   (define absento-pairs (map oc-rands absentos))
