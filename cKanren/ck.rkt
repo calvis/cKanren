@@ -29,7 +29,7 @@
  update-s-nocheck update-s-prefix update-c-prefix attr-tag update-package
  default-reify-attr : define-constraint-interaction run-constraints
  run/lazy case/lazy run/interactive resume/interactive reify/interactive 
- enforce/interactive exit/interactive)
+ enforce/interactive exit/interactive extend-subscriptions)
 
 (provide
  (rename-out 
@@ -47,6 +47,13 @@
 (define attr-tag 'attr)
 
 (define-syntax : (syntax-rules ()))
+
+;; == PARAMETERS ===============================================================
+
+(define ((extend-parameter param) tag fn)
+  (let ((fns (param)))
+    (and (not (assq tag fns))
+         (param (cons `(,tag . ,fn) fns)))))
 
 ;; == VARIABLES =================================================================
 
@@ -553,11 +560,37 @@
 (define (update-c oc)
   (cond
    [(any/var? (oc-rands oc))
-    (run-constraint-interactions oc)]
+    (update-c-nocheck oc)]
    [else identitym]))
 
 (define (update-c-nocheck oc)
   (run-constraint-interactions oc))
+
+;; a parameter containing subscriptions
+;; hash maps publisher to a list of subscribers
+(define subscriptions (make-parameter (hash)))
+
+;; extends the subscriptions of all publishers in pubs with sub
+(define (extend-subscriptions sub pubs)
+  (subscriptions
+   (for/fold
+    ([subs (subscriptions)])
+    ([pub pubs])
+    (define (update-fn other-subs)
+      (cond
+       [(memq sub other-subs) other-subs]
+       [else (cons sub other-subs)]))
+    (hash-update subs pub update-fn '()))))
+
+(define (get-subscribers oc)
+  (let ([subs (subscriptions)])
+    (hash-ref subs (oc-rator oc) '())))
+
+(define (run-subscribers oc)
+  (let ([subs (get-subscribers oc)])
+    (lambdam@ (a)
+      (let ([c (constraint-store-c (a-c a))])
+        ((run-constraints (filter-memq/rator subs c)) a)))))
 
 (define (run-constraint-interactions oc)
   (lambdam@ (a : s c q t)
@@ -567,7 +600,10 @@
          [(null? fns) 
           (let ([old-c (constraint-store-c c)])
             (let ([new-store (constraint-store (ext-c oc old-c))])
-              (make-a s new-store q t)))]
+              (make-a s new-store q t)
+              #;
+              ((run-subscribers oc)
+               (make-a s new-store q t))))]
          [(((cdar fns) oc) a)]
          [else (loop (cdr fns))])))))
 
@@ -786,13 +822,13 @@
   (syntax-rules ()
     [(_ op x uw?)
      (let ((x^ x))
-       (make-attr-oc (op x^) 'attr `(,x^) 'op uw?))]))
+       (make-attr-oc (op x^) attr-tag `(,x^) 'op uw?))]))
 
 ;; gets the attributes of variable x in the constraint store
 (define (get-attributes x c)
   (define (x-attr? oc) 
     (eq? (car (oc-rands oc)) x))
-  (let ((attrs (filter x-attr? (filter/rator 'attr c))))
+  (let ((attrs (filter x-attr? (filter/rator attr-tag c))))
     (and (not (null? attrs)) attrs)))
 
 ;; == FIXPOINT =================================================================
@@ -843,13 +879,6 @@
          (let ([new-c (constraint-store (remq-c oc ocs))])
            (make-a s new-c q t)))]
        (else a)))))
-
-;; == PARAMETERS ===============================================================
-
-(define ((extend-parameter param) tag fn)
-  (let ((fns (param)))
-    (and (not (assq tag fns))
-         (param (cons `(,tag . ,fn) fns)))))
 
 ;; == ENFORCE CONSTRAINTS ======================================================
 
