@@ -279,13 +279,13 @@
 
 (define (enforce-set-cs x)
   (lambdag@ (a)
-    ((fresh ()
+    ((conj
        (loop 'union-fresh enforce-one-union-fresh)
        (cycle a))
      a)))
 
 (define (cycle a)
-  (fresh ()
+  (conj
     (loop 'in-c            enforce-in)
     (loop 'lazy-unify-same enforce-lazy-unify-same)
     (loop 'lazy-unify-diff enforce-lazy-unify-diff)
@@ -314,7 +314,7 @@
 (define (loop sym fn)
   (lambdag@ (a : s c)
     (let ([ocs (filter/rator sym c)])
-      ((fresh ()
+      ((conj
          (goal-construct
           (replace-ocs sym '()))
          (let inner ([ocs ocs])
@@ -322,7 +322,7 @@
             [(null? ocs) 
              unitg]
             [else 
-             (fresh () 
+             (conj
                (fn (car ocs))
                (inner (cdr ocs)))])))
        a))))
@@ -408,7 +408,7 @@
        [(set? S)
         (let ([t (car (set-left S))]
               [rest (set (cdr (set-left S)) (set-right S))])
-          ((fresh ()
+          ((conj
              (conde
               [(== x t)]
               [(=/= x t) 

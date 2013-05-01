@@ -20,7 +20,7 @@
 
 (define-syntax-rule (infd x0 x ... e)
   (let ((n* e))
-    (fresh () (domfd x0 n*) (domfd x n*) ...)))
+    (conj (domfd x0 n*) (domfd x n*) ...)))
 
 (define (=fd u v)
   (goal-construct (=fd-c u v)))
@@ -29,7 +29,7 @@
   (goal-construct (=/=fd-c u v)))
 
 (define (<fd u v)
-  (fresh () (<=fd u v) (=/=fd u v)))
+  (conj (<=fd u v) (=/=fd u v)))
 
 (define (<=fd u v)
   (goal-construct (<=fd-c u v)))
@@ -108,7 +108,7 @@
                 (lambdam@ (a)
                   ((update-s x v) a)))))]
         [(pair? x)
-         (fresh ()
+         (conj
            (force-ans (car x))
            (force-ans (cdr x)))]
         [else unitg])
@@ -265,13 +265,13 @@
 (define (enforce-constraintsfd x)
   (define (domfd-c->var domfd-c) 
     (car (oc-rands domfd-c)))
-  (fresh ()
+  (conj
     (force-ans x)
     (lambdag@ (a : s c)
       (let ([domains (filter/rator 'domfd-c c)])
         (let ([bound-x* (map domfd-c->var domains)])
           (verify-all-bound s c bound-x*)
-          ((fresh ()
+          ((conj
              (onceo (force-ans bound-x*))
              (lambdag@ (a^) a)) 
            a))))))

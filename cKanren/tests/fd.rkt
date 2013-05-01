@@ -40,9 +40,9 @@
         ((null? s) (loop (cdr r) (cddr r) (+ i 1) (+ i 2)))
         (else
          (let ((qi (car r)) (qj (car s)))
-           (fresh ()
-                  (diago qi qj (- j i) (range 0 (* 2 n)))
-                  (loop r (cdr s) i (+ j 1)))))))))
+           (conj
+            (diago qi qj (- j i) (range 0 (* 2 n)))
+            (loop r (cdr s) i (+ j 1)))))))))
 
 (define diago
   (lambda (qi qj d rng)
@@ -58,10 +58,10 @@
     (let loop ((i n) (l '()))
       (cond
         ((zero? i)
-         (fresh ()
-                (distinctfd l)
-                (diagonalso n l)
-                (== q* l)))
+         (conj
+          (distinctfd l)
+          (diagonalso n l)
+          (== q* l)))
         (else (fresh (x)
                      (infd x (range 1 n))
                      (loop (- i 1) (cons x l))))))))

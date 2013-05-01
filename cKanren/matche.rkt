@@ -15,7 +15,7 @@
 
 (define-syntax fresh* ;;; easy way to deal with duplicate vars (as if fresh used let*)
   (syntax-rules ()
-    ((_ () g ...) (fresh () g ...))  ;;; just in case there were no vars in pattern.
+    ((_ () g ...) (conj g ...))  ;;; just in case there were no vars in pattern.
     ((_ (x) g ...) (fresh (x) g ...)) ;;; exactly one var
     ((_ (y x z ...) g ...) (fresh (y) (fresh* (x z ...) g ...))))) ;;; more than one.
 

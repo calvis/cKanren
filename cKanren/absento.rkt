@@ -169,13 +169,13 @@
 
 (define type-cs '(number-c symbol-c))
 (define (rerun-type-cs x)
-  (fresh ()
-    (elim-diseqs)
-    (goal-construct
-     (lambdam@ (a : s c)
-       (let ([ocs (filter (lambda (oc) (memq (attr-oc-type oc) type-cs))
-                          (filter/rator attr-tag c))])
-         ((run-relevant-constraints (map (compose car oc-rands) ocs) c) a))))))
+  (conj
+   (elim-diseqs)
+   (goal-construct
+    (lambdam@ (a : s c)
+      (let ([ocs (filter (lambda (oc) (memq (attr-oc-type oc) type-cs))
+                         (filter/rator attr-tag c))])
+        ((run-relevant-constraints (map (compose car oc-rands) ocs) c) a))))))
 
 (define (elim-diseqs)
   (goal-construct

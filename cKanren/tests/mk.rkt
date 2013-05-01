@@ -239,6 +239,7 @@
 
   (test-check "lots of programs to make a 6"
               (run 12 (q) (eval-expo q '() `(intval ,(build-num 6))))
+              #;
               '((intexp (0 1 1))
                 (sub1 (intexp (1 1 1)))
                 (* (intexp (1)) (intexp (0 1 1)))
@@ -250,7 +251,19 @@
                 (((lambda (_.0) (intexp (0 1 1))) #t) (=/= ((_.0 numo))) (sym _.0))
                 (sub1 (* (intexp (1 1 1)) (intexp (1))))
                 (sub1 (sub1 (intexp (0 0 0 1))))
-                (sub1 (if #t (intexp (1 1 1)) _.0))))
+                (sub1 (if #t (intexp (1 1 1)) _.0)))
+              '((intexp (0 1 1))
+                (sub1 (intexp (1 1 1)))
+                (* (intexp (1)) (intexp (0 1 1)))
+                (* (intexp (0 1 1)) (intexp (1)))
+                (* (intexp (0 1)) (intexp (1 1)))
+                (if #t (intexp (0 1 1)) _.0)
+                (sub1 (sub1 (intexp (0 0 0 1))))
+                (* (intexp (1 1)) (intexp (0 1)))
+                (sub1 (* (intexp (1)) (intexp (1 1 1))))
+                (if #f _.0 (intexp (0 1 1)))
+                (sub1 (* (intexp (1 1 1)) (intexp (1))))
+                (((lambda (_.0) (intexp (0 1 1))) #t) (=/= ((_.0 numo))) (sym _.0))))
 
   (define rel-fact5
     `((lambda (f)

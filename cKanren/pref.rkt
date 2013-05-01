@@ -33,7 +33,7 @@
 
 (define pick-prefs
   (lambda ()
-    (fresh ()
+    (conj
       (lambdag@ (a : s c)
         ((letrec
              ((loop
@@ -44,7 +44,7 @@
                    (let ((x (walk (caar c^) s)))
                      (cond
                       ((var? x)
-                       (fresh ()
+                       (conj
                          (== x (cadar c^))
                          (loop (cdr c^))))
                       (else (loop (cdr c^))))))))))
