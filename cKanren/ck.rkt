@@ -4,8 +4,7 @@
          racket/stxparam
          racket/generator
          "src/errors.rkt"
-         (only-in rackunit check-equal?)
-         optimization-coach)
+         (only-in rackunit check-equal?))
 
 (require (for-syntax 
           syntax/parse
@@ -28,7 +27,7 @@
  filter-not-memq/rator #%app-safe use-constraints debug replace-s
  update-s-nocheck update-s-prefix update-c-prefix attr-tag update-package
  default-reify-attr : define-constraint-interaction run-constraints
- run/lazy case/lazy run/interactive resume/interactive reify/interactive 
+ run/lazy case/lazy start/interactive resume/interactive reify/interactive 
  enforce/interactive exit/interactive extend-subscriptions conj)
 
 (provide
@@ -1091,53 +1090,50 @@
   [(define (write-proc ra port mode) 
      ((parse-mode mode) "#<running/interactive>" port))])
 
-(define-syntax run/interactive
-  (syntax-rules ()
-    [(_ (x) g ...)
-     (let ([x (var 'x)])
-       (running x (bindg empty-a (conj succeed g ...))))]))
+(define-syntax (start/interactive stx)
+  (syntax-parse stx
+    [(_ (~seq #:var x) g ...)
+     #'(running x (bindg empty-a (conj succeed g ...)))]))
 
-(define-syntax resume/interactive
-  (syntax-rules ()
-    [(_ state g ...)
-     (let ([st state])
-       (let ([x (running-x st)]
-             [a-inf (running-a-inf st)])
-         (running x (bindg a-inf (conj succeed g ...)))))]))
+(define-syntax-rule 
+  (resume/interactive state g ...)
+  (let ([st state])
+    (let ([x (running-x st)]
+          [a-inf (running-a-inf st)])
+      (running x (bindg a-inf (conj succeed g ...))))))
 
-(define-syntax enforce/interactive
-  (syntax-rules ()
-    [(_ state)
-     (let ([st state])
-       (let ([x (running-x st)]
-             [a-inf (running-a-inf st)])
-         (enforced x (bindg a-inf (enforce x)))))]))
+(define-syntax-rule 
+  (enforce/interactive state)
+  (let ([st state])
+    (let ([x (running-x st)]
+          [a-inf (running-a-inf st)])
+      (enforced x (bindg a-inf (enforce x))))))
 
-(define-syntax reify/interactive
-  (syntax-rules ()
-    [(_ state)
-     (let ([st state])
-       (unless (enforced? st)
-         (error 'reify/interactive "trying to reify an unenforced state ~s" st))
-       (let ([x (running-x st)]
-             [a-inf (running-a-inf st)])
-         (bindg a-inf (reify x))))]))
+(define-syntax-rule
+  (reify/interactive state)
+  (let ([st state])
+    (unless (enforced? st)
+      (error 'reify/interactive "trying to reify an unenforced state ~s" st))
+    (let ([x (running-x st)]
+          [a-inf (running-a-inf st)])
+      (bindg a-inf (reify x)))))
 
-(define-syntax exit/interactive
-  (syntax-rules ()
-    [(_ state)
-     (let ([st state])
-       (reify/interactive
-        (cond
-         [(enforced? st) state]
-         [else (enforce/interactive state)])))]))
+(define-syntax-rule 
+  (exit/interactive n state)
+  (let ([stream
+         (generator 
+          ()
+          (take/lazy
+           (let ([st state])
+             (reify/interactive
+              (cond
+               [(enforced? st) state]
+               [else (enforce/interactive state)])))))])
+    (take n stream)))
 
-(define-syntax take/interactive
-  (syntax-rules () 
-    [(_ state)
-     (take #f (generator () (take/lazy state)))]
-    [(_ n state)
-     (take n (generator () (take/lazy state)))]))
+(define-syntax-rule
+  (exit*/interactive state)
+  (exit/interactive #f state))
 
 ;; == HELPERS ==================================================================
 
