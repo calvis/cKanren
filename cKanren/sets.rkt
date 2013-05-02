@@ -34,8 +34,8 @@
      (k (set-left s) (set-right s)))
    (define (constructor s) set)
    (define (override-occurs-check? s) #t)
-   (define (mk-struct->sexp s)
-     (set->sexp (normalize s)))]
+   (define (reify-mk-struct s r) 
+     (reify-set (normalize s) r))]
   #:methods gen:unifiable
   [(define (compatible? set v s c)
      (or (var? v) (set? v)))
@@ -54,26 +54,13 @@
        (display " }" port)]))])
 
 ;; returns the list equivalent of s
-(define (set->sexp s)
-  (define (term->sexp t) 
-    (cond
-     [(set? t) (set->sexp t)]
-     [(mk-struct? t) (mk-struct->sexp t)]
-     [else t]))
+(define (reify-set s r)
   (cond
-   [(empty-set? s) '∅]
+   [(empty-set? s) s]
    [else
-    (define sl (sort (map term->sexp (set-left s)) lex<=))
-    (define r  (set-right s))
-    (define sr (or (and (set? r) (set->sexp r)) r))
-    (cond
-     [(null? sl)
-      (cond
-       [(var? sr) sr]
-       [else (cadr sr)])]
-     [(or (var? sr) (symbol? sr))
-      `(set (,@sl : ,sr))]
-     [else `(set (,@sl : . ,(cadr sr)))])]))
+    (define sl (sort (map (lambda (t) (reify-term t r)) (set-left s)) lex<=))
+    (define sr (reify-term (set-right s) r))
+    (set sl sr)]))
 
 (define (empty-set) 
   (set #f #f))
@@ -919,18 +906,12 @@
     (ino n v)))
 
 (define (process-rands rands* r)
-  (let ([rands* (map (lambda (rands) (map format-rand rands)) rands*)])
+  (let ([rands* (map (lambda (rands) (map (lambda (t) (reify-term t r)) rands)) rands*)])
     (for/fold ([new '()])
               ([rand rands*])
        (cond
         [(member rand new) new]
         [else (cons rand new)]))))
-
-(define (format-rand rand)
-  (cond
-   [(mk-struct? rand)
-    (mk-struct->sexp rand)]
-   [else rand]))
 
 (define reify-set-neq
   (default-reify '=/= '(set-neq neq-?) process-rands))

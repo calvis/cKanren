@@ -44,17 +44,12 @@
        (make-tie a (car t-ls))))
    (define (unifiable? tie x) 
      (tie? x))
-   (define (mk-struct->sexp tie)
-     (tie->sexp tie))])
+   (define (reify-mk-struct tie r)
+     (reify-tie tie r))])
 
-(define (tie->sexp t)
-  (cond
-   [(tie? t)
-    `(tie ,(tie->sexp (tie-a t)) 
-          ,(tie->sexp (tie-t t)))]
-   [(mk-struct? t)
-    (mk-struct->sexp t)]
-   [else t]))
+(define (reify-tie t r)
+  `(tie ,(reify-term (tie-a t) r) 
+        ,(reify-term (tie-t t) r)))
 
 (define (sus x pi)
   (goal-construct (sus-c x pi)))

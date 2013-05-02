@@ -23,7 +23,7 @@
  occurs-check run-relevant-constraints build-attr-oc attr-oc?  attr-oc-uw?
  get-attributes filter/rator filter-not/rator default-reify attr-oc-type
  filter-memq/rator define-lazy-goal replace-ocs same-default-type?
- override-occurs-check? mk-struct->sexp var-x update-c-nocheck
+ override-occurs-check? update-c-nocheck reify-term var-x
  filter-not-memq/rator #%app-safe use-constraints debug replace-s
  update-s-nocheck update-s-prefix update-c-prefix attr-tag update-package
  default-reify-attr : define-constraint-interaction run-constraints
@@ -354,7 +354,7 @@
   (constructor mk-struct)
 
   ;; for reification 
-  (mk-struct->sexp mk-struct)
+  (reify-mk-struct mk-struct r)
 
   ;; structs also have the option of overriding the occurs-check for
   ;; variables if it's okay to unify a variable to a struct with the
@@ -367,8 +367,8 @@
       (k (car p) (cdr p)))
     (define (constructor p) cons)
     (define (override-occurs-check? p) #f)
-    (define (mk-struct->sexp p)
-      (pair->sexp p))]
+    (define (reify-mk-struct p r)
+      (reify-pair p r))]
    [vector?
     (define (recur v k)
       (let ([v (vector->list v)])
@@ -376,8 +376,14 @@
     (define (constructor v)
       (compose list->vector cons))
     (define (override-occurs-check? v) #f)
-    (define (mk-struct->sexp v)
-      (vector->sexp v))]))
+    (define (reify-mk-struct v r)
+      (reify-vector v r))]))
+
+(define (reify-term t r)
+  (cond
+   [(mk-struct? t)
+    (reify-mk-struct t r)]
+   [else (walk t r)]))
 
 (define (default-mk-struct? x)
   (or (pair? x) (vector? x)))
@@ -386,13 +392,12 @@
   (or (and (pair? x) (pair? y))
       (and (vector? x) (vector? y))))
 
-(define (pair->sexp p)
-  (let ([a (car p)] [d (cdr p)])
-    (cons (if (mk-struct? a) (mk-struct->sexp a) a)
-          (if (mk-struct? d) (mk-struct->sexp d) d))))
+(define (reify-pair p r)
+  (cons (reify-term (car p) r)
+        (reify-term (cdr p) r)))
 
-(define (vector->sexp v)
-  (vector-map (lambda (t) (if (mk-struct? t) (mk-struct->sexp t) t)) v))
+(define (reify-vector v r)
+  (vector-map (lambda (t) (reify-term t r)) v))
 
 ;; == SUBSTITUTIONS ============================================================
 
@@ -605,9 +610,8 @@
           (let ([old-c (constraint-store-c c)])
             (let ([new-store (constraint-store (ext-c oc old-c))])
               (make-a s new-store q t)
-              #;
-              ((run-subscribers oc)
-               (make-a s new-store q t))))]
+              #;((run-subscribers oc) (make-a s new-store q t))
+              ))]
          [(((cdar fns) oc) a)]
          [else (loop (cdr fns))])))))
 
@@ -946,11 +950,11 @@
           [c (constraint-store-c c)])
       (define v (walk* x s))
       (define r (reify-s v empty-s))
-      (define v^ (if (mk-struct? v) (mk-struct->sexp v) v))
+      (define v^ (reify-term v r))
       (define answer
         (cond
-         ((null? r) v^)
-         (else (reify-constraints (walk* v^ r) r c))))
+         [(null? r) v^]
+         [else (reify-constraints v^ r c)]))
       (choiceg answer empty-f))))
 
 ;; reifies a cvar
@@ -1235,7 +1239,8 @@
     [(define-constraint-interaction 
        name
        (constraint-exprs ...)
-       (~or (~optional (~seq #:package (a:id : s:id c:id))))
+       (~or (~optional (~seq #:package (a:id : s:id c:id)))
+            (~optional (~seq (~and #:not-reflexive reflexive?))))
        ...
        clauses ...)
      (define a-name (or (attribute a) (generate-temporaries #'(?a))))
@@ -1262,7 +1267,7 @@
         [bad-pattern-error 
          #'(error 'name "bad pattern ~s" '((rator rands ...) ...))])
        #`(let ()
-           (define (run-all . arg*)
+           (define (run-interaction . arg*)
              (lambdam@ (a : ?s ?c ?q ?t)
                (let ([s (substitution-s ?s)]
                      [c (constraint-store-c ?c)])
@@ -1279,15 +1284,15 @@
            (define (name oc)
              (let ([this-rator (oc-rator oc)])
                (lambdam@-external (a : s c)
-                 (generate-cond run-all (a s c) oc this-rator 
+                 (generate-cond run-interaction (a s c) oc this-rator 
                                 () ((rator rands ...) ...)))))
            name))]))
 
 (define-syntax (generate-cond stx)
   (syntax-parse stx 
-    [(generate-cond run-all (a s c) oc this-rator (pattern ...) ()) #'#f]
+    [(generate-cond run-interaction (a s c) oc this-rator (pattern ...) ()) #'#f]
     [(generate-cond 
-      run-all (a s c) oc this-rator
+      run-interaction (a s c) oc this-rator
       ((rator-pre rand-pre) ...)
       ((rator rand ...) (rator-post rand-post) ...))
      (with-syntax
@@ -1306,16 +1311,12 @@
                [post  post-ocs] ...)
               (lambdam@-external (a : s c)
                 (cond
-                 [((run-all pre ... this post ...) a)]
+                 [((run-interaction pre ... this post ...) a)]
                  [else (fn a)]))))]
         [rest-formatted 
          #'(generate-cond 
-            run-all (a s c) oc this-rator
+            run-interaction (a s c) oc this-rator
             ((rator-pre rand-pre) ... (rator rand ...))
             ((rator-post rand-post) ...))])
-       #'(cond
-          [(and pattern-applies? run-rule)]
-          [else rest-formatted])))]))
-
-
+       #'(or (and pattern-applies? run-rule) rest-formatted)))]))
 

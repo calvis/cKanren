@@ -40,7 +40,8 @@
     #:methods gen:mk-struct
     [(define (recur my k) (k (my-struct-a my) `()))
      (define (constructor my) (lambda (a d) (my-struct a)))
-     (define (mk-struct->sexp my) `(my-struct ,(my-struct-a my)))
+     (define (reify-mk-struct my r) 
+       `(my-struct ,(reify-term (my-struct-a my) r)))
      (define (override-occurs-check? my) #f)]
     #:methods gen:unifiable
     [(define (compatible? my x s c)
@@ -54,7 +55,8 @@
     #:methods gen:mk-struct
     [(define (recur my k) (k (my-struct-a my) `(,(my-other-struct-b my))))
      (define (constructor my) (lambda (a d) (my-other-struct a (car d))))
-     (define (mk-struct->sexp my) `(my-struct ,(my-struct-a my)))
+     (define (reify-mk-struct my r)
+       `(my-struct ,(reify-term (my-struct-a my) r)))
      (define (override-occurs-check? my) #f)]
     #:methods gen:unifiable
     [(define (compatible? my x s c)
