@@ -14,7 +14,7 @@
 (provide
  var? define-var-type goal? make-a c->list empty-s empty-c
  update-s update-c any/var?  prefix-s prtm identitym composem
- goal-construct ext-c build-oc oc-proc oc-rands oc-rator run run* prt
+ goal-construct ext-c build-oc oc-rands oc-rator run run* prt
  extend-enforce-fns extend-reify-fns goal? a?  walk walk*
  mzerog unitg onceo fresh-aux conde conda condu ifa ifu project fresh
  succeed fail enforce reify empty-a take mzerom bindm constraint?
@@ -23,9 +23,9 @@
  occurs-check run-relevant-constraints build-attr-oc attr-oc?  attr-oc-uw?
  get-attributes filter/rator filter-not/rator default-reify attr-oc-type
  filter-memq/rator define-lazy-goal replace-ocs same-default-type?
- override-occurs-check? update-c-nocheck reify-term var-x
+ override-occurs-check? update-c-nocheck reify-term var-x ext-c*
  filter-not-memq/rator #%app-safe use-constraints debug replace-s
- update-s-nocheck update-s-prefix update-c-prefix attr-tag update-package
+ update-s-nocheck update-s-prefix attr-tag update-package
  default-reify-attr : define-constraint-interaction run-constraints
  run/lazy case/lazy start/interactive resume/interactive reify/interactive 
  enforce/interactive exit/interactive extend-subscriptions conj)
@@ -423,6 +423,9 @@
 (define (ext-s x v s)
   (cons `(,x . ,v) s))
 
+(define (ext-s* p s)
+  (append p s))
+
 ;; checks if x appears in v
 (define occurs-check
   (lambda (x v s)
@@ -492,13 +495,14 @@
   (lambdam@ (a : s c q t)
     (make-a (substitution s^) c q t)))
 
-(define (update-s-prefix s s^)
-  (cond
-   [(eq? s s^) 
-    identitym]
-   [else 
-    (define oc (update-s (caar s^) (cdar s^)))
-    (composem oc (update-s-prefix s (cdr s^)))]))
+;; returns an updated substitution and a function that will run all
+;; the relevant constraints
+(define (update-s-prefix s c s^)
+  (define p (prefix-s s s^))
+  (define relevant-vars (map car p))
+  (define run-constraints-fn
+    (run-relevant-constraints relevant-vars c))
+  (values (ext-s* p s) run-constraints-fn))
 
 ;; returns the part of s^ that is a prefix of s
 (define (prefix-s s s^)
@@ -532,6 +536,9 @@
 (define (ext-c oc c) 
   (hash-update c (oc-rator oc) (lambda (ocs) (cons oc ocs)) '()))
 
+(define (ext-c* ocs c)
+  (for/fold ([c c]) ([oc ocs]) (ext-c oc c)))
+
 ;; checks if oc is in c
 (define (memq-c oc c)
   (let ([ocs (filter/rator (oc-rator oc) c)])
@@ -547,15 +554,23 @@
 
 ;; filters the constraint store
 (define (filter/rator key c)
+  (unless (hash? c)
+    (error 'filter/rator "not given a c ~s\n" c))
   (hash-ref c key '()))
 
 (define (filter-not/rator sym c)
+  (unless (hash? c)
+    (error 'filter-not/rator "not given a c ~s\n" c))
   (apply append (for/list ([key (remq sym (hash-keys c))]) (hash-ref c key '()))))
 
 (define (filter-memq/rator symls c)
+  (unless (hash? c)
+    (error 'filter-memq/rator "not given a c ~s\n" c))
   (apply append (for/list ([key symls]) (hash-ref c key '()))))
 
 (define (filter-not-memq/rator symls c)
+  (unless (hash? c)
+    (error 'filter-not-memq/rator "not given a c ~s\n" c))
   (apply append (for/list ([key (hash-keys c)])
                           (cond
                            [(memq key symls) '()]
@@ -619,7 +634,7 @@
            [new-store (constraint-store new-c)])
       (make-a s new-store q t))))
 
-(define (update-c-prefix c c^)
+(define (run-c-prefix c c^)
   (for/fold 
    ([fn identitym])
    ([(key ocs^) c^])
@@ -630,7 +645,7 @@
       [else
        (composem 
         (loop (cdr ocs^))
-        (update-c-nocheck (car ocs^)))]))))
+        (oc-proc (car ocs^)))]))))
 
 (define (c->list c)
   (apply append (hash-values c)))
@@ -725,11 +740,14 @@
 ;; all the constraints in c^, then run all the constraints relating to
 ;; the variables in s^
 (define (update-package s^/c^)
-  (lambdam@-external (a : s c)
-    (bindm a
-      (composem
-       (update-s-prefix s (car s^/c^))
-       (update-c-prefix c (cdr s^/c^))))))
+  (lambdam@ (a : s c q t)
+    (define-values (s^ update-s-fn)
+      (update-s-prefix (substitution-s s) (constraint-store-c c) (car s^/c^)))
+    (define update-c-fn
+      (lambdam@ (a)
+        ((run-c-prefix (constraint-store-c c) (cdr s^/c^))
+         (make-a (substitution s^) c q t))))
+    (bindm a (composem update-c-fn update-s-fn))))
 
 ;; == CONSTRAINTS ==============================================================
 

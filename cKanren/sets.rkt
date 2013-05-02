@@ -116,91 +116,73 @@
 
 ;; unifis a set u and a term v
 (define (unify-set u v e s c)
-  (cond
-   [(make-well-formed-set u s c)
-    => (lambda (s/c)
-         (cond
-          [(make-well-formed-set v (car s/c) (cdr s/c))
-           => (lambda (s/c)
-                (unify-well-formed-sets u v e (car s/c) (cdr s/c)))]
-          [else #f]))]
-   [else #f]))
+  (unify e s (ext-c (build-oc safe-unify-set u v) c)))
 
-(define (unify-well-formed-sets X T e s c)
-  (let ([X (normalize (walk* X s))]
-        [T (normalize (walk* T s))])
-    (cond
-     [(same-set? X T) (unify e s c)]
-     [(and (not (set? X)) (set? T))
-      (unify-well-formed-sets T X e s c)]
-     ;; it is possible normalization gave us two set-vars?
-     [(and (set-var? X) (set-var? T))
-      (unify-walked X T e s c)]
-     [(set? T)
+(define (safe-unify-set u v)
+  (composem
+   (well-formed-set-c u)
+   (well-formed-set-c v)
+   (unify-well-formed-sets u v)))
+
+(define (unify-well-formed-sets X T)
+  (lambdam@ (a : s c)
+    (let ([X (normalize (walk* X s))]
+          [T (normalize (walk* T s))])
       (cond
-       [(or (empty-set? X) (empty-set? T)) #f]
-       [(set-member? X T) #f]
-       [(same-set? (set-right X) (set-right T))
-        (unify-same-tail X T e s c)]
-       [else (unify-diff-tail X T e s c)])]
-     [(set-var? T)
-      (cond
-       [(same-set? (set-right X) T)
-        (let ([N (set-var (gensym 'n-unify))])
-          (cond
-           [(make-proper-set (set (set-left X) N) s c)
-            => (lambda (s/c)
-                 (unify-well-formed-sets (set (set-left X) N) T e (car s/c) (cdr s/c)))]
-           [else #f]))]
-       [else (unify e (ext-s T X s) c)])]
-     [else #f])))
+       [(same-set? X T) a]
+       [(and (not (set? X)) (set? T))
+        ((unify-well-formed-sets T X) a)]
+       ;; it is possible normalization gave us two set-vars
+       [(and (set-var? X) (set-var? T))
+        ((==-c X T) a)]
+       [(set? T)
+        (cond
+         [(or (empty-set? X) (empty-set? T)) #f]
+         [(set-member? X T) #f]
+         [(same-set? (set-right X) (set-right T))
+          ((lazy-unify-same X T) a)]
+         [else ((lazy-unify-diff X T) a)])]
+       [(set-var? T)
+        (cond
+         [(same-set? (set-right X) T)
+          (let ([N (set-var (gensym 'n-unify))])
+            (bindm a
+              (composem
+               (proper-set-c (set (set-left X) N))
+               (unify-well-formed-sets (set (set-left X) N) T))))]
+         [else ((update-s T X) a)])]
+       [else #f]))))
 
 (define (lazy-unify-same X T)
   (lambdam@ (a : s c) 
     (let ([X (normalize (walk* X s))]
           [T (normalize (walk* T s))])
       (cond
-       [(unify-same-tail X T `() s c)
-        => (lambda (s/c) (bindm a (update-package s/c)))]
-       [else #f]))))
-
-(define (unify-same-tail X T e s c)
-  (let ([X (normalize (walk* X s))]
-        [T (normalize (walk* T s))])
-    (cond
-     [(null? (set-left X))
-      (unify-walked (set-right X) T e s c)]
-     [(and (set? T) (null? (set-left T)))
-      (unify-walked (set-right T) X e s c)]
-     [else (unify e s (ext-c (build-oc lazy-unify-same X T) c))])))
+       [(null? (set-left X))
+        ((unify-walked (set-right X) T) a)]
+       [(and (set? T) (null? (set-left T)))
+        ((unify-walked (set-right T) X) a)]
+       [else ((update-c-nocheck (build-oc lazy-unify-same X T)) a)]))))
 
 (define (lazy-unify-diff X T)
   (lambdam@ (a : s c) 
     (let ([X (normalize (walk* X s))]
           [T (normalize (walk* T s))])
       (cond
-       [(unify-diff-tail X T `() s c)
-        => (lambda (s/c)
-             ((update-package s/c) a))]
-       [else #f]))))
-
-(define (unify-diff-tail X T e s c)
-  (let ([X (normalize (walk* X s))]
-        [T (normalize (walk* T s))])
-    (cond
-     [(null? (set-left X))
-      (unify-walked T (set-right X) e s c)]
-     [(null? (set-left T))
-      (unify-walked X (set-right T) e s c)]
-     ;; if there's only one thing in X or T, gtfo
-     [(or (and (empty-set? (set-right X))
-               (null? (cdr (set-left X))))
-          (and (empty-set? (set-right T))
-               (null? (cdr (set-left T)))))
-      (unify-walked (set-left  X) (set-left T)
-                    `((,(set-right X) . ,(set-right T)) . ,e)
-                    s c)]
-     [else (unify e s (ext-c (build-oc lazy-unify-diff X T) c))])))
+       [(null? (set-left X))
+        ((==-c T (set-right X)) a)]
+       [(null? (set-left T))
+        ((==-c X (set-right T)) a)]
+       ;; if there's only one thing in X or T, gtfo
+       [(or (and (empty-set? (set-right X))
+                 (null? (cdr (set-left X))))
+            (and (empty-set? (set-right T))
+                 (null? (cdr (set-left T)))))
+        (bindm a
+          (composem
+           (==-c (set-left  X) (set-left T))
+           (==-c (set-right X) (set-right T))))]
+       [else ((update-c-nocheck (build-oc lazy-unify-diff X T)) a)]))))
 
 ;; =============================================================================
 
@@ -327,27 +309,6 @@
 
 (define (seto u) 
   (goal-construct (well-formed-set-c u)))
-
-(define (make-well-formed-set u s c)
-  (let ([u (walk u s)])
-    (cond
-     [(set-var? u) (cons s c)]
-     [(empty-set? u) (cons s c)]
-     [(set? u)
-      (let loop ([l (set-left u)] [s s] [c c])
-        (cond
-         [(null? l)
-          (make-well-formed-set (set-right u) s c)]
-         [(set? (car l))
-          (cond
-           [(make-well-formed-set (car l) s c)
-            => (lambda (s/c)
-                 (loop (cdr l) (car s/c) (cdr s/c)))])]
-         [else (loop (cdr l) s c)]))]
-     [(var? u)
-      (let ([u^ (set-var (var-x u))])
-        (cons (ext-s u u^ s) c))]
-     [else #f])))
 
 (define (well-formed-set-c u)
   (lambdam@ (a : s c)
@@ -528,28 +489,6 @@
    (composem
     (well-formed-set-c S)
     (!in-c x S))))
-
-(define (make-!in-c x S s c)
-  (let ([x (walk x s)]
-        [S (walk S s)])
-    (cond
-     [(empty-set? S) (cons s c)]
-     [(and (set-var? S) (set? x) 
-           (occurs-check S (set-left x) s))
-      (cons s c)]
-     [(set? S)
-      (cond
-       [(memq x (set-left S)) #f]
-       [(and (not (var? x))
-             (empty-set? (set-right S))
-             (not (any/var? (set-left S)))
-             (not (memq x (set-left S))))
-        (cons s c)]
-       [(make-not-in-t* x (set-left S) s c)
-        => (lambda (s/c)
-             (make-!in-c x (set-right S) (car s/c) (cdr s/c)))]
-       [else #f])]
-     [else (cons s (ext-c (build-oc !in-c x S) c))])))
 
 (define (!in-c x S)
   (lambdam@ (a : s c)
@@ -733,26 +672,6 @@
    (composem
     (well-formed-set-c S)
     (proper-set-c S))))
-
-(define (make-proper-set S s c)
-  (cond
-   ;; X = {t0 .. tn | N}
-   [(empty-set? S) (cons s c)]
-   [(set? S)
-    (let loop ([t* (set-left S)] [s s] [c c])
-      (cond
-       [(null? t*) 
-        (make-proper-set (set-right S) s c)]
-       [(make-not-in-t*
-         (car t*) (rem1 (car t*) (set-left S))
-         s c)
-        => (lambda (s/c)
-             (cond
-              [(make-!in-c (car t*) (set-right S) (car s/c) (cdr s/c))
-               => (lambda (s/c) (loop (cdr t*) (car s/c) (cdr s/c)))]
-              [else #f]))]
-       [else #f]))]
-   [else (cons s (ext-c (build-oc proper-set-c S) c))]))
 
 (define (proper-set-c S)
   (lambdam@ (a : s c)
