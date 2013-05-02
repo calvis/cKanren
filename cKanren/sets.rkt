@@ -81,13 +81,13 @@
    [(null? (set-left s)) 
     (normalize (set-right s))]
    [else
-    (let ([s-l (sort (set-left s) lex<=)]
-          [s-r (normalize (set-right s))])
+    (let ([sl (sort (set-left s) lex<=)]
+          [sr (normalize (set-right s))])
       (cond
-       [(set-var? s-r) (set s-l s-r)]
-       [(empty-set? s-r) (set s-l s-r)]
-       [else (set (sort (append s-l (set-left s-r)) lex<=)
-                  (set-right s-r))]))]))
+       [(set-var? sr) (set sl sr)]
+       [(empty-set? sr) (set sl sr)]
+       [else (set (sort (append sl (set-left sr)) lex<=)
+                  (set-right sr))]))]))
 
 ;; checks membership in a set
 (define (set-member? x st)
