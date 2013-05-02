@@ -467,10 +467,10 @@
       (let ((x (walk x s))
             (v (walk v s)))
         (cond
-         ((or (var? x) (var? v))
-          (update-s-internal x v s c q t))
-         ((equal? x v) a)
-         (else #f))))))
+         [(or (var? x) (var? v))
+          (update-s-internal x v s c q t)]
+         [(equal? x v) a]
+         [else #f])))))
 
 ;; a function that will insecurely extend the substitution 
 ;; with a binding of x to v 
@@ -492,17 +492,13 @@
   (lambdam@ (a : s c q t)
     (make-a (substitution s^) c q t)))
 
-(define (update-s-prefix s^)
-  (lambdam@ (a)
-    (let ([s (substitution-s (a-s a))])
-      (bindm a (process-s-prefix s s^)))))
-
-(define (process-s-prefix s s^)
+(define (update-s-prefix s s^)
   (cond
-   [(eq? s s^) identitym]
+   [(eq? s s^) 
+    identitym]
    [else 
-    (let ([oc (update-s (caar s^) (cdar s^))])
-      (composem (process-s-prefix s (cdr s^)) oc))]))
+    (define oc (update-s (caar s^) (cdar s^)))
+    (composem oc (update-s-prefix s (cdr s^)))]))
 
 ;; returns the part of s^ that is a prefix of s
 (define (prefix-s s s^)
@@ -623,21 +619,18 @@
            [new-store (constraint-store new-c)])
       (make-a s new-store q t))))
 
-(define (update-c-prefix c^)
-  (lambdam@ (a : s c q t)
-    (let ([c (constraint-store-c c)])
-      (bindm a
-        (for/fold 
-         ([fn identitym])
-         ([key (hash-keys c^)])
-         (let ([ocs (hash-ref c key '())])
-           (let loop ([ocs^ (hash-ref c^ key)])
-             (cond
-              [(eq? ocs ocs^) fn]
-              [else
-               (composem 
-                (update-c-nocheck (car ocs^))
-                (loop (cdr ocs^)))]))))))))
+(define (update-c-prefix c c^)
+  (for/fold 
+   ([fn identitym])
+   ([(key ocs^) c^])
+   (define ocs (hash-ref c key '()))
+   (let loop ([ocs^ ocs^])
+     (cond
+      [(eq? ocs ocs^) fn]
+      [else
+       (composem 
+        (loop (cdr ocs^))
+        (update-c-nocheck (car ocs^)))]))))
 
 (define (c->list c)
   (apply append (hash-values c)))
@@ -728,10 +721,15 @@
           empty-q
           empty-t))
 
-(define (update-package s/c)
-  (composem
-   (update-c-prefix (cdr s/c))
-   (update-s-prefix (car s/c))))
+;; should update the substitution with the bindings in s^, then run
+;; all the constraints in c^, then run all the constraints relating to
+;; the variables in s^
+(define (update-package s^/c^)
+  (lambdam@-external (a : s c)
+    (bindm a
+      (composem
+       (update-s-prefix s (car s^/c^))
+       (update-c-prefix c (cdr s^/c^))))))
 
 ;; == CONSTRAINTS ==============================================================
 
