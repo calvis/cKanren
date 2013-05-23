@@ -1,7 +1,7 @@
 #lang racket
 
 (require "ck.rkt" racket/generic)
-(provide == ==-c unify gen:unifiable gen-unify compatible? unify-two unify-walked)
+(provide == ==-c unify gen:unifiable gen-unify compatible? unify-two unify-walked unifiable?)
 (require racket/trace)
 
 ;; a generic that defines when things are unifiable!
