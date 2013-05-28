@@ -608,29 +608,33 @@
           (let ([t (car (set-left U))]
                 [ts (cdr (set-left U))]
                 [m  (set-right U)])
-            ((fresh (N)
-               (== W (set `(,t) N))
-               (proper-seto N)
-               (!ino t N)
-               (conde
-                [(fresh (N1)
-                   (proper-seto N1)
-                   (== N1 (set ts m))
-                   (!ino t N1)
-                   (uniono N1 V N))]
-                [(fresh (N1)
-                   (proper-seto N1)
-                   (== V (set `(,t) N1))
-                   (!ino t N1)
-                   (uniono U N1 N))]
-                [(fresh (N1 N2)
-                   (proper-seto N1)
-                   (proper-seto N2)
-                   (== N1 (set ts m))
-                   (!ino t N1)
-                   (== V (set `(,t) N2))
-                   (!ino t N2)
-                   (uniono N1 N2 N))])) 
+            ((conde
+              ((== W (empty-set))
+               (== V (empty-set))
+               (== U (empty-set)))
+              ((fresh (N)
+                 (== W (set `(,t) N))
+                 (proper-seto N)
+                 (!ino t N)
+                 (conde
+                  [(fresh (N1)
+                     (proper-seto N1)
+                     (== N1 (set ts m))
+                     (!ino t N1)
+                     (uniono N1 V N))]
+                  [(fresh (N1)
+                     (proper-seto N1)
+                     (== V (set `(,t) N1))
+                     (!ino t N1)
+                     (uniono U N1 N))]
+                  [(fresh (N1 N2)
+                     (proper-seto N1)
+                     (proper-seto N2)
+                     (== N1 (set ts m))
+                     (!ino t N1)
+                     (== V (set `(,t) N2))
+                     (!ino t N2)
+                     (uniono N1 N2 N))]))))
              a)))]
        [else ((goal-construct (union-fresh U V W)) a)]))))
 
@@ -643,29 +647,33 @@
 
 ;; U or V is a set, W is a var
 (define (union-var-cases t-val U V W)
-  (fresh (t N)
-    (== t t-val)
-    (== W (set `(,t) N))
-    (!ino t N)
-    (conde
-     [(fresh (N1)
-        (proper-seto N1)
-        (== U (set `(,t) N1))
-        (!ino t N1)
-        (uniono N1 V N))]
-     [(fresh (N1)
-        (proper-seto N1)
-        (== V (set `(,t) N1))
-        (!ino t N1)
-        (uniono U N1 N))]
-     [(fresh (N1 N2)
-        (proper-seto N1)
-        (proper-seto N2)
-        (== U (set `(,t) N1))
-        (!ino t N1)
-        (== V (set `(,t) N2))
-        (!ino t N2)
-        (uniono N1 N2 N))])))
+  (conde
+   [(== W (empty-set))
+    (== U (empty-set))
+    (== V (empty-set))]
+   [(fresh (t N)
+      (== t t-val)
+      (== W (set `(,t) N))
+      (!ino t N)
+      (conde
+       [(fresh (N1)
+          (proper-seto N1)
+          (== U (set `(,t) N1))
+          (!ino t N1)
+          (uniono N1 V N))]
+       [(fresh (N1)
+          (proper-seto N1)
+          (== V (set `(,t) N1))
+          (!ino t N1)
+          (uniono U N1 N))]
+       [(fresh (N1 N2)
+          (proper-seto N1)
+          (proper-seto N2)
+          (== U (set `(,t) N1))
+          (!ino t N1)
+          (== V (set `(,t) N2))
+          (!ino t N2)
+          (uniono N1 N2 N))]))]))
 
 (define (proper-seto S)
   (goal-construct 

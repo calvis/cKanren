@@ -318,13 +318,30 @@
             q)))
         `(,(make-set `(bird cat dog))))
   
-  (test "union fresh"
+  (test "union fresh 1"
         (run* (q)
           (fresh (x y z)
             (== q `(,x ,y ,z))
             (uniono x y z)
             (=/= z (empty-set))))
         `(((,(set `(_.0) `s.1) s.2 ,(set `(_.0) `s.3)) 
+           : (!in (_.0 s.1) (_.0 s.3)) (union (s.1 s.2 s.3)))
+          ((s.0 ,(set `(_.1) `s.2) ,(set `(_.1) `s.3)) 
+           : (!in (_.1 s.2) (_.1 s.3)) (union (s.0 s.2 s.3)))
+          ((,(set `(_.0) `s.1) ,(set `(_.0) `s.2) ,(set `(_.0) `s.3)) 
+           : (!in (_.0 s.1) (_.0 s.2) (_.0 s.3)) (union (s.1 s.2 s.3)))))
+
+  (test "empty uniono"
+        (run* (q) (fresh (x y) (== q `(,x ,y)) (uniono x y (empty-set))))
+        `((,(empty-set) ,(empty-set))))
+
+  (test "union fresh 2"
+        (run* (q)
+          (fresh (x y z)
+            (== q `(,x ,y ,z))
+            (uniono x y z)))
+        `((,(empty-set) ,(empty-set) ,(empty-set))
+          ((,(set `(_.0) `s.1) s.2 ,(set `(_.0) `s.3)) 
            : (!in (_.0 s.1) (_.0 s.3)) (union (s.1 s.2 s.3)))
           ((s.0 ,(set `(_.1) `s.2) ,(set `(_.1) `s.3)) 
            : (!in (_.1 s.2) (_.1 s.3)) (union (s.0 s.2 s.3)))
