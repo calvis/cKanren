@@ -60,16 +60,40 @@
 
 (define (get-env env-var c)
   (let ([envs (filter/rator 'template-env c)])
-    (cadr (oc-rands (findf (lambda (oc) (eq? (car (oc-rands oc)) env-var)) envs)))))
+    (when (null? envs)
+      (error 'get-env "there are no enviroments to get for ~s" env-var))
+    (let ([oc (findf (lambda (oc) (eq? (car (oc-rands oc)) env-var)) envs)])
+      (when (not oc)
+        (error 'get-env "something went wrong here ~s" (list  env-var c envs oc)))
+      (when (not (oc? oc))
+        (error 'get-env "expected oc, got something else ~s" (list env-var c envs oc)))
+      (cadr (oc-rands oc)))))
 
 (define (update-env env-var env^)
   (lambdam@ (a : s c)
+    (unless (var? env-var)
+      (error 'update-env "env-var is not a var ~s" env-var))
     ((update-c (build-oc update-env env-var env^)) a)))
+
+(define (unify-duplicates env)
+  (cond
+   [(null? env) identitym]
+   [(assq (caar env) (cdr env))
+    => (lambda (p) 
+         (composem 
+          (==-c (cdr p) (cdar env))
+          (unify-duplicates (cdr env))))]
+   [else (unify-duplicates (cdr env))]))
 
 (define (template-env env-var env)
   (lambdam@ (a : s c)
     (let ([env (walk* env s)])
-      ((update-c (build-oc template-env env-var env)) a))))
+      (unless (var? env-var)
+        (error 'template-env "env-var is not a var ~s" env-var))
+      ((composem
+        (update-c (build-oc template-env env-var env))
+        (unify-duplicates env))
+       a))))
 
 (define-constraint-interaction
   update-env-trigger
@@ -210,6 +234,22 @@
   (test "12"
         (run 1 (q) (fresh (x y) (templateo `(lambda (,x) (,y ,x)) q)))
         '((lambda (_.0) (_.1 _.0))))
+
+  (test "13"
+        (run* (q)
+          (fresh (x y a b)
+            (== x y)
+            (templateo `(,x ,y) `(,a ,b))
+            (== q `(,x ,y ,a ,b))))
+        '((_.0 _.0 _.1 _.1)))
+
+  (test "14"
+        (run* (q)
+          (fresh (x y a b)
+            (templateo `(,x ,y) `(,a ,b))
+            (== x y)
+            (== q `(,x ,y ,a ,b))))
+        '((_.0 _.0 _.1 _.1)))
 )
 
 

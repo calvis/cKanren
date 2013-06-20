@@ -15,7 +15,7 @@
  var? define-var-type goal? make-a c->list empty-s empty-c
  update-s update-c any/var?  prefix-s prtm identitym composem
  goal-construct ext-c build-oc oc-rands oc-rator run run* prt
- extend-enforce-fns extend-reify-fns goal? a?  walk walk*
+ extend-enforce-fns extend-reify-fns goal? a?  walk walk* oc?
  mzerog unitg onceo fresh-aux conde conda condu ifa ifu project fresh
  succeed fail enforce reify empty-a take mzerom bindm constraint?
  format-source reify-cvar var ext-s gen:mk-struct recur constructor
@@ -25,7 +25,7 @@
  filter-memq/rator define-lazy-goal replace-ocs same-default-type?
  override-occurs-check? update-c-nocheck reify-term var-x ext-c*
  filter-not-memq/rator #%app-safe use-constraints debug replace-s
- update-s-nocheck update-s-prefix attr-tag update-package
+ update-s-nocheck update-s-prefix attr-tag update-package oc-proc
  default-reify-attr : define-constraint-interaction run-constraints
  run/lazy case/lazy start/interactive resume/interactive reify/interactive 
  enforce/interactive exit/interactive extend-subscriptions conj)
