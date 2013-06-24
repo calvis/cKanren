@@ -258,8 +258,7 @@
         (== `(,t ,t^) q)))
     '((_.0 _.0)))
 
-  #;
-  (test "templateo-97d"
+  (test "16.6"
     (run* (q)
       (fresh (x g g^ t t^ t1 t2)
         (templateo `(,g ,t) `(,g^ ,t^))
