@@ -10,7 +10,12 @@
   (goal-construct (init-template t x)))
 
 (define empty-env '())
-(define (extend-env x v env) (cons `(,x . ,v) env))
+
+(define (extend-env x v env) 
+  (unless (var? v) 
+    (error "extend-env: first argument is not a variable" x))
+  (cons `(,x . ,v) env))
+
 (define (lookup-env x env)
   (cond
    [(assq x env) => cdr]
@@ -37,9 +42,9 @@
 ;; turns into ==. otherwise, placed back in the store.
 (define (template t x env-var)
   (lambdam@ (a : s c)
-    (let ([t (walk t s)]
+    (let ([t (walk* t s)]
           [x (walk x s)]
-          [env (get-env env-var c)])
+          [env (get-env env-var s c)])
       (cond
        [(eq? t x) a]
        [(occurs-check x t s) #f]
@@ -58,7 +63,7 @@
         (bindm a (==-c t x))]
        [else (bindm a (update-c (build-oc template t x env-var)))]))))
 
-(define (get-env env-var c)
+(define (get-env env-var s c)
   (let ([envs (filter/rator 'template-env c)])
     (when (null? envs)
       (error 'get-env "there are no enviroments to get for ~s" env-var))
@@ -67,7 +72,7 @@
         (error 'get-env "something went wrong here ~s" (list  env-var c envs oc)))
       (when (not (oc? oc))
         (error 'get-env "expected oc, got something else ~s" (list env-var c envs oc)))
-      (cadr (oc-rands oc)))))
+      (walk* (cadr (oc-rands oc)) s))))
 
 (define (update-env env-var env^)
   (lambdam@ (a : s c)
@@ -250,6 +255,49 @@
             (== x y)
             (== q `(,x ,y ,a ,b))))
         '((_.0 _.0 _.1 _.1)))
+
+  (test "15"
+    (run* (q)
+      (fresh (x g g^ t t^)
+        (templateo `(,t ,t) `(,t ,t^))
+        (== `(,t ,t^) q)))
+    '((_.0 _.0)))
+  
+  (test "16.1"
+        (run* (q)
+          (fresh (x g g^ t t^)
+            (== `(,t) g^)
+            (templateo `((,t) ,t) `(,g^ ,t^))
+            (== `(,t ,t^) q)))
+        '((_.0 _.0)))
+
+  (test "16.2"
+        (run* (q)
+          (fresh (x g g^ t t^)
+            (templateo `(,g ,t) `(,g^ ,t^))
+            (== `(,t) g)
+            (== g g^)
+            (== `(,t ,t^) q)))
+        '((_.0 _.0)))
+
+  (test "16.3"
+        (run* (q)
+          (fresh (x g t t^)
+            (== `(,t) g)
+            (templateo `(,g ,t) `(,g ,t^))
+            (== `(,t ,t^) q)))
+        '((_.0 _.0)))
+
+  (test "16.4"
+        (run* (q)
+          (fresh (x g g^ t t^ t1 t2)
+            (== g g^)
+            (== `(-> ,t1 ,t2) t)
+            (== `((x ,t1)) g)
+            (== `(,t ,t^) q)
+            (templateo `(,g ,t) `(,g^ ,t^))))
+        '(((-> _.0 _.1) (-> _.0 _.2))))
+
 )
 
 
