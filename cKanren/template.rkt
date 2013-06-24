@@ -42,26 +42,28 @@
 ;; turns into ==. otherwise, placed back in the store.
 (define (template t x env-var)
   (lambdam@ (a : s c)
-    (let ([t (walk* t s)]
-          [x (walk x s)]
-          [env (get-env env-var s c)])
-      (cond
-       [(eq? t x) a]
-       [(occurs-check x t s) #f]
-       [(pair? t)
-        (define-values (first env^) 
-          (make-var (car t) env))
-        (define-values (rest env^^)
-          (make-var (cdr t) env^))
-        (bindm a
-          (composem
-           (update-env env-var env^^)
-           (==-c x `(,first . ,rest))
-           (template (car t) first env-var)
-           (template (cdr t) rest env-var)))]
-       [(not (var? t))
-        (bindm a (==-c t x))]
-       [else (bindm a (update-c (build-oc template t x env-var)))]))))
+    (update-args 
+     #:with-args (s)
+     ([t walk*]
+      [x walk])
+     (cond
+      [(eq? t x) a]
+      [(occurs-check x t s) #f]
+      [(pair? t)
+       (define env (get-env env-var s c))
+       (define-values (first env^) 
+         (make-var (car t) env))
+       (define-values (rest env^^)
+         (make-var (cdr t) env^))
+       (bindm a
+         (composem
+          (update-env env-var env^^)
+          (==-c x `(,first . ,rest))
+          (template (car t) first env-var)
+          (template (cdr t) rest env-var)))]
+      [(not (var? t))
+       (bindm a (==-c t x))]
+      [else (bindm a (update-c (build-oc template t x env-var)))]))))
 
 (define (get-env env-var s c)
   (let ([envs (filter/rator 'template-env c)])
@@ -92,13 +94,14 @@
 
 (define (template-env env-var env)
   (lambdam@ (a : s c)
-    (let ([env (walk* env s)])
-      (unless (var? env-var)
-        (error 'template-env "env-var is not a var ~s" env-var))
-      ((composem
-        (update-c (build-oc template-env env-var env))
-        (unify-duplicates env))
-       a))))
+    (update-args 
+     #:with-args (s) ([env walk*])
+     (unless (var? env-var)
+       (error 'template-env "env-var is not a var ~s" env-var))
+     ((composem
+       (update-c (build-oc template-env env-var env))
+       (unify-duplicates env))
+      a))))
 
 (define-constraint-interaction
   update-env-trigger

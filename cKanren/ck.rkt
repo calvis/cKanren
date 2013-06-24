@@ -28,7 +28,8 @@
  update-s-nocheck update-s-prefix attr-tag update-package oc-proc
  default-reify-attr : define-constraint-interaction run-constraints
  run/lazy case/lazy start/interactive resume/interactive reify/interactive 
- enforce/interactive exit/interactive extend-subscriptions conj)
+ enforce/interactive exit/interactive extend-subscriptions conj
+ update-args)
 
 (provide
  (rename-out 
@@ -443,14 +444,14 @@
     (length s)))
 
 ;; walk an s
-(define (walk v s)
+(define (walk v s . rest)
   (cond
    ((and (var? v) (assq v s))
     => (lambda (a) (walk (cdr a) s)))
    (else v)))
 
 ;; walks a possibly nested structure
-(define (walk* w s)
+(define (walk* w s . rest)
   (let ((v (walk w s)))
     (cond
      ((mk-struct? v)
@@ -1336,4 +1337,16 @@
              ((rator-pre rand-pre ...) ... (rator rand ...))
              ((rator-post rand-post ...) ...))])
         #'(or (and pattern-applies? run-rule) rest-formatted)))]))
+
+;; =============================================================================
+
+(define-syntax (update-args stx)
+  (syntax-parse stx
+    [(update-args 
+      (~seq #:with-args (args ...))
+      ([x:id function:expr] ...)
+      bodies ...)
+     #'(let ([args^ (list args ...)])
+         (let ([x (apply function x args^)] ...) 
+           bodies ...))]))
 
