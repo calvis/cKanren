@@ -471,7 +471,7 @@
 ;; This is a tracing macro, akin to trace-define in Chez Scheme.  Upon
 ;; entry to the goal, all arguments to the function will be projected
 ;; in the current substitution and printed out.
-(define-syntax trace-define-mk
+(define-syntax trace-define
   (syntax-rules ()
     ((_ (name a* ...) body)
      (trace-define-mk name (lambda (a* ...) body)))

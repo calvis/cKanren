@@ -5,6 +5,8 @@
          "errors.rkt"
          "goals.rkt"
          "variables.rkt"
+         "mk-structs.rkt"
+         "debugging.rkt"
          racket/stxparam)
 
 (require 
@@ -52,7 +54,7 @@
   (syntax-parse stx
     [(_ ((~optional (~seq #:name branch-name)) g g* ...) ...+)
      (with-syntax ([(labels ...) (attribute branch-name)])
-       #'(lambdag@ (a : s c q t) 
+       #'(lambdag@/private (a : s c q t) 
            (delay 
             (mplusg* 
              (let ([a (make-a s c q (add-level t 'labels))])

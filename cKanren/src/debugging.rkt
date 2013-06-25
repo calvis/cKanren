@@ -2,7 +2,7 @@
 
 (require "helpers.rkt")
 
-(provide (struct-out path) empty-t add-level)
+(provide (all-defined-out))
 
 ;; wrapper for the tree
 (struct path (t)
