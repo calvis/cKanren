@@ -252,7 +252,7 @@
           (lambda (dom)
             (cond
               ((null-dom? dom)
-               (lambdag@ (a) (mzerog)))
+               (lambdag@ (a) mzerog))
               (else
                (conde
                 ((f (car-dom dom)))
