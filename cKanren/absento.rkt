@@ -3,7 +3,7 @@
 ;; Based on code provided by Jason Hemann and Dan Friedman
 ;; See: https://github.com/jasonhemann/miniKanren
 
-(require "ck.rkt" "tree-unify.rkt" "neq.rkt")
+(require "ck.rkt" "tree-unify.rkt" "neq.rkt" "src/helpers.rkt")
 (provide symbolo numbero absento mem-check term=)
 
 ;; symbolo

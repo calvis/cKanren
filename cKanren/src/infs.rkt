@@ -10,7 +10,6 @@
          (struct-out inc)
          (struct-out a)
          empty-f
-         lambdaf@
          delay
          case-inf)
 
@@ -20,7 +19,11 @@
 ;; the simple manifestations of the stream
 (struct mzerof a-inf ())
 (struct choiceg a-inf (a f))
-(struct inc a-inf (e) #:property prop:procedure (struct-field-index e))
+(struct inc a-inf (e) 
+  #:property prop:procedure (struct-field-index e)
+  #:methods gen:custom-write 
+  [(define (write-proc i port mode) 
+     ((parse-mode mode) "#<inc>" port))])
 (struct a a-inf (s c q t)
   #:extra-constructor-name make-a
   #:methods gen:custom-write 
