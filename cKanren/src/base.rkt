@@ -38,7 +38,7 @@
 
 ;; ocs
 (require "ocs.rkt") 
-(provide oc-rator oc-rands build-oc)
+(provide (struct-out oc) build-oc)
 
 ;; operators
 (require "operators.rkt") 

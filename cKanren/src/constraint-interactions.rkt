@@ -15,15 +15,14 @@
 (define-syntax (define-constraint-interaction stx)
   (syntax-parse stx 
     [(define-constraint-interaction 
-       name
+       name:id
        (constraint-exprs ...)
-       (~or (~optional (~seq #:package (a:id : s:id c:id)))
-            (~optional (~seq (~and #:not-reflexive reflexive?))))
+       (~or (~optional (~seq #:package (a:id : s:id c:id))))
        ...
        clauses ...)
-     (define a-name (or (attribute a) (generate-temporaries #'(?a))))
-     (define s-name (or (attribute s) (generate-temporaries #'(?s))))
-     (define c-name (or (attribute c) (generate-temporaries #'(?c))))
+     (define a-name (or (attribute a) (generate-temporary #'?a)))
+     (define s-name (or (attribute s) (generate-temporary #'?s)))
+     (define c-name (or (attribute c) (generate-temporary #'?c)))
      (with-syntax*
        ([(a s c) (list a-name s-name c-name)]
         [constraint-interaction-expr
@@ -41,9 +40,7 @@
       ([pred? (constraints ...)] ...)
       (a s c))
      (with-syntax 
-       ([(arg ...) (generate-temporaries #'(rator ...))]
-        [bad-pattern-error 
-         #'(error 'name "bad pattern ~s" '((rator rands ...) ...))])
+       ([(arg ...) (generate-temporaries #'(rator ...))])
        #`(let ()
            (define (run-interaction . arg*)
              (lambdam@/private (a : ?s ?c ?q ?t)
@@ -58,7 +55,10 @@
                           ((composem constraints ...) new-a)))]
                      ...
                      [else #f])]
-                   [_ bad-pattern-error]))))
+                   ;; when the rators are all correct but the pattern
+                   ;; is more strict than we were expecting, we should
+                   ;; fail instead of erroring
+                   [_ #f]))))
            (define (name oc)
              (let ([this-rator (oc-rator oc)])
                (lambdam@ (a : s c)
@@ -71,30 +71,30 @@
     [(generate-cond run-interaction (a s c) oc this-rator (pattern ...) ()) #'#f]
     [(generate-cond 
       run-interaction (a s c) oc this-rator
-      ((rator-pre rand-pre) ...)
-      ((rator rand ...) (rator-post rand-post) ...))
+      ((rator-pre rand-pre ...) ...)
+      ((rator rand ...) (rator-post rand-post ...) ...))
      (with-syntax
-      ([(pre ...) (generate-temporaries #'(rator-pre ...))]
-       [(post ...) (generate-temporaries #'(rand-post ...))])
-      (with-syntax*
-       ([(pre-ocs ...)  #'((filter/rator 'rator-pre c) ...)]
-        [(post-ocs ...) #'((filter/rator 'rator-post c) ...)]
-        [pattern-applies? #'(eq? 'rator this-rator)]
-        [run-rule
-         #'(bindm a
-             (for*/fold
-              ([fn mzerom])
-              ([pre    pre-ocs] ...
-               [this (list oc)]
-               [post  post-ocs] ...)
-              (lambdam@ (a : s c)
+      ([(pre ...)  (generate-temporaries #'(rator-pre ...))]
+       [(post ...) (generate-temporaries #'(rator-post ...))]
+       [(pre-ocs ...)  #'((filter/rator 'rator-pre c) ...)]
+       [(post-ocs ...) #'((filter/rator 'rator-post c) ...)]
+       [pattern-applies? #'(eq? 'rator this-rator)])
+      (with-syntax
+        ([run-rule
+          #'(bindm a
+              (for*/fold
+               ([fn mzerom])
+               ([pre    pre-ocs] ...
+                [this (list oc)]
+                [post  post-ocs] ...)
+               (lambdam@ 
+                (a : s c)
                 (cond
                  [((run-interaction pre ... this post ...) a)]
                  [else (fn a)]))))]
-        [rest-formatted 
-         #'(generate-cond 
-            run-interaction (a s c) oc this-rator
-            ((rator-pre rand-pre) ... (rator rand ...))
-            ((rator-post rand-post) ...))])
-       #'(or (and pattern-applies? run-rule) rest-formatted)))]))
-
+         [rest-formatted 
+          #'(generate-cond 
+             run-interaction (a s c) oc this-rator
+             ((rator-pre rand-pre ...) ... (rator rand ...))
+             ((rator-post rand-post ...) ...))])
+        #'(or (and pattern-applies? run-rule) rest-formatted)))]))
