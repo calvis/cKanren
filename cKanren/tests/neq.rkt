@@ -204,7 +204,7 @@
                   (== y 1)))
               '())
   
-  (test-check "=/=21.1"
+  (test-check "=/=-21.1"
               (run* (q)
                 (fresh (x y z)
                   (=/= `(,x 2 ,z)  `(1 ,z 3))

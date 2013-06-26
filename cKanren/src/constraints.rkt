@@ -46,13 +46,13 @@
       (~seq #:package ....)
       (~seq #:event e))]))
 
+;; the failure value
+(define mzerom (mzerof))
+
 ;; the identity constraint
 (define identitym (lambdam@ (a) a))
 
-;; the simplest failing constraint
-(define mzerom (mzerof))
-
-;; succeed and fail are the simplest succeeding and failing goals
+;; succeed and fail are the simplest succeeding and failing constraint
 (define succeed identitym)
 (define fail    (lambdam@ (a) mzerom))
 

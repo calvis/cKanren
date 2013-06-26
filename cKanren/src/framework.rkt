@@ -27,16 +27,18 @@
   (run-constraint-interactions oc))
 
 (define (run-constraint-interactions oc)
-  (lambdam@/private (a : s c q t)
-    (let ([fns (constraint-interactions)])
-      (let loop ([fns fns])
-        (cond
-         [(null? fns) 
+  (let ([fns (constraint-interactions)])
+    (let loop ([fns fns])
+      (cond
+       [(null? fns) 
+        (lambdam@/private (a : s c q t)
           (let ([old-c (constraint-store-c c)])
             (let ([new-store (constraint-store (ext-c oc old-c))])
-              (make-a s new-store q t)))]
-         [(((cdar fns) oc) a)]
-         [else (loop (cdr fns))])))))
+              (make-a s new-store q t))))]
+       [else
+        (define fn (cdar fns))
+        (define constraint (fn oc))
+        (conda [(fn oc)] [(loop (cdr fns))])]))))
 
 ;; replaces all ocs with a rator equal to key with ocs^
 (define (replace-ocs key ocs^)

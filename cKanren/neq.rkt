@@ -1,7 +1,7 @@
 #lang racket
 
 (require "ck.rkt" (only-in "tree-unify.rkt" unify))
-(provide =/= =/=-c =/=neq-c oc-prefix reify-prefix-dot)
+(provide =/= =/=neq-c oc-prefix reify-prefix-dot)
 
 ;;; little helpers
 
@@ -59,21 +59,18 @@
       (let ([p* (walk* (map car rands) r)])
         (map remove-dots (sort-ps p*))))))
 
-(define =/=neq-c
-  (lambda (p)
-    (lambdam@ (a : s c)
-      (let ([p (walk* p s)])
-        (cond
-         ((unify p s c)
-          =>
-          (lambdam@ (s/c)
-            (let ((p (prefix-s s (car s/c))))
-              (cond
-               ((null? p) #f)
-               (else (bindm a (update-c (build-oc =/=neq-c p)))
-                     #;((normalize-store p) a)
-                     )))))
-         (else a))))))
+(define (=/=neq-c p)
+  (lambdam@ (a : s c)
+    (let ([p (walk* p s)])
+      (cond
+       [(unify p s c)
+        =>
+        (lambda (s/c)
+          (let ([p (prefix-s s (car s/c))])
+            (cond
+             [(null? p) mzerom]
+             [else (bindm a (update-c (build-oc =/=neq-c p)))])))]
+       [else a]))))
 
 ;; how to read this: 
 ;; neq-subsume defines an interaction between =/=neq-c constraints
@@ -86,27 +83,6 @@
   #:package (a : s c)
   [(subsumes? p p^ c) ((=/=neq-c p))])
 
-#;
-(define normalize-store
-  (lambda (p)
-    (lambdam@ (a : s c)
-      (let ([ncs (filter/rator '=/=neq-c c)])
-        (let loop ((ncs ncs) (ncs^ '()))
-          (cond
-           [(null? ncs)
-            (let ([oc (build-oc =/=neq-c p)])
-              (bindm a
-                (composem
-                 (replace-ocs '=/=neq-c ncs^)
-                 (update-c oc))))]
-           (else
-            (let* ((oc (car ncs))
-                   (p^ (oc-prefix oc)))
-              (cond
-               (((subsumes? p^ p) a) a)
-               (((subsumes? p p^) a) (loop (cdr ncs) ncs^))
-               (else (loop (cdr ncs) (cons oc ncs^))))))))))))
-
 (define subsumes?
   (lambda (p p^ c)
     (cond
@@ -116,18 +92,13 @@
 
 ;;; goals
 
-(define =/=
-  (lambda (u v)
-    (goal-construct (=/=-c u v))))
-
-(define =/=-c
-  (lambda (u v)
-    (lambdam@ (a : s c)
-      (cond
-       ((unify `((,u . ,v)) s c)
-        => (lambda (s/c)
-             ((=/=neq-c (prefix-s s (car s/c))) a)))
-       (else a)))))
+(define (=/= u v)
+  (lambdam@ (a : s c)
+    (cond
+     [(unify `((,u . ,v)) s c)
+      => (lambda (s/c)
+           ((=/=neq-c (prefix-s s (car s/c))) a))]
+     [else a])))
 
 (extend-reify-fns 'neq reify-constraintsneq)
 

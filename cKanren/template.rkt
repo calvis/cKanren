@@ -7,9 +7,6 @@
 ;; goal that will copy the "template" in t, i.e. the structure and
 ;; free variables, to x
 (define (templateo t x)
-  (goal-construct (init-template t x)))
-
-(define (init-template t x)
   (let ([new-env-var (var 'env)])
     (template t x new-env-var)))
 
@@ -20,21 +17,20 @@
   (lambdam@ (a : s c)
     (let ([t (walk* t s)]
           [x (walk x s)])
-      (cond
-       [(eq? t x) 
-        (bindm a (update-c (build-oc template t x env-var)))]
-       [(occurs-check x t s) #f]
-       [(pair? t)
-        (let ([first (var 'first)]
-              [rest  (var 'rest)])
-          (bindm a
-            (composem
-             (==-c x `(,first . ,rest))
+      (bindm a
+        (cond
+         [(not (var? t)) (== t x)]
+         [(eq? t x) 
+          (update-c (build-oc template t x env-var))]
+         [(occurs-check x t s) fail]
+         [(pair? t)
+          (let ([first (var 'first)]
+                [rest  (var 'rest)])
+            (conj
+             (== x `(,first . ,rest))
              (template (car t) first env-var)
-             (template (cdr t) rest env-var))))]
-       [(not (var? t))
-        (bindm a (==-c t x))]
-       [else (bindm a (update-c (build-oc template t x env-var)))]))))
+             (template (cdr t) rest env-var)))]
+         [else (update-c (build-oc template t x env-var))])))))
 
 (define (get-env env-var s c)
   (let ([envs (filter/rator 'template-env c)])
@@ -50,19 +46,19 @@
 (define-constraint-interaction
   template-to-unify
   [(template ,t ,x ,env1) (template ,x ,t ,env2)]
-  [#t ((==-c t x))])
+  [#t ((== t x))])
 
 (define-constraint-interaction
   same-template
   [(template ,x ,y ,env-var) (template ,x ,z ,env-var)]
-  [#t ((==-c y z)
+  [#t ((== y z)
        (template x y env-var))])
 
 (define (specific-templateo t x)
   (conj (specifico t) (templateo t x)))
 
 (define (specifico t)
-  (goal-construct (specific t)))
+  (specific t))
 
 (define (specific t)
   (lambdam@ (a : s c)
@@ -70,7 +66,7 @@
       ((update-c (build-oc specific t)) a))))
 
 (define (enforce-specifics x)
-  (lambdag@ (a : s c)
+  (lambdam@ (a : s c)
     ((let loop ([specs (filter/rator 'specific c)])
        (cond
         [(null? specs) succeed]
@@ -81,7 +77,7 @@
      a)))
 
 (define (make-specifico spec)
-  (goal-construct (make-specific spec)))
+  (make-specific spec))
 
 (define (make-specific t)
   (lambdam@ (a : s c)
@@ -95,7 +91,7 @@
                 ([specific-pattern (cadr (oc-rands (car ts)))])
                 ([pat (cdr ts)])
                 (union-pattern specific-pattern (cadr (oc-rands pat)) s c))])
-          (bindm a (==-c t specific-pattern)))]))))
+          (bindm a (== t specific-pattern)))]))))
 
 (define (union-pattern spec pat s c)
   (cond
@@ -128,11 +124,18 @@
                        (union-pattern ud vd s c))))))]
    [else (var (gensym 'gen-fail))]))
 
-(extend-enforce-fns 'specifics enforce-specifics)
+;; (extend-enforce-fns 'specifics enforce-specifics)
 
 (module+ test
   (require "tester.rkt")
+
+  ;; sanity
+  (test (run* (q) succeed) '(_.0))
+  (test (run* (q) fail) '())
+
+  (test (run* (q) (== 5 5)) '(_.0))
   (test "0" (run* (q) (templateo 5 5)) '(_.0))
+
   (test "1" (run* (q) (templateo q q)) '(_.0))
   (test "2" (run* (q) (templateo 5 q)) '(5))
   (test "3" (run* (q) (templateo q 5) (templateo q 6)) '(_.0))

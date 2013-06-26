@@ -1,7 +1,7 @@
 #lang racket
 
 (require "helpers.rkt" "package.rkt" "ocs.rkt" "constraint-store.rkt"
-         "constraints.rkt")
+         "constraints.rkt" "operators.rkt")
 (require (for-syntax syntax/parse racket/syntax))
 
 (provide (all-defined-out))
@@ -11,6 +11,13 @@
 
 (define extend-constraint-interactions
   (extend-parameter constraint-interactions))
+
+#;
+(define-constraint-interaction
+  same-template
+  [(template ,x ,y ,env-var) (template ,x ,z ,env-var)]
+  [#t ((== y z)
+       (template x y env-var))])
 
 (define-syntax (define-constraint-interaction stx)
   (syntax-parse stx 
@@ -43,34 +50,33 @@
        ([(arg ...) (generate-temporaries #'(rator ...))])
        #`(let ()
            (define (run-interaction . arg*)
-             (lambdam@/private (a : ?s ?c ?q ?t)
-               (let ([s (substitution-s ?s)]
-                     [c (constraint-store-c ?c)])
-                 (match (map oc-rands arg*)
-                   [`((rands ...) ...)
+             (match (map oc-rands arg*)
+               [`((rands ...) ...)
+                (lambdam@/private (a : ?s ?c ?q ?t)
+                  (let ([s (substitution-s ?s)]
+                        [c (constraint-store-c ?c)])
                     (cond
                      [pred? 
                       (let ([new-c (remq*-c arg* c)])
                         (let ([new-a (make-a ?s (constraint-store new-c) ?q ?t)])
-                          ((composem constraints ...) new-a)))]
+                          (bindm new-a (conj constraints ...))))]
                      ...
-                     [else #f])]
-                   ;; when the rators are all correct but the pattern
-                   ;; is more strict than we were expecting, we should
-                   ;; fail instead of erroring
-                   [_ #f]))))
+                     [else mzerom])))]
+               ;; when the rators are all correct but the pattern
+               ;; is more strict than we were expecting, we should
+               ;; fail instead of erroring
+               [_ mzerom]))
            (define (name oc)
              (let ([this-rator (oc-rator oc)])
-               (lambdam@ (a : s c)
-                 (generate-cond run-interaction (a s c) oc this-rator 
-                                () ((rator rands ...) ...)))))
+               (generate-cond run-interaction oc c this-rator 
+                              () ((rator rands ...) ...))))
            name))]))
 
 (define-syntax (generate-cond stx)
   (syntax-parse stx 
-    [(generate-cond run-interaction (a s c) oc this-rator (pattern ...) ()) #'#f]
+    [(generate-cond run-interaction oc c this-rator (pattern ...) ()) #'fail]
     [(generate-cond 
-      run-interaction (a s c) oc this-rator
+      run-interaction oc c this-rator
       ((rator-pre rand-pre ...) ...)
       ((rator rand ...) (rator-post rand-post ...) ...))
      (with-syntax
@@ -81,20 +87,24 @@
        [pattern-applies? #'(eq? 'rator this-rator)])
       (with-syntax
         ([run-rule
-          #'(bindm a
-              (for*/fold
-               ([fn mzerom])
-               ([pre    pre-ocs] ...
-                [this (list oc)]
-                [post  post-ocs] ...)
-               (lambdam@ 
-                (a : s c)
-                (cond
-                 [((run-interaction pre ... this post ...) a)]
-                 [else (fn a)]))))]
+          #'(lambdam@ (a : s c)
+              (bindm a
+                (for*/fold
+                 ([fn fail])
+                 ([pre    pre-ocs] ...
+                  [this (list oc)]
+                  [post  post-ocs] ...)
+                 (conda
+                  [(run-interaction pre ... this post ...)]
+                  [fn]))))]
          [rest-formatted 
           #'(generate-cond 
-             run-interaction (a s c) oc this-rator
+             run-interaction oc c this-rator
              ((rator-pre rand-pre ...) ... (rator rand ...))
              ((rator-post rand-post ...) ...))])
-        #'(or (and pattern-applies? run-rule) rest-formatted)))]))
+        #'(cond
+           [pattern-applies?
+            (conda
+             [run-rule]
+             [rest-formatted])]
+           [else rest-formatted])))]))
