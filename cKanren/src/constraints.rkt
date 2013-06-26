@@ -39,13 +39,6 @@
              [c (constraint-store-c (a-c a))]) 
          e ...))]))
 
-#;
-(define-syntax (constraint-wrap stx)
-  (syntax-parse
-    [(constraint-wrap
-      (~seq #:package ....)
-      (~seq #:event e))]))
-
 ;; the failure value
 (define mzerom (mzerof))
 

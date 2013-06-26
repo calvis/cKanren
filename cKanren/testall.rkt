@@ -68,6 +68,7 @@
   (run-all))
 
 (module+ test
-  (run-all-long))
+  (require profile)
+  (profile-thunk run-all-long))
 
 

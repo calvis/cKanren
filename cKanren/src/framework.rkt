@@ -28,7 +28,7 @@
 
 (define (run-constraint-interactions oc)
   (let ([fns (constraint-interactions)])
-    (let loop ([fns fns])
+    (let ci-loop ([fns fns])
       (cond
        [(null? fns) 
         (lambdam@/private (a : s c q t)
@@ -38,7 +38,7 @@
        [else
         (define fn (cdar fns))
         (define constraint (fn oc))
-        (conda [(fn oc)] [(loop (cdr fns))])]))))
+        (conda [(fn oc)] [(ci-loop (cdr fns))])]))))
 
 ;; replaces all ocs with a rator equal to key with ocs^
 (define (replace-ocs key ocs^)
@@ -53,12 +53,12 @@
    ([fn identitym])
    ([(key ocs^) c^])
    (define ocs (hash-ref c key '()))
-   (let loop ([ocs^ ocs^])
+   (let prefix-loop ([ocs^ ocs^])
      (cond
       [(eq? ocs ocs^) fn]
       [else
        (conj 
-        (loop (cdr ocs^))
+        (prefix-loop (cdr ocs^))
         (oc-proc (car ocs^)))]))))
 
 ;; DFS: first do the continuation that was already in the store, then
@@ -183,9 +183,10 @@
     (let ([ocs (constraint-store-c c)])
       (cond
        [(memq-c oc ocs)
-        ((oc-proc oc)
-         (let ([new-c (constraint-store (remq-c oc ocs))])
-           (make-a s new-c q t)))]
+        (bindm 
+          (let ([new-c (constraint-store (remq-c oc ocs))])
+            (make-a s new-c q t))
+          (oc-proc oc))]
        [else a]))))
 
 (define-syntax case/lazy
@@ -253,8 +254,7 @@
              [(bfs) #'update-q-bfs]
              [(hybrid) #'update-q-hybrid]
              [else (bad-search-strat-error st)])])
-         #`(define (name args ...)
-             (update-q body))))]
+         #`(define (name args ...) (update-q body))))]
     [(define-lazy-goal name (lambda (args ...) body))
      #'(define-lazy-goal (name args ...) body)]))
 
