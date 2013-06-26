@@ -65,7 +65,7 @@
                ;; when the rators are all correct but the pattern
                ;; is more strict than we were expecting, we should
                ;; fail instead of erroring
-               [_ mzerom]))
+               [_ fail]))
            (define (name oc)
              (let ([this-rator (oc-rator oc)])
                (generate-cond run-interaction oc c this-rator 

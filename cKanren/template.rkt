@@ -19,7 +19,6 @@
           [x (walk x s)])
       (bindm a
         (cond
-         [(not (var? t)) (== t x)]
          [(eq? t x) 
           (update-c (build-oc template t x env-var))]
          [(occurs-check x t s) fail]
@@ -30,6 +29,7 @@
              (== x `(,first . ,rest))
              (template (car t) first env-var)
              (template (cdr t) rest env-var)))]
+         [(not (var? t)) (== t x)]
          [else (update-c (build-oc template t x env-var))])))))
 
 (define (get-env env-var s c)
