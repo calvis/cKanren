@@ -1,8 +1,8 @@
 #lang racket
 
-(require "constraints.rkt" "goals.rkt" "package.rkt" "mk-structs.rkt" "ocs.rkt"
-         "constraint-interactions.rkt" "variables.rkt" "errors.rkt" "infs.rkt"
-         "helpers.rkt" "operators.rkt" "attributes.rkt")
+(require "attributes.rkt" "constraints.rkt" "goals.rkt" "package.rkt" 
+         "mk-structs.rkt" "ocs.rkt" "constraint-interactions.rkt" 
+         "variables.rkt" "errors.rkt" "infs.rkt" "helpers.rkt" "operators.rkt")
 
 (require racket/generator)
 
@@ -491,6 +491,7 @@
 (define-syntax-rule (use-constraints file ...) 
   (require file ...))
 
+#;
 (define gensym
   (let ([counter 0])
     (lambda ([x 'g])
