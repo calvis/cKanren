@@ -4,7 +4,7 @@
 ;; See: https://github.com/namin/clpset-miniKanren
 
 (require "ck.rkt" "tree-unify.rkt"
-         (rename-in (only-in "neq.rkt" =/=-c) [=/=-c =/=-other])
+         (rename-in (only-in "neq.rkt" =/=) [=/= =/=-other])
          (only-in rackunit check-equal?))
 (provide set seto set-var normalize empty-set make-set
          enforce-lazy-unify-same =/= lazy-unify-same
@@ -119,7 +119,7 @@
   (unify e s (ext-c (build-oc safe-unify-set u v) c)))
 
 (define (safe-unify-set u v)
-  (composem
+  (conj
    (well-formed-set-c u)
    (well-formed-set-c v)
    (unify-well-formed-sets u v)))
@@ -134,11 +134,11 @@
         ((unify-well-formed-sets T X) a)]
        ;; it is possible normalization gave us two set-vars
        [(and (set-var? X) (set-var? T))
-        ((==-c X T) a)]
+        ((== X T) a)]
        [(set? T)
         (cond
-         [(or (empty-set? X) (empty-set? T)) #f]
-         [(set-member? X T) #f]
+         [(or (empty-set? X) (empty-set? T)) mzerom]
+         [(set-member? X T) mzerom]
          [(same-set? (set-right X) (set-right T))
           ((lazy-unify-same X T) a)]
          [else ((lazy-unify-diff X T) a)])]
@@ -147,11 +147,11 @@
          [(same-set? (set-right X) T)
           (let ([N (set-var (gensym 'n-unify))])
             (bindm a
-              (composem
+              (conj
                (proper-set-c (set (set-left X) N))
                (unify-well-formed-sets (set (set-left X) N) T))))]
          [else ((update-s T X) a)])]
-       [else #f]))))
+       [else mzerom]))))
 
 (define (lazy-unify-same X T)
   (lambdam@ (a : s c) 
@@ -170,25 +170,25 @@
           [T (normalize (walk* T s))])
       (cond
        [(null? (set-left X))
-        ((==-c T (set-right X)) a)]
+        ((== T (set-right X)) a)]
        [(null? (set-left T))
-        ((==-c X (set-right T)) a)]
+        ((== X (set-right T)) a)]
        ;; if there's only one thing in X or T, gtfo
        [(or (and (empty-set? (set-right X))
                  (null? (cdr (set-left X))))
             (and (empty-set? (set-right T))
                  (null? (cdr (set-left T)))))
         (bindm a
-          (composem
-           (==-c (set-left  X) (set-left T))
-           (==-c (set-right X) (set-right T))))]
+          (conj
+           (== (set-left  X) (set-left T))
+           (== (set-right X) (set-right T))))]
        [else ((update-c-nocheck (build-oc lazy-unify-diff X T)) a)]))))
 
 ;; =============================================================================
 
 ;; X = {t|s} = {t'|s'} = T
 (define (enforce-lazy-unify-diff oc)
-  (lambdag@ (a : s c)
+  (lambdam@ (a : s c)
     (let ([X (normalize (walk* (car (oc-rands oc)) s))]
           [T (normalize (walk* (cadr (oc-rands oc)) s))])
       (let ([t  (car (set-left X))]
@@ -214,7 +214,7 @@
 ;; X = {t0 .. tm | M} 
 ;; T = {t'0 .. t'n | M}
 (define (enforce-lazy-unify-same oc)
-  (lambdag@ (a : s c)
+  (lambdam@ (a : s c)
     (let ([X (normalize (walk* (car (oc-rands oc)) s))]
           [T (normalize (walk* (cadr (oc-rands oc)) s))])
       (let ([t0  (car (set-left X))]
@@ -247,7 +247,7 @@
          a)))))
 
 (define (enforce-set-cs x)
-  (lambdag@ (a)
+  (lambdam@ (a)
     ((conj
        (loop 'union-fresh enforce-one-union-fresh)
        (cycle a))
@@ -265,7 +265,7 @@
     (loop 'lazy-union-neq  enforce-lazy-union-neq)
     (loop 'lazy-!union     enforce-!union)
     (loop 'disj-c          enforce-disj)
-    (lambdag@ (a^ : s^ c^)
+    (lambdam@ (a^ : s^ c^)
       (cond
        [(null? (filter-memq/rator
                 '(in-c
@@ -283,20 +283,18 @@
        [else ((cycle a^) a^)]))))
 
 (define (loop sym fn)
-  (lambdag@ (a : s c)
+  (lambdam@ (a : s c)
     (let ([ocs (filter/rator sym c)])
-      ((conj
-         (goal-construct
-          (replace-ocs sym '()))
+      (bindm a
+        (conj
+         (replace-ocs sym '())
          (let inner ([ocs ocs])
            (cond
-            [(null? ocs) 
-             unitg]
+            [(null? ocs) identitym]
             [else 
              (conj
                (fn (car ocs))
-               (inner (cdr ocs)))])))
-       a))))
+               (inner (cdr ocs)))])))))))
 
 (define (rem1 x ls)
   (cond
@@ -310,7 +308,7 @@
       (set ls (empty-set))))
 
 (define (seto u) 
-  (goal-construct (well-formed-set-c u)))
+  (well-formed-set-c u))
 
 (define (well-formed-set-c u)
   (lambdam@ (a : s c)
@@ -325,36 +323,35 @@
              [(null? l)
               (well-formed-set-c (set-right u))]
              [(set? (car l))
-              (composem
+              (conj
                (well-formed-set-c (car l))
                (loop (cdr l)))]
              [else (loop (cdr l))])))]
        [(var? u)
         (let ([u^ (set-var (var-x u))])
           ((update-s u u^) a))]
-       [else #f]))))
+       [else mzerom]))))
 
 (define (ino t s)
-  (goal-construct 
-   (composem
-    (well-formed-set-c s)
-    (in-c t s))))
+  (conj
+   (well-formed-set-c s)
+   (in-c t s)))
 
 (define (in-c x S)
   (lambdam@ (a : s c)
     (let ([x (walk x s)]
           [S (normalize (walk* S s))])
       (cond
-       [(empty-set? S) #f]
+       [(empty-set? S) mzerom]
        [(and (set? S) (memq x (set-left S))) a]
        [else ((update-c-nocheck (build-oc in-c x S)) a)]))))
 
 (define (enforce-in oc)
-  (lambdag@ (a : s c)
+  (lambdam@ (a : s c)
     (let ([x (walk (car (oc-rands oc)) s)]
           [S (normalize (walk* (cadr (oc-rands oc)) s))])
       (cond
-       [(empty-set? S) #f]
+       [(empty-set? S) mzerom]
        [(set? S)
         (let ([t (car (set-left S))]
               [rest (set (cdr (set-left S)) (set-right S))])
@@ -377,10 +374,10 @@
    [else (conde [(== x (car t*))] [(one-of-terms x (cdr t*))])]))
 
 (define (=/= u v)
-  (goal-construct (neq-? u v)))
+  (neq-? u v))
 
 (define (=/=-set u v)
-  (composem
+  (conj
    (well-formed-set-c u)
    (well-formed-set-c v)
    (=/=-well-formed u v)))
@@ -390,7 +387,7 @@
     (let ([u (walk u s)]
           [v (walk v s)])
       (cond
-       [(eq? u v) #f]
+       [(eq? u v) mzerom]
        [(and (or (set? u) (set-var? u))
              (or (set? v) (set-var? v)))
         ((=/=-set u v) a)]
@@ -411,14 +408,14 @@
         ((lazy-neq-var U V) a)]
        [(set-var? V)
         ((lazy-neq-var V U) a)]
-       [else #f]))))
+       [else mzerom]))))
 
 (define (set-neq U V)
   (lambdam@ (a : s c)
     (let ([U (normalize (walk* U s))]
           [V (normalize (walk* V s))])
       (cond
-       [(same-set? U V) #f]
+       [(same-set? U V) mzerom]
        [else ((update-c-nocheck (build-oc set-neq U V)) a)]))))
 
 ;; both U and V are sets: {s|r} != {u|t}
@@ -427,7 +424,7 @@
     (let ([U (normalize (walk* U s))]
           [V (normalize (walk* V s))])
       (cond
-       [(same-set? U V) #f]
+       [(same-set? U V) mzerom]
        [(empty-set? U) a]
        [(empty-set? V) a]
        ;; {|r} != {u|t}
@@ -444,7 +441,7 @@
     (let ([U (normalize (walk* U s))]
           [V (normalize (walk* V s))])
       (cond
-       [(same-set? U V) #f]
+       [(same-set? U V) mzerom]
        [(set? U)
         ((lazy-neq-sets U V) a)]
        ;; V = {t0 .. tn | t} where U != t
@@ -456,29 +453,29 @@
 
 ;; U is a set var, and V might be a set or a set var
 (define (enforce-lazy-neq-var oc)
-  (lambdag@ (a : s c)
+  (lambdam@ (a : s c)
     (let ([U (normalize (walk* (car (oc-rands oc)) s))]
           [V (normalize (walk* (cadr (oc-rands oc)) s))])
-      ((conde
-        ;; V = {t0 .. tn | U} => U != {t0 .. tn|U}
-        [(cond
-          [(and (set? V)
-                (same-set? U (set-right V)))
-           (let loop ([ts (set-left V)])
-             (cond
-              [(null? ts) fail]
-              [else 
-               (conde
-                [(!ino (car ts) U)]
-                [(loop (cdr ts))])]))]
-          [else fail])]
-        ;; V = {t0 .. tn | t} where U != t
-        [(goal-construct (set-neq U V))])
-       a))))
+      (bindm a
+        (conde
+         ;; V = {t0 .. tn | U} => U != {t0 .. tn|U}
+         [(cond
+           [(and (set? V)
+                 (same-set? U (set-right V)))
+            (let loop ([ts (set-left V)])
+              (cond
+               [(null? ts) fail]
+               [else 
+                (conde
+                 [(!ino (car ts) U)]
+                 [(loop (cdr ts))])]))]
+           [else fail])]
+         ;; V = {t0 .. tn | t} where U != t
+         [(set-neq U V)])))))
 
 ;; both U and V are sets
 (define (enforce-lazy-neq-sets oc)
-  (lambdag@ (a : s c)
+  (lambdam@ (a : s c)
     (let ([U (normalize (walk* (car (oc-rands oc)) s))]
           [V (normalize (walk* (cadr (oc-rands oc)) s))])
       ((fresh (x)
@@ -488,10 +485,9 @@
        a))))
 
 (define (!ino x S)
-  (goal-construct 
-   (composem
-    (well-formed-set-c S)
-    (!in-c x S))))
+  (conj
+   (well-formed-set-c S)
+   (!in-c x S)))
 
 (define (!in-c x S)
   (lambdam@ (a : s c)
@@ -504,7 +500,7 @@
         a]
        [(set? S)
         (cond
-         [(memq x (set-left S)) #f]
+         [(memq x (set-left S)) mzerom]
          [(and (not (var? x))
                (empty-set? (set-right S))
                (not (any/var? (set-left S)))
@@ -512,7 +508,7 @@
           a]
          [else
           (bindm a
-            (composem
+            (conj
              (not-in-t* x (set-left S))
              (!in-c x (set-right S))))])]
        [else ((update-c-nocheck (build-oc !in-c x S)) a)]))))
@@ -526,15 +522,14 @@
   (cond
    [(null? t*) identitym]
    [else
-    (composem (neq-? x (car t*)) (not-in-t* x (cdr t*)))]))
+    (conj (neq-? x (car t*)) (not-in-t* x (cdr t*)))]))
 
 (define (uniono u v w)
-  (goal-construct
-   (composem
-    (well-formed-set-c u)
-    (well-formed-set-c v)
-    (well-formed-set-c w)
-    (union-fresh u v w))))
+  (conj
+   (well-formed-set-c u)
+   (well-formed-set-c v)
+   (well-formed-set-c w)
+   (union-fresh u v w)))
 
 ;; W is a set var
 (define (lazy-union-var U V W)
@@ -546,14 +541,14 @@
        [(set? W)
         (bindm a (lazy-union-set U V W))]
        [(same-set? U V)
-        (bindm a (==-c W U))]
+        (bindm a (== W U))]
        [(empty-set? U)
-        (bindm a (==-c W V))]
+        (bindm a (== W V))]
        [(empty-set? V)
-        (bindm a (==-c W U))]
+        (bindm a (== W U))]
        [else 
         (bindm a
-          (composem
+          (conj
            ;; Not tested yet
            ;; (check-set-neq U)
            ;; (check-set-neq V)
@@ -566,12 +561,11 @@
     (let ([U (normalize (walk* U s))]
           [V (normalize (walk* V s))]
           [W (normalize (walk* W s))])
-      (printf "lazy-union-set: ~s ~s ~s\n" U V W)
       (cond
        [(empty-set? W)
-        (bindm a (composem (==-c U W) (==-c V W)))]
+        (bindm a (conj (== U W) (== V W)))]
        [(same-set? U V)
-        (bindm a (==-c U W))]
+        (bindm a (== U W))]
        [else (bindm a (update-c-nocheck (build-oc lazy-union-set U V W)))]))))
 
 ;; Untested
@@ -599,7 +593,7 @@
 
 ;; W should be a var
 (define (enforce-lazy-union-var oc)
-  (lambdag@ (a : s c)
+  (lambdam@ (a : s c)
     (let ([U (normalize (walk* (car (oc-rands oc)) s))]
           [V (normalize (walk* (cadr (oc-rands oc)) s))]
           [W (normalize (walk* (caddr (oc-rands oc)) s))])
@@ -640,10 +634,10 @@
                      (!ino t N2)
                      (uniono N1 N2 N))]))))
              a)))]
-       [else ((goal-construct (union-fresh U V W)) a)]))))
+       [else (bindm a (union-fresh U V W))]))))
 
 (define (enforce-one-union-fresh oc)
-  (lambdag@ (a : s c)
+  (lambdam@ (a : s c)
     (let ([U (normalize (walk* (car (oc-rands oc)) s))]
           [V (normalize (walk* (cadr (oc-rands oc)) s))]
           [W (normalize (walk* (caddr (oc-rands oc)) s))])
@@ -680,10 +674,9 @@
           (uniono N1 N2 N))]))]))
 
 (define (proper-seto S)
-  (goal-construct 
-   (composem
-    (well-formed-set-c S)
-    (proper-set-c S))))
+  (conj
+   (well-formed-set-c S)
+   (proper-set-c S)))
 
 (define (proper-set-c S)
   (lambdam@ (a : s c)
@@ -692,12 +685,12 @@
        ;; X = {t0 .. tn | N}
        [(empty-set? S) a]
        [(set? S)
-        ((composem
+        ((conj
           (let loop ([t* (set-left S)])
             (cond
              [(null? t*) identitym]
              [else
-              (composem
+              (conj
                (not-in-t* (car t*) (rem1 (car t*) (set-left S)))
                (!in-c (car t*) (set-right S))
                (loop (cdr t*)))]))
@@ -719,7 +712,7 @@
 
 ;; W is a set
 (define (enforce-lazy-union-set oc)
-  (lambdag@ (a : s c)
+  (lambdam@ (a : s c)
     (let ([U (normalize (walk* (car (oc-rands oc)) s))]
           [V (normalize (walk* (cadr (oc-rands oc)) s))]
           [W (normalize (walk* (caddr (oc-rands oc)) s))])
@@ -740,9 +733,9 @@
        a))))
 
 (define (enforce-lazy-union-neq oc)
-  (lambdag@ (a : s c)
+  (lambdam@ (a : s c)
     (let ([Z (normalize (walk* (car (oc-rands oc)) s))]
-          [t* (map (composem normalize walk*) (cadr (oc-rands oc)))])
+          [t* (map (conj normalize walk*) (cadr (oc-rands oc)))])
       ((let loop ([t* t*])
          (cond
           [(null? t*) succeed]
@@ -759,11 +752,10 @@
        a))))
 
 (define (disjo u v)
-  (goal-construct
-   (composem
-    (well-formed-set-c u)
-    (well-formed-set-c v)
-    (disj-c u v))))
+  (conj
+   (well-formed-set-c u)
+   (well-formed-set-c v)
+   (disj-c u v)))
 
 (define (disj-c U V)
   (lambdam@ (a : s c)
@@ -772,9 +764,9 @@
       (cond
        [(same-set? U V)
         (bindm a
-          (composem
-           (==-c U (empty-set))
-           (==-c V (empty-set))))]
+          (conj
+           (== U (empty-set))
+           (== V (empty-set))))]
        [(empty-set? U) a]
        [(empty-set? V) a]
        [(and (set? U) (set? V))
@@ -783,7 +775,7 @@
               [t2 (car (set-left V))]
               [s2 (set (cdr (set-left V)) (set-right V))])
           (bindm a
-            (composem
+            (conj
              (neq-? t1 t2)
              (!in-c t1 s2)
              (!in-c t2 s1)
@@ -792,20 +784,20 @@
         (let ([t (car (set-left U))]
               [U^ (set (cdr (set-left U)) (set-right U))])
           (bindm a
-            (composem
+            (conj
              (!in-c t U^)
              (disj-c U^ V))))]
        [(set? V)
         (let ([t (car (set-left V))]
               [V^ (set (cdr (set-left V)) (set-right V))])
           (bindm a
-            (composem
+            (conj
              (!in-c t V^)
              (disj-c U V^))))]
        [else ((update-c-nocheck (build-oc disj-c U V)) a)]))))
 
 (define (enforce-disj oc)
-  (lambdag@ (a : s c)
+  (lambdam@ (a : s c)
     (let ([U (normalize (walk* (car (oc-rands oc)) s))]
           [V (normalize (walk* (cadr (oc-rands oc)) s))])
       (printf "enforce-disj: ~s ~s\n" U V)
@@ -824,15 +816,14 @@
              (!ino v U^)
              (disjo U^ V^))])
          a)]
-       [else (goal-construct (oc-proc oc))]))))
+       [else (oc-proc oc)]))))
 
 (define (!uniono u v w)
-  (goal-construct
-   (composem
-    (well-formed-set-c u)
-    (well-formed-set-c v)
-    (well-formed-set-c w)
-    (lazy-!union u v w))))
+  (conj
+   (well-formed-set-c u)
+   (well-formed-set-c v)
+   (well-formed-set-c w)
+   (lazy-!union u v w)))
 
 (define (lazy-!union U V W)
   (lambdam@ (a : s c)
@@ -842,7 +833,7 @@
       ((update-c-nocheck (build-oc lazy-!union U V W)) a))))
 
 (define (enforce-!union oc)
-  (lambdag@ (a : s c)
+  (lambdam@ (a : s c)
     (let ([U (normalize (walk* (car (oc-rands oc)) s))]
           [V (normalize (walk* (cadr (oc-rands oc)) s))]
           [W (normalize (walk* (caddr (oc-rands oc)) s))])
