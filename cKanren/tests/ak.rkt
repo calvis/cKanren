@@ -288,8 +288,8 @@
                           ((== (tie a (tie b `(,b ,y))) (tie b (tie a `(,a ,x)))))
                           ((== (tie a (tie b `(,b ,y))) (tie a (tie a `(,a ,x))))))
                          (== `(,x ,y) q))))
-          '((a.0 a.1)
-            ((sus _.0 ((a.1 . a.2))) _.0)
+          '(((sus _.0 ((a.1 . a.2))) _.0)
+            (a.0 a.1)
             (((sus _.0 ((a.1 . a.2))) _.0) : (alpha (hash (a.2 _.0))))))
 
   (define substo  

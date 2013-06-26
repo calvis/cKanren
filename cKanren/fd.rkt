@@ -12,7 +12,7 @@
 ;;; goals
 
 (define (domfd x n*)
-  (goal-construct (domfd-c x n*)))
+  (domfd-c x n*))
 
 (define (domfd-c x n*)
   (lambdam@ (a : s c)
@@ -23,25 +23,25 @@
     (conj (domfd x0 n*) (domfd x n*) ...)))
 
 (define (=fd u v)
-  (goal-construct (=fd-c u v)))
+  (=fd-c u v))
 
 (define (=/=fd u v)
-  (goal-construct (=/=fd-c u v)))
+  (=/=fd-c u v))
 
 (define (<fd u v)
   (conj (<=fd u v) (=/=fd u v)))
 
 (define (<=fd u v)
-  (goal-construct (<=fd-c u v)))
+  (<=fd-c u v))
 
 (define (plusfd u v w)
-  (goal-construct (plusfd-c u v w)))
+  (plusfd-c u v w))
 
 (define (timesfd u v w)
-  (goal-construct (timesfd-c u v w)))
+  (timesfd-c u v w))
 
 (define (distinctfd v*)
-  (goal-construct (distinctfd-c v*)))
+  (distinctfd-c v*))
 
 ;;; 
 
@@ -74,7 +74,7 @@
       (cond
         ((var? v) ((update-var-dom v dom) a))
         ((memv-dom? v dom) a)
-        (else #f)))))
+        (else mzerom)))))
 
 (define update-var-dom 
   (lambda (x dom)
@@ -84,7 +84,7 @@
          => (lambda (xdom)
               (let ((i (intersection-dom xdom dom)))
                 (cond
-                  ((null-dom? i) #f)
+                  ((null-dom? i) mzerom)
                   (else ((resolve-storable-dom i x) a))))))
         (else ((resolve-storable-dom dom x) a))))))
 
@@ -98,21 +98,19 @@
        [else ((ext-d x dom) a)]))))
 
 (define (force-ans x)
-  (lambdag@ (a : s c)
+  (lambdam@ (a : s c)
     (let ([x (walk x s)])
-      ((cond
-        [(and (var? x) (get-dom x c))
-         => (map-sum 
-             (lambda (v) 
-               (goal-construct
-                (lambdam@ (a)
-                  ((update-s x v) a)))))]
-        [(pair? x)
-         (conj
+      (bindm a
+        (cond
+         [(and (var? x) (get-dom x c))
+          => (map-sum 
+              (lambda (v) 
+                (update-s x v)))]
+         [(pair? x)
+          (conj
            (force-ans (car x))
            (force-ans (cdr x)))]
-        [else unitg])
-       a))))
+         [else identitym])))))
 
 (define-syntax let-dom
   (syntax-rules (:)
@@ -135,23 +133,23 @@
              (singleton-dom? d_v)
              (= (singleton-element-dom d_u)
                 (singleton-element-dom d_v)))
-        #f)
+        mzerom)
        ((disjoint-dom? d_u d_v) a)
        (else
         (let ((oc (build-oc =/=fd-c u v)))
-          ((composem
+          (bindm a
+           (conj
             (update-c oc)
             (cond
-             ((singleton-dom? d_u)
-              (process-dom v (diff-dom d_v d_u)))
-             ((singleton-dom? d_v)
-              (process-dom u (diff-dom d_u d_v)))
-             (else identitym)))
-           a)))))))
+             [(singleton-dom? d_u)
+              (process-dom v (diff-dom d_v d_u))]
+             [(singleton-dom? d_v)
+              (process-dom u (diff-dom d_u d_v))]
+             [else identitym])))))))))
 
 (define (distinctfd-c v*)
   (lambdam@ (a : s c)
-    (let ((v* (walk* v* s)))
+    (let ([v* (walk* v* s)])
       (cond
        ((not (list? v*))
         (let ((oc (build-oc distinctfd-c v*)))
@@ -162,7 +160,7 @@
             (cond
              ((list-sorted? < n*)
               ((distinct/fd-c x* n*) a))
-             (else #f)))))))))
+             (else mzerom)))))))))
 
 (define (distinct/fd-c y* n*)
   (lambdam@ (a : s c)
@@ -170,7 +168,7 @@
       (cond
        ((null? y*)
         (let* ((oc (build-oc distinct/fd-c x* n*)))
-          ((composem
+          ((conj
             (update-c oc)
             (exclude-from-dom (make-dom n*) c x*))
            a)))
@@ -180,7 +178,7 @@
            ((var? y)
             (loop (cdr y*) n* (cons y x*)))
            ;; n* is NOT A DOM
-           ((memv y n*) #f)
+           ((memv y n*) mzerom)
            (else
             (let ((n* (list-insert < y n*)))
               (loop (cdr y*) n* x*))))))))))
@@ -191,7 +189,7 @@
     (cond
      [(get-dom x c)
       => (lambda (dom2)
-           (composem
+           (conj
             (process-dom x (diff-dom dom2 dom1))
             fn))]
      [else fn])))
@@ -202,7 +200,7 @@
      (lambdam@ (a : s c)
        (let-dom (s c) ([u : d_u] ...)
          (let ([oc (build-oc op u ...)])
-           ((composem
+           ((conj
              (update-c oc)
              (cond
               [(and d_u ...) body]
@@ -212,7 +210,7 @@
 (define (=fd-c u v)
   (c-op =fd-c ([u : d_u] [v : d_v])
     (let ([i (intersection-dom d_u d_v)])
-      (composem
+      (conj
        (process-dom u i)
        (process-dom v i)))))
 
@@ -222,7 +220,7 @@
           [vmax (max-dom d_v)])
       (let ([new-u-dom (copy-before-dom (lambda (u) (< vmax u)) d_u)]
             [new-v-dom (drop-before-dom (lambda (v) (<= umin v)) d_v)])
-        (composem
+        (conj
          (process-dom u new-u-dom)
          (process-dom v new-v-dom))))))
 
@@ -234,11 +232,10 @@
       (let ([new-w-dom (range (+ umin vmin) (+ umax vmax))]
             [new-u-dom (range (- wmin vmax) (- wmax vmin))]
             [new-v-dom (range (- wmin umax) (- wmax umin))])
-        (composem
+        (conj
          (process-dom w new-w-dom)
-         (composem
-          (process-dom u new-u-dom)
-          (process-dom v new-v-dom)))))))
+         (process-dom u new-u-dom)
+         (process-dom v new-v-dom))))))
 
 (define (timesfd-c u v w)
   (let ((safe-div (lambda (n c a) (if (zero? n) c (quotient a n)))))
@@ -256,24 +253,23 @@
                (range
                 (safe-div umax vmin wmin)
                 (safe-div umin vmax wmax))])
-          (composem
+          (conj
            (process-dom w new-w-dom)
-           (composem
-            (process-dom u new-u-dom)
-            (process-dom v new-v-dom))))))))
+           (process-dom u new-u-dom)
+           (process-dom v new-v-dom)))))))
 
 (define (enforce-constraintsfd x)
   (define (domfd-c->var domfd-c) 
     (car (oc-rands domfd-c)))
   (conj
     (force-ans x)
-    (lambdag@ (a : s c)
+    (lambdam@ (a : s c)
       (let ([domains (filter/rator 'domfd-c c)])
         (let ([bound-x* (map domfd-c->var domains)])
           (verify-all-bound s c bound-x*)
           ((conj
              (onceo (force-ans bound-x*))
-             (lambdag@ (a^) a)) 
+             (lambdam@ (a^) a)) 
            a))))))
 
 (define fd-cs '(=/=fd-c distinctfd-c distinct/fd-c 

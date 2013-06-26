@@ -117,15 +117,6 @@
 
 ;; a function that will safely extend the subsitution with
 ;; a binding of x to v
-#;
-(defc (update-s-check [x walk] [v walk])
-  #:package (a : s c q t)
-  (cond
-   [(or (var? x) (var? v))
-    (update-s-internal x v s c q t)]
-   [(equal? x v) a]
-   [else mzerom]))
-
 (define (update-s-check x v)
   (lambdam@/private (a : s c q t)
     (let ([s (substitution-s s)]
@@ -263,7 +254,7 @@
              [(hybrid) #'update-q-hybrid]
              [else (bad-search-strat-error st)])])
          #`(define (name args ...)
-             (goal-construct (update-q body)))))]
+             (update-q body))))]
     [(define-lazy-goal name (lambda (args ...) body))
      #'(define-lazy-goal (name args ...) body)]))
 

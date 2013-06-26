@@ -19,42 +19,41 @@
 
 (define prefo
   (lambda (x l)
-    (goal-construct (prefo-c x l))))
+    (prefo-c x l)))
 
 (define prefo-c
   (lambda (x l)
     (lambdam@ (a : s c)
-              (let ((x (walk x s)))
-                (cond
-                  ((var? x)
-                   ((update-c (build-oc prefo-c x l)) a))
-                  ((memq x l) a)
-                  (else #f))))))
+      (let ((x (walk x s)))
+        (cond
+         ((var? x)
+          ((update-c (build-oc prefo-c x l)) a))
+         ((memq x l) a)
+         (else mzerom))))))
 
 (define pick-prefs
   (lambda ()
-    (conj
-      (lambdag@ (a : s c)
-        ((letrec
-             ((loop
-               (lambda (c^)
-                 (cond
-                  ((null? c^) unitg)
-                  (else
-                   (let ((x (walk (caar c^) s)))
-                     (cond
-                      ((var? x)
-                       (conj
-                         (== x (cadar c^))
-                         (loop (cdr c^))))
-                      (else (loop (cdr c^))))))))))
-           (loop
-            (map
-             (lambda (oc)
-               (let ((p (oc-rands oc)))
-                 (cons (car p) (cadr p))))
-             (filter/rator 'prefo-c c))))
-         a)))))
+    (lambdam@ (a : s c)
+      (bindm a
+        (letrec
+            ((loop
+              (lambda (c^)
+                (cond
+                 ((null? c^) identitym)
+                 (else
+                  (let ((x (walk (caar c^) s)))
+                    (cond
+                     ((var? x)
+                      (conj
+                       (== x (cadar c^))
+                       (loop (cdr c^))))
+                     (else (loop (cdr c^))))))))))
+          (loop
+           (map
+            (lambda (oc)
+              (let ((p (oc-rands oc)))
+                (cons (car p) (cadr p))))
+            (filter/rator 'prefo-c c))))))))
 
 (define enforce-constraintspref
   (lambda (x)

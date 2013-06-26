@@ -8,12 +8,12 @@
     (lambdam@ (a : s c)
       (let ((x (walk x s)))
         (cond
-          ((pred? x) #f)
+          ((pred? x) mzerom)
           (else ((update-c (build-oc never-true-c pred? x)) a)))))))
 
 (define never-trueo
   (lambda (pred? x)
-    (goal-construct (never-true-c pred? x))))
+    (never-true-c pred? x)))
 
 (define never-pairo
   (lambda (x)
@@ -21,7 +21,7 @@
 
 (define requiredo
   (lambda (pred? x)
-    (goal-construct (required-c pred? x))))
+    (required-c pred? x)))
 
 (define required-c
   (lambda (pred? x)
@@ -33,13 +33,14 @@
 
 (define required-enforceo
   (lambda (x)
-    (goal-construct
-      (lambdam@ (a : s c)
-        (and (null? (filter/rator 'required-c c)) a)))))
+    (lambdam@ (a : s c)
+      (cond
+       [(null? (filter/rator 'required-c c)) a]
+       [else mzerom]))))
 
 (define allowedo
   (lambda (pred? x)
-    (goal-construct (allowed-c pred? x))))
+    (allowed-c pred? x)))
 
 (define allowed-c
   (lambda (pred? x)

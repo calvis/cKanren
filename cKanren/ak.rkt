@@ -52,24 +52,10 @@
         ,(reify-term (tie-t t) r)))
 
 (define (sus x pi)
-  (goal-construct (sus-c x pi)))
+  (sus-c x pi))
 
 (define (== u v)
-  (goal-construct (unify-s u v)))
-
-#;
-(define (==-nom u v)
-  (lambdam@ (a : s c)
-    (cond
-     [(unify `((,u . ,v)) s)
-      => (lambda (s^/c^) 
-           (let ([s^ (car s^/c^)]
-                 [c^ (cdr s^/c^)])
-             ((composem
-               (update-constraints c^)
-               (update-prefix s s^))
-              a)))]
-     [else #f])))
+  (unify-s u v))
 
 (define (unify-s u v)
   (lambdam@ (a : s c)
@@ -91,31 +77,31 @@
               (tu (tie-t u)) (tv (tie-t v)))
           (if (eq? au av)
               ((unify-s tu tv) a)
-              ((composem
+              ((conj
                 (hash-c au tv)
                 (unify-s tu (apply-pi `((,au . ,av)) tv c)))
                a))))
        ((and (pair? u) (pair? v))
-        ((composem
+        ((conj
           (unify-s (car u) (car v))
           (unify-s (cdr u) (cdr v)))
          a))
        ((and (var? u) (not (nom? u)))
-        ((composem
+        ((conj
           (sus u `())
           (update-s u (apply-pi `() v c)))
          a))
        ((and (var? v) (not (nom? v)))
-        ((composem
+        ((conj
           (sus v `())
           (update-s v (apply-pi `() u c)))
          a))          
-       ((or (nom? u) (nom? v)) #f)          
+       ((or (nom? u) (nom? v)) mzerom)          
        ((equal? u v) a)
-       (else #f)))))
+       (else mzerom)))))
 
 (define (==-check u v)
-  (goal-construct (unify-s-check u v)))
+  (unify-s-check u v))
 
 (define (unify-s-check u v)
   (lambdam@ (a : s c)
@@ -137,28 +123,28 @@
               (tu (tie-t u)) (tv (tie-t v)))
           (if (eq? au av)
               ((unify-s-check tu tv) a)
-              ((composem
+              ((conj
                 (hash-c au tv)
                 (unify-s-check tu (apply-pi `((,au . ,av)) tv c)))
                a))))
        ((and (pair? u) (pair? v))
-        ((composem
+        ((conj
           (unify-s-check (car u) (car v))
           (unify-s-check (cdr u) (cdr v)))
          a))
        ((and (var? u) (not (nom? u)))
-        ((composem
+        ((conj
           (sus u `())
           (ext-s-check u (apply-pi `() v c)))
          a))
        ((and (var? v) (not (nom? v)))
-        ((composem
+        ((conj
           (sus v `())
           (ext-s-check v (apply-pi `() u c)))
          a))          
-       ((or (nom? u) (nom? v)) #f)
+       ((or (nom? u) (nom? v)) mzerom)
        ((equal? u v) a)
-       (else #f)))))
+       (else mzerom)))))
 
 (define (ext-s-check x u)
   (lambdam@ (a : s c)
@@ -177,14 +163,14 @@
        [else #t]))))
 
 (define (hash b t)
-  (goal-construct (hash-c b t)))
+  (hash-c b t))
 
 (define (hash-c b t)
   (let rec ((t t))
     (lambdam@ (a : s c)
       (let ((t (walk t s c)))
         (cond
-         ((eq? b t) #f)
+         ((eq? b t) mzerom)
          ((sus? t)
           (let ((lhs (apply-pi (caddr t) b c)))
             ((update-c (build-oc hash-c lhs t)) a)))
@@ -195,9 +181,9 @@
          ((tie? t)
           (if (eq? b (tie-a t)) a ((rec (tie-t t)) a)))
          ((pair? t)
-          ((composem (rec (car t)) (rec (cdr t))) a))
+          ((conj (rec (car t)) (rec (cdr t))) a))
          ((and (var? t) (not (nom? t)))
-          ((composem (sus t `()) (rec t)) a))
+          ((conj (sus t `()) (rec t)) a))
          (else a))))))
 
 (define (tie-t* t)

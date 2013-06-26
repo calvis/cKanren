@@ -8,9 +8,8 @@
 
 ;; symbolo
 
-(define symbolo
-  (lambda (u)
-    (goal-construct (symbol-c u))))
+(define (symbolo u)
+  (symbol-c u))
 
 (define symbol-c
   (lambda (u)
@@ -18,10 +17,10 @@
       (let ((u (walk u s)))
         (cond
          [(symbol? u) a]
-         [(not (var? u)) #f]
+         [(not (var? u)) mzerom]
          [(symbol-uw? u (get-attributes u c))
           ((update-c (build-attr-oc symbol-c u symbol-uw?)) a)]
-         [else #f])))))
+         [else mzerom])))))
  
 (define (symbol-uw? x attrs)
   (define incompatible '(number-c))
@@ -47,7 +46,7 @@
 
 (define numbero
   (lambda (u)
-    (goal-construct (number-c u))))
+    (number-c u)))
 
 (define (number-uw? x attrs)
   (define incompatible '(symbol-c))
@@ -64,10 +63,10 @@
       (let ((u (walk u s)))
         (cond
          ((number? u) a)
-         ((not (var? u)) #f)
+         ((not (var? u)) mzerom)
          ((number-uw? u (get-attributes u c))
           ((update-c (build-attr-oc number-c u number-uw?)) a))
-         (else #f))))))
+         (else mzerom))))))
 
 (define number-constrained?
   (lambda (v attrs)
@@ -90,7 +89,7 @@
 
 (define absento
   (lambda (u v)
-    (goal-construct (absent-c u v))))
+    (absent-c u v)))
 
 (define absent-c
   (lambda (u v)
@@ -108,10 +107,10 @@
                [else #f]))
           (cond
            [(pair? u) a]
-           [else ((=/=-c u v) a)])]
+           [else ((=/= u v) a)])]
          [(pair? v) ((absento-split u v) a)]
-         [(not (var? v)) ((=/=-c u v) a)]
-         [(eq? u v) #f]
+         [(not (var? v)) ((=/= u v) a)]
+         [(eq? u v) mzerom]
          [(mem-check v u s c) a]
          [else ((normalize-store u v) a)])))))
 
@@ -162,29 +161,27 @@
       (remove-duplicates rands))))
 
 (define (absento-split u v)
-  (composem
+  (conj
    (absent-c u (car v))
    (absent-c u (cdr v))
-   (=/=-c u v)))
+   (=/= u v)))
 
 (define type-cs '(number-c symbol-c))
 (define (rerun-type-cs x)
   (conj
    (elim-diseqs)
-   (goal-construct
-    (lambdam@ (a : s c)
-      (let ([ocs (filter (lambda (oc) (memq (attr-oc-type oc) type-cs))
-                         (filter/rator attr-tag c))])
-        ((run-relevant-constraints (map (compose car oc-rands) ocs) c) a))))))
+   (lambdam@ (a : s c)
+     (let ([ocs (filter (lambda (oc) (memq (attr-oc-type oc) type-cs))
+                        (filter/rator attr-tag c))])
+       ((run-relevant-constraints (map (compose car oc-rands) ocs) c) a)))))
 
 (define (elim-diseqs)
-  (goal-construct
-   (lambdam@ (a : s c)
-     (let ([neqs (filter/rator '=/=neq-c c)]
-           [absentos (filter/rator 'absent-c c)])
-       (let ([neqs^ (map (lambda (oc) (filter-subsumed-prefixes oc absentos s c)) neqs)])
-         (let ([neqs^ (filter-not (compose null? oc-prefix) neqs^)])
-           ((replace-ocs '=/=neq-c neqs^) a)))))))
+  (lambdam@ (a : s c)
+    (let ([neqs (filter/rator '=/=neq-c c)]
+          [absentos (filter/rator 'absent-c c)])
+      (let ([neqs^ (map (lambda (oc) (filter-subsumed-prefixes oc absentos s c)) neqs)])
+        (let ([neqs^ (filter-not (compose null? oc-prefix) neqs^)])
+          (bindm a (replace-ocs '=/=neq-c neqs^)))))))
 
 (define (filter-subsumed-prefixes oc absentos s c)
   (define absento-pairs (map oc-rands absentos))

@@ -45,7 +45,8 @@
                   (fresh (a b)
                     (absento q a)
                     (absento `(3 ,a) `(,q ,a))
-                    (== 3 b)))
+                    (== 3 b)
+                    prt))
                 '((_.0 (=/= ((_.0 3))))))
     
     (test "test 5.1"

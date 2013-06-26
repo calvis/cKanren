@@ -13,11 +13,8 @@
          interval-difference interval-union interval-intersection
          interval-memq? cons-dom interval-combinable? interval-> interval-<)
 
-;;INTERVALS;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(define interval?
-  (lambda (x)
-    (pair? x)))
+(define (interval? x)
+  (pair? x))
 
 (define interval-union
   (lambda (i j)
@@ -110,8 +107,6 @@
           ((pred i) `((,i . ,max)))
           ((= i max) `())
           (else (loop (+ i 1))))))))
-
-;;DOMAINS;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define range
   (lambda (lb ub)
@@ -251,12 +246,11 @@
         ((loop
           (lambda (dom)
             (cond
-              ((null-dom? dom)
-               (lambdag@ (a) mzerog))
-              (else
-               (conde
-                ((f (car-dom dom)))
-                ((loop (cdr-dom dom)))))))))
+             [(null-dom? dom) fail]
+             [else
+              (conde
+               [(f (car-dom dom))]
+               [(loop (cdr-dom dom))])]))))
       loop)))
 
 ;; Uncomment for interval test programs!
