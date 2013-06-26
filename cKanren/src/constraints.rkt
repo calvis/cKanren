@@ -1,6 +1,6 @@
 #lang racket
 
-(require "helpers.rkt" "package.rkt")
+(require "helpers.rkt" "substitution.rkt" "constraint-store.rkt" "infs.rkt" "errors.rkt")
 
 (provide (all-defined-out))
 
@@ -39,21 +39,71 @@
              [c (constraint-store-c (a-c a))]) 
          e ...))]))
 
+#;
+(define-syntax (constraint-wrap stx)
+  (syntax-parse
+    [(constraint-wrap
+      (~seq #:package ....)
+      (~seq #:event e))]))
+
 ;; the identity constraint
 (define identitym (lambdam@ (a) a))
 
 ;; the simplest failing constraint
-(define mzerom (lambdam@ (a) #f))
+(define mzerom (mzerof))
 
-;; applies a constraint to a package
-(define (bindm a fm) (fm a))
+;; succeed and fail are the simplest succeeding and failing goals
+(define succeed identitym)
+(define fail    (lambdam@ (a) mzerom))
 
-;; composes two constraints together
-(define (composem . fm*)
-  (lambdam@ (a)
-    (cond
-     [(null? fm*) a]
-     [((car fm*) a)
-      => (apply composem (cdr fm*))]
-     [else #f])))
+;; applies a goal to an a-inf and returns an a-inf
+(define bindm
+  (lambda (a-inf g)
+    (case-inf a-inf
+      [() (mzerof)]
+      [(f) (delay (bindm (f) g))]
+      [(a) (app-goal g a)]
+      [(a f) (mplusm (app-goal g a) (delay (bindm (f) g)))])))
+
+;; performs a conjunction over goals applied to an a-inf
+(define-syntax bindm*
+  (syntax-rules ()
+    [(_ a-inf) a-inf]
+    [(_ a-inf g g* ...)
+     (bindm* (bindm a-inf g) g* ...)]))
+
+;; combines a-inf and f, returning an a-inf
+(define mplusm
+  (lambda (a-inf f)
+    (case-inf a-inf
+      (() (f))
+      ((f^) (delay (mplusm (f) f^)))
+      ((a) (choiceg a f))
+      ((a f^) (choiceg a (delay (mplusm (f) f^)))))))
+
+;; shorthand for combining a-infs
+(define-syntax mplusm*
+  (syntax-rules ()
+    ((_ a-inf) a-inf)
+    ((_ a-inf a-inf* ...)
+     (mplusm a-inf (delay (mplusm* a-inf* ...))))))
+
+(define-syntax (app-goal x)
+  (syntax-case x ()
+    [(_ g a) #`((wrap-goal g #,(build-srcloc-stx #'g)) a)]))
+
+(define (non-goal-error-msg val)
+  (string-append
+   "expression evaluated to non-constraint where a constraint was expected"
+   (format "\n  value: ~s" val)))
+
+(define (wrap-goal val src)
+  (cond
+   [(constraint? val) val]
+   [(format-source src) => 
+    (lambda (loc) (error loc (non-goal-error-msg val)))]
+   [else (error (non-goal-error-msg val))]))
+
+(define-syntax-rule (start a g g* ...)
+  (bindm* (app-goal g a) g* ...))
 

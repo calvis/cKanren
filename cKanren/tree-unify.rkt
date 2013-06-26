@@ -1,7 +1,7 @@
 #lang racket
 
 (require "ck.rkt" racket/generic)
-(provide == ==-c unify gen:unifiable gen-unify compatible? unify-two unify-walked unifiable?)
+(provide == unify gen:unifiable gen-unify compatible? unify-two unify-walked unifiable?)
 (require racket/trace)
 
 ;; a generic that defines when things are unifiable!
@@ -41,15 +41,12 @@
        [else (unify e s c)]))]))
 
 (define (== u v)
-  (goal-construct (==-c u v)))
-
-(define (==-c u v)
   (lambdam@ (a : s c)
     (cond
      [(unify `((,u . ,v)) s c)
       => (lambda (s/c)
            ((update-package s/c) a))]
-     [else #f]) ))
+     [else mzerom])))
 
 (define (unify e s c)
   (cond

@@ -11,10 +11,6 @@
 (provide (all-defined-out))
 (provide (for-syntax search-strategy))
 
-;; constructs a goal from a constraint
-(define (goal-construct fm)
-  (lambdag@ (a) (or (fm a) mzerog)))
-
 ;; for subsumption checks
 (define (replace-s s^)
   (lambdam@/private (a : s c q t)
@@ -59,7 +55,7 @@
      (cond
       [(eq? ocs ocs^) fn]
       [else
-       (composem 
+       (conj 
         (loop (cdr ocs^))
         (oc-proc (car ocs^)))]))))
 
@@ -69,7 +65,7 @@
 (define (update-q-dfs new-enforce)
   (lambdam@/private (a : s c q-old t)
     (let ([q-new
-           (lambdag@/private (a : s c q-new t)
+           (lambdam@/private (a : s c q-new t)
              ((ext-q q-new new-enforce)
               (make-a s c empty-q t)))])
       (make-a s c (ext-q q-old q-new) t))))
@@ -78,7 +74,7 @@
 (define (update-q-hybrid new-enforce)
   (lambdam@/private (a : s c q-old t)
     (let ([q-new
-           (lambdag@/private (a : s c q-new t)
+           (lambdam@/private (a : s c q-new t)
              ((ext-q new-enforce q-new)
               (make-a s c empty-q t)))])
       (make-a s c (ext-q q-old q-new) t))))
@@ -101,7 +97,7 @@
       (lambdam@/private (a)
         ((run-c-prefix (constraint-store-c c) (cdr s^/c^))
          (make-a (substitution s^) c q t))))
-    (bindm a (composem update-c-fn update-s-fn))))
+    (bindm a (conj update-c-fn update-s-fn))))
 
 ;; s and c should be unwrapped
 (define (update-s-internal x v s c q t)
@@ -119,17 +115,26 @@
 
 ;; a function that will safely extend the subsitution with
 ;; a binding of x to v
+#;
+(defc (update-s-check [x walk] [v walk])
+  #:package (a : s c q t)
+  (cond
+   [(or (var? x) (var? v))
+    (update-s-internal x v s c q t)]
+   [(equal? x v) a]
+   [else mzerom]))
+
 (define (update-s-check x v)
   (lambdam@/private (a : s c q t)
     (let ([s (substitution-s s)]
           [c (constraint-store-c c)])
-      (let ((x (walk x s))
-            (v (walk v s)))
+      (let [(x (walk x s))
+            (v (walk v s))]
         (cond
          [(or (var? x) (var? v))
           (update-s-internal x v s c q t)]
          [(equal? x v) a]
-         [else #f])))))
+         [else mzerom])))))
 
 ;; a function that will insecurely extend the substitution 
 ;; with a binding of x to v 
@@ -152,29 +157,29 @@
     (for/fold 
      ([rest identitym])
      ([(key ocs) c])
-     (composem 
+     (conj 
       (for/fold 
        ([fn identitym])
        ([oc ocs])
-       (composem fn (rem/run oc)))
+       (conj fn (rem/run oc)))
       rest))]
    [(list? c)
     (for/fold 
      ([rest identitym])
      ([oc c])
-     (composem rest (rem/run oc)))]
+     (conj rest (rem/run oc)))]
    [else (error 'run-constraints "don't know how to run ~s" c)]))
 
 (define (run-relevant-constraints x* c)
   (for/fold 
    ([rest identitym])
    ([(key ocs) c])
-   (composem 
+   (conj 
     (for/fold 
      ([fn identitym])
      ([oc ocs]
       #:when (any-relevant/var? (oc-rands oc) x*))
-     (composem fn (rem/run oc)))
+     (conj fn (rem/run oc)))
     rest)))
 
 ;; removes a constraint from the constraint store and then 
@@ -233,7 +238,7 @@
 
 ;; runs the given search strategy on the queue of lazy goals
 (define fixpoint-enforce
-  (lambdag@/private (a : s c q t)
+  (lambdam@/private (a : s c q t)
     (cond
      [(empty-q? q) a]
      [else 
@@ -272,7 +277,7 @@
 
 ;; reifies the constraint store with respect to x
 (define (reify x)
-  (lambdag@/private (a : s c q t)
+  (lambdam@/private (a : s c q t)
     (let ([s (substitution-s s)]
           [c (constraint-store-c c)])
       (define v (walk* x s))
@@ -328,12 +333,12 @@
        (else `((,sym . ,(sort rands lex<=))))))))
 
 (define ((default-reify-attr sym type fn) v r ocs)
-  (let ((ocs (filter (lambda (oc) (eq? (attr-oc-type oc) type))
-                     (filter/rator attr-tag ocs))))
-    (let ((rands (filter-not any/var? (walk* (fn (map (compose car oc-rands) ocs) r) r))))
+  (let ([ocs (filter (lambda (oc) (eq? (attr-oc-type oc) type))
+                     (filter/rator attr-tag ocs))])
+    (let ([rands (filter-not any/var? (walk* (fn (map (compose car oc-rands) ocs) r) r))])
       (cond
-       ((null? rands) `())
-       (else `((,sym . ,(sort rands lex<=))))))))
+       [(null? rands) `()]
+       [else `((,sym . ,(sort rands lex<=)))]))))
 
 ;; sorts the constraint store by lex<=
 (define (sort-store ocs) (sort ocs lex<= #:key car))
@@ -424,21 +429,21 @@
 (define-syntax (start/interactive stx)
   (syntax-parse stx
     [(_ (~seq #:var x) g ...)
-     #'(running x (bindg empty-a (conj succeed g ...)))]))
+     #'(running x (bindm empty-a (conj succeed g ...)))]))
 
 (define-syntax-rule 
   (resume/interactive state g ...)
   (let ([st state])
     (let ([x (running-x st)]
           [a-inf (running-a-inf st)])
-      (running x (bindg a-inf (conj succeed g ...))))))
+      (running x (bindm a-inf (conj succeed g ...))))))
 
 (define-syntax-rule 
   (enforce/interactive state)
   (let ([st state])
     (let ([x (running-x st)]
           [a-inf (running-a-inf st)])
-      (enforced x (bindg a-inf (enforce x))))))
+      (enforced x (bindm a-inf (enforce x))))))
 
 (define-syntax-rule
   (reify/interactive state)
@@ -447,7 +452,7 @@
       (error 'reify/interactive "trying to reify an unenforced state ~s" st))
     (let ([x (running-x st)]
           [a-inf (running-a-inf st)])
-      (bindg a-inf (reify x)))))
+      (bindm a-inf (reify x)))))
 
 (define-syntax-rule 
   (exit/interactive n state)
@@ -521,8 +526,8 @@
 ;; The only correct application of a goal g is to a package a; i.e. (g a).
 (define-for-syntax (valid-app?-pred fn args) 
   (syntax-case args ()
-    [(a) #`(or (not (goal? #,fn)) (a? a))]
-    [(a* ...) #`(not (goal? #,fn))]))
+    [(a) #`(or (not (constraint? #,fn)) (a? a))]
+    [(a* ...) #`(not (constraint? #,fn))]))
 
 (define-syntax (#%app-safe x)
   (syntax-case x () 

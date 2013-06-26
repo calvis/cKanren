@@ -12,23 +12,19 @@
 
 ;; constraints
 (require "constraints.rkt") 
-(provide identitym composem lambdam@)
+(provide succeed fail identitym mzerom lambdam@)
 
 ;; debugging
 (require "debugging.rkt") 
 
 ;; framework
 (require "framework.rkt") 
-(provide update-s replace-s goal-construct reify-cvar update-c-nocheck
+(provide update-s replace-s reify-cvar update-c-nocheck
          update-package sort-by-lex<= lex<= default-reify bindm update-c
          extend-reify-fns run-relevant-constraints extend-enforce-fns
          define-lazy-goal reify-with-colon run run* run/lazy #%app-safe
          use-constraints trace-define)
 (provide (for-syntax search-strategy))
-
-;; goals
-(require "goals.rkt") 
-(provide lambdag@)
 
 ;; mk-structs
 (require "mk-structs.rkt") 
@@ -42,7 +38,7 @@
 
 ;; operators
 (require "operators.rkt") 
-(provide succeed fail conj conde fresh fresh-aux conj mzerog unitg)
+(provide conj conde fresh fresh-aux)
 (provide ifu condu ifa conda project onceo)
 (provide debug debug-conde prt prtm prtt)
 

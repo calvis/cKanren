@@ -7,6 +7,7 @@
          "variables.rkt"
          "mk-structs.rkt"
          "debugging.rkt"
+         "constraints.rkt"
          racket/stxparam)
 
 (require 
@@ -36,7 +37,15 @@
   (syntax-rules ()
     [(_ g) g]
     [(_ g g* ...)
-     (lambdag@ (a) (delay (start a g g* ...)))]))
+     (lambdam@ (a) (delay (start a g g* ...)))]))
+
+#;
+(define-syntax disj
+  (syntax-rules ()
+    [(_ g) g]
+    [(_ g* ...+)
+     (lambdam@ (a)
+       (delay (mplusm* (app-goal g* a) ...)))]))
 
 (define-syntax-parameter conde
   (lambda (stx)
@@ -47,18 +56,18 @@
           (with-syntax ([(branches ...) (attribute branch-name)])
             #'(debug-conde [#:name branches g g* ...] ...))]
          [else 
-          #'(lambdag@ (a) 
-              (delay (mplusg* (bindg* (app-goal g a) g* ...) ...)))])])))
+          #'(lambdam@ (a) 
+              (delay (mplusm* (start a g g* ...) ...)))])])))
 
 (define-syntax (debug-conde stx)
   (syntax-parse stx
     [(_ ((~optional (~seq #:name branch-name)) g g* ...) ...+)
      (with-syntax ([(labels ...) (attribute branch-name)])
-       #'(lambdag@/private (a : s c q t) 
+       #'(lambdam@/private (a : s c q t) 
            (delay 
-            (mplusg* 
+            (mplusm* 
              (let ([a (make-a s c q (add-level t 'labels))])
-               (bindg* (app-goal g a) g* ...))
+               (start a g g* ...))
              ...))))]))
 
 (define-syntax (debug stx)
@@ -76,40 +85,40 @@
           expr ...))]))
 
 (define-syntax-rule (conda (g0 g ...) (g1 g^ ...) ...)
-  (lambdag@ (a)
+  (lambdam@ (a)
     (delay (ifa ((app-goal g0 a) g ...) 
                 ((app-goal g1 a) g^ ...) ...))))
 
 (define-syntax ifa
   (syntax-rules ()
-    ((_) mzerog)
+    ((_) mzerom)
     ((_ (e g ...) b ...)
      (let loop ((a-inf e))
        (case-inf a-inf
          (() (ifa b ...))
          ((f) (delay (loop (f))))
-         ((a) (bindg* a-inf g ...))
-         ((a f) (bindg* a-inf g ...)))))))
+         ((a) (bindm* a-inf g ...))
+         ((a f) (bindm* a-inf g ...)))))))
 
 (define-syntax-rule (condu (g0 g ...) (g1 g^ ...) ...)
-  (lambdag@ (a)
+  (lambdam@ (a)
     (delay
      (ifu ((start a g0) g ...)
           ((start a g1) g^ ...) ...))))
 
 (define-syntax ifu
   (syntax-rules ()
-    ((_) mzerog)
+    ((_) mzerom)
     ((_ (e g ...) b ...)
      (let loop ((a-inf e))
        (case-inf a-inf
          (() (ifu b ...))
          ((f) (delay (loop (f))))
-         ((a) (bindg* a-inf g ...))
-         ((a f) (bindg* a g ...)))))))
+         ((a) (bindm* a-inf g ...))
+         ((a f) (bindm* a g ...)))))))
 
 (define-syntax-rule (project (x ...) g g* ...) 
-  (lambdag@ (a : s)
+  (lambdam@ (a : s)
     (let ((x (walk* x s)) ...)
       ((conj g g* ...) a))))
 
@@ -117,11 +126,11 @@
 ;; that prints a message.  both succeed.
 
 (define prt  
-  (lambdag@ (a) (begin (printf "~a\n" a) a)))
+  (lambdam@ (a) (begin (printf "~a\n" a) a)))
 (define (prtm . m) 
-  (lambdag@ (a) (begin (apply printf m) a)))
+  (lambdam@ (a) (begin (apply printf m) a)))
 
 (define (prtt . m) 
-  (lambdag@/private (a : s c q t) 
+  (lambdam@/private (a : s c q t) 
     (begin (display t) (display " ") (apply printf m) a)))
 
