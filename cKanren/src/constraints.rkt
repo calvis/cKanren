@@ -81,9 +81,12 @@
     ((_ a-inf a-inf* ...)
      (mplusm a-inf (delay (mplusm* a-inf* ...))))))
 
+#;
 (define-syntax (app-goal x)
   (syntax-case x ()
     [(_ g a) #`((wrap-goal g #,(build-srcloc-stx #'g)) a)]))
+
+(define-syntax-rule (app-goal g a) (g a))
 
 (define (non-goal-error-msg val)
   (string-append

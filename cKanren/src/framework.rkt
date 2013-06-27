@@ -3,10 +3,10 @@
 (require "attributes.rkt" "constraints.rkt" "goals.rkt" "package.rkt" 
          "mk-structs.rkt" "ocs.rkt" "constraint-interactions.rkt" 
          "variables.rkt" "errors.rkt" "infs.rkt" "helpers.rkt" "operators.rkt")
-
 (require racket/generator)
-
 (require (for-syntax syntax/parse racket/syntax))
+
+(require optimization-coach)
 
 (provide (all-defined-out))
 (provide (for-syntax search-strategy))

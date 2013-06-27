@@ -42,8 +42,7 @@
    (define (constructor tie)
      (lambda (a t-ls)
        (make-tie a (car t-ls))))
-   (define (unifiable? tie x) 
-     (tie? x))
+   (define (override-occurs-check? tie) #f)
    (define (reify-mk-struct tie r)
      (reify-tie tie r))])
 
@@ -63,40 +62,40 @@
       (cond
        ((eq? u v) a)
        ((sus? u)
-        ((update-s (sus-v u) (apply-pi (sus-pi u) v c)) a))
+        (bindm a (update-s (sus-v u) (apply-pi (sus-pi u) v c))))
        ((get-sus u c)
         => (lambda (s)
-             ((update-s u (apply-pi (sus-pi s) v c)) a)))
+             (bindm a (update-s u (apply-pi (sus-pi s) v c)))))
        ((sus? v)
-        ((update-s (sus-v v) (apply-pi (sus-pi v) u c)) a))
+        (bindm a (update-s (sus-v v) (apply-pi (sus-pi v) u c))))
        ((get-sus v c)
         => (lambda (s)
-             ((update-s v (apply-pi (sus-pi s) u c)) a)))
+             (bindm a (update-s v (apply-pi (sus-pi s) u c)))))
        ((and (tie? u) (tie? v))
         (let ((au (tie-a u)) (av (tie-a v))
               (tu (tie-t u)) (tv (tie-t v)))
-          (if (eq? au av)
-              ((unify-s tu tv) a)
-              ((conj
-                (hash-c au tv)
-                (unify-s tu (apply-pi `((,au . ,av)) tv c)))
-               a))))
+          (bindm a
+            (if (eq? au av)
+                (unify-s tu tv)
+                (conj
+                 (hash-c au tv)
+                 (unify-s tu (apply-pi `((,au . ,av)) tv c)))))))
        ((and (pair? u) (pair? v))
-        ((conj
-          (unify-s (car u) (car v))
-          (unify-s (cdr u) (cdr v)))
-         a))
+        (bindm a
+          (conj
+           (unify-s (car u) (car v))
+           (unify-s (cdr u) (cdr v)))))
        ((and (var? u) (not (nom? u)))
-        ((conj
-          (sus u `())
-          (update-s u (apply-pi `() v c)))
-         a))
+        (bindm a 
+          (conj
+           (sus u `())
+           (update-s u (apply-pi `() v c)))))
        ((and (var? v) (not (nom? v)))
-        ((conj
-          (sus v `())
-          (update-s v (apply-pi `() u c)))
-         a))          
-       ((or (nom? u) (nom? v)) mzerom)          
+        (bindm a
+          (conj
+           (sus v `())
+           (update-s v (apply-pi `() u c)))))          
+       ((or (nom? u) (nom? v)) mzerom)
        ((equal? u v) a)
        (else mzerom)))))
 
@@ -148,8 +147,10 @@
 
 (define (ext-s-check x u)
   (lambdam@ (a : s c)
-    (and (occurs-check x u s c)
-         ((update-s x u) a))))
+    (cond
+     [(occurs-check x u s c)
+      ((update-s x u) a)]
+     [else mzerom])))
 
 (define (occurs-check x t s c)
   (let rec ([t t])

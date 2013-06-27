@@ -38,7 +38,6 @@
   (test-sets)
   (test-symbolo)
   (test-symbolo-numbero)
-
   (test-comp)
 )
 
@@ -56,19 +55,19 @@
   (test-numbero-long)
   (test-no-closure-long)
   (test-pref-long)
-  (test-quines-long)
   (test-sets-long)
   (test-symbolo-long)
   (test-symbolo-numbero-long)
-
   (test-comp-long)
+
+  (test-quines-long)
 )
 
 (module+ main
   (run-all))
 
 (module+ test
-  (require profile)
-  (profile-thunk run-all-long))
+  (require optimization-coach)
+  (optimization-coach-profile (run-all-long)))
 
 

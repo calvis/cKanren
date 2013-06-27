@@ -244,20 +244,21 @@
           (uniono (make-set '(1)) (make-set '(2)) q))
         `(,(make-set `(1 2))))
 
-  (test "test 30.5"
-        (run* (q) 
-          (fresh (x y z v)
-            (== q `(,x ,y ,z ,v))
-            (uniono (make-set `(,x)) (set `(,y) z) v)))
-        `(((_.0 _.1 s.2 ,(set `(_.0 _.1) `s.2)) 
-           : (!in (_.0 s.2) (_.1 s.2)) (=/= (_.0 _.1)))
-          ((_.0 _.0 ,(set `(_.0) `s.1) ,(set `(_.0) `s.1))
-           : (!in (_.0 s.1)))
-          ((_.0 _.0 s.1 ,(set `(_.0) `s.1))
-           : (!in (_.0 s.1)))
-          ((_.0 _.1 ,(set `(_.0) `s.2) ,(set `(_.0 _.1) `s.2))
-           : (!in (_.0 s.2) (_.1 s.2)) (=/= (_.0 _.1)))))
-
+  (test-any-order
+   "test 30.5"
+   (run* (q) 
+     (fresh (x y z v)
+       (== q `(,x ,y ,z ,v))
+       (uniono (make-set `(,x)) (set `(,y) z) v)))
+   `(((_.0 _.1 s.2 ,(set `(_.0 _.1) `s.2)) 
+      : (!in (_.0 s.2) (_.1 s.2)) (=/= (_.0 _.1)))
+     ((_.0 _.0 ,(set `(_.0) `s.1) ,(set `(_.0) `s.1))
+      : (!in (_.0 s.1)))
+     ((_.0 _.0 s.1 ,(set `(_.0) `s.1))
+      : (!in (_.0 s.1)))
+     ((_.0 _.1 ,(set `(_.0) `s.2) ,(set `(_.0 _.1) `s.2))
+      : (!in (_.0 s.2) (_.1 s.2)) (=/= (_.0 _.1)))))
+  
   (test "test 31"
         (run* (q)
           (fresh (x y)
@@ -266,18 +267,19 @@
         `(,(make-set `(bird cat)) ,(make-set `(bird cat))))
 
   ;; Wrong?
-  (test "test 32.15"
-        (run* (q)
-          (fresh (x y)
-            (uniono (make-set `(cat ,x)) (make-set `(bird ,y)) q)))
-        `((,(make-set `(_.0 bird cat)) : (=/= ((_.0 . bird)) ((_.0 . cat))))
-          (,(make-set `(_.0 _.1 bird cat))
-           : (=/= (_.0 _.1)) (=/= ((_.0 . bird)) ((_.0 . cat)) ((_.1 . bird)) ((_.1 . cat))))
-          ,(make-set `(bird cat))
-          (,(make-set `(_.0 bird cat)) : (=/= ((_.0 . bird)) ((_.0 . cat))))
-          (,(make-set `(_.0 bird cat)) : (=/= ((_.0 . bird)) ((_.0 . cat))))
-          ,(make-set `(bird cat))))
-
+  (test-any-order
+   "test 32.15"
+   (run* (q)
+     (fresh (x y)
+       (uniono (make-set `(cat ,x)) (make-set `(bird ,y)) q)))
+   `((,(make-set `(_.0 bird cat)) : (=/= ((_.0 . bird)) ((_.0 . cat))))
+     (,(make-set `(_.0 _.1 bird cat))
+      : (=/= (_.0 _.1)) (=/= ((_.0 . bird)) ((_.0 . cat)) ((_.1 . bird)) ((_.1 . cat))))
+     ,(make-set `(bird cat))
+     (,(make-set `(_.0 bird cat)) : (=/= ((_.0 . bird)) ((_.0 . cat))))
+     (,(make-set `(_.0 bird cat)) : (=/= ((_.0 . bird)) ((_.0 . cat))))
+     ,(make-set `(bird cat))))
+  
   (test "enforce-lazy-union-var 1"
         (run* (q)
           (enforce-lazy-union-var
@@ -318,35 +320,37 @@
             q)))
         `(,(make-set `(bird cat dog))))
   
-  (test "union fresh 1"
-        (run* (q)
-          (fresh (x y z)
-            (== q `(,x ,y ,z))
-            (uniono x y z)
-            (=/= z (empty-set))))
-        `(((,(set `(_.0) `s.1) s.2 ,(set `(_.0) `s.3)) 
-           : (!in (_.0 s.1) (_.0 s.3)) (union (s.1 s.2 s.3)))
-          ((s.0 ,(set `(_.1) `s.2) ,(set `(_.1) `s.3)) 
-           : (!in (_.1 s.2) (_.1 s.3)) (union (s.0 s.2 s.3)))
-          ((,(set `(_.0) `s.1) ,(set `(_.0) `s.2) ,(set `(_.0) `s.3)) 
-           : (!in (_.0 s.1) (_.0 s.2) (_.0 s.3)) (union (s.1 s.2 s.3)))))
-
+  (test-any-order
+   "union fresh 1"
+   (run* (q)
+     (fresh (x y z)
+       (== q `(,x ,y ,z))
+       (uniono x y z)
+       (=/= z (empty-set))))
+   `(((,(set `(_.0) `s.1) s.2 ,(set `(_.0) `s.3)) 
+      : (!in (_.0 s.1) (_.0 s.3)) (union (s.1 s.2 s.3)))
+     ((s.0 ,(set `(_.1) `s.2) ,(set `(_.1) `s.3)) 
+      : (!in (_.1 s.2) (_.1 s.3)) (union (s.0 s.2 s.3)))
+     ((,(set `(_.0) `s.1) ,(set `(_.0) `s.2) ,(set `(_.0) `s.3)) 
+      : (!in (_.0 s.1) (_.0 s.2) (_.0 s.3)) (union (s.1 s.2 s.3)))))
+  
   (test "empty uniono"
         (run* (q) (fresh (x y) (== q `(,x ,y)) (uniono x y (empty-set))))
         `((,(empty-set) ,(empty-set))))
 
-  (test "union fresh 2"
-        (run* (q)
-          (fresh (x y z)
-            (== q `(,x ,y ,z))
-            (uniono x y z)))
-        `((,(empty-set) ,(empty-set) ,(empty-set))
-          ((,(set `(_.0) `s.1) s.2 ,(set `(_.0) `s.3)) 
-           : (!in (_.0 s.1) (_.0 s.3)) (union (s.1 s.2 s.3)))
-          ((s.0 ,(set `(_.1) `s.2) ,(set `(_.1) `s.3)) 
-           : (!in (_.1 s.2) (_.1 s.3)) (union (s.0 s.2 s.3)))
-          ((,(set `(_.0) `s.1) ,(set `(_.0) `s.2) ,(set `(_.0) `s.3)) 
-           : (!in (_.0 s.1) (_.0 s.2) (_.0 s.3)) (union (s.1 s.2 s.3)))))
+  (test-any-order
+   "union fresh 2"
+   (run* (q)
+     (fresh (x y z)
+       (== q `(,x ,y ,z))
+       (uniono x y z)))
+   `((,(empty-set) ,(empty-set) ,(empty-set))
+     ((,(set `(_.0) `s.1) s.2 ,(set `(_.0) `s.3)) 
+      : (!in (_.0 s.1) (_.0 s.3)) (union (s.1 s.2 s.3)))
+     ((s.0 ,(set `(_.1) `s.2) ,(set `(_.1) `s.3)) 
+      : (!in (_.1 s.2) (_.1 s.3)) (union (s.0 s.2 s.3)))
+     ((,(set `(_.0) `s.1) ,(set `(_.0) `s.2) ,(set `(_.0) `s.3)) 
+      : (!in (_.0 s.1) (_.0 s.2) (_.0 s.3)) (union (s.1 s.2 s.3)))))
 
   (test "david's example"
         (time
@@ -429,33 +433,36 @@
             (!uniono x y (set `(a b) (empty-set)))))
         '(((s.0 s.1) : (!in (a s.0) (a s.1)))))
 
-  (test "!uniono 5"
-        (run 5 (q)
-          (fresh (x y)
-            (!uniono q (empty-set) (set `(a b) (empty-set)))))
-        `((s.0 : (!in (a s.0)))
-          (,(set `(_.0) `s.1) : (!in (_.0 s.1)) (=/= ((_.0 . a)) ((_.0 . b))))
-          (s.0 : (!in (b s.0)))))
+  (test-any-order
+   "!uniono 5"
+   (run 5 (q)
+     (fresh (x y)
+       (!uniono q (empty-set) (set `(a b) (empty-set)))))
+   `((s.0 : (!in (a s.0)))
+     (,(set `(_.0) `s.1) : (!in (_.0 s.1)) (=/= ((_.0 . a)) ((_.0 . b))))
+     (s.0 : (!in (b s.0)))))
+  
+  (test-any-order
+   "!uniono 6"
+   (run 5 (q)
+     (fresh (x y)
+       (== q `(,x ,y))
+       (!uniono x y (set `(a b) (empty-set)))))
+   `(((s.0 s.1) : (!in (a s.0) (a s.1)))
+     ((s.0 s.1) : (!in (b s.0) (b s.1)))
+     ((,(set `(_.0) `s.1) s.2) : (!in (_.0 s.1)) (=/= ((_.0 . a)) ((_.0 . b))))
+     ((s.0 ,(set `(_.1) `s.2)) : (!in (_.1 s.2)) (=/= ((_.1 . a)) ((_.1 . b))))))
 
-  (test "!uniono 6"
-        (run 5 (q)
-          (fresh (x y)
-            (== q `(,x ,y))
-            (!uniono x y (set `(a b) (empty-set)))))
-        `(((s.0 s.1) : (!in (a s.0) (a s.1)))
-          ((s.0 s.1) : (!in (b s.0) (b s.1)))
-          ((,(set `(_.0) `s.1) s.2) : (!in (_.0 s.1)) (=/= ((_.0 . a)) ((_.0 . b))))
-          ((s.0 ,(set `(_.1) `s.2)) : (!in (_.1 s.2)) (=/= ((_.1 . a)) ((_.1 . b))))))
-
-  (test "!uniono 7"
-        (run* (q)
-          (fresh (x y)
-            (== q `(,x ,y))
-            (!uniono x y (set `(a b) (empty-set)))))
-        `(((s.0 s.1) : (!in (a s.0) (a s.1)))
-          ((s.0 s.1) : (!in (b s.0) (b s.1)))
-          ((,(set `(_.0) `s.1) s.2) : (!in (_.0 s.1)) (=/= ((_.0 . a)) ((_.0 . b))))
-          ((s.0 ,(set `(_.1) `s.2)) : (!in (_.1 s.2)) (=/= ((_.1 . a)) ((_.1 . b))))))
+  (test-any-order
+   "!uniono 7"
+   (run* (q)
+     (fresh (x y)
+       (== q `(,x ,y))
+       (!uniono x y (set `(a b) (empty-set)))))
+   `(((s.0 s.1) : (!in (a s.0) (a s.1)))
+     ((s.0 s.1) : (!in (b s.0) (b s.1)))
+     ((,(set `(_.0) `s.1) s.2) : (!in (_.0 s.1)) (=/= ((_.0 . a)) ((_.0 . b))))
+     ((s.0 ,(set `(_.1) `s.2)) : (!in (_.1 s.2)) (=/= ((_.1 . a)) ((_.1 . b))))))
   )
 
 (define (test-sets-long)

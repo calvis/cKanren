@@ -27,7 +27,7 @@
                      (not (memq (attr-oc-type aoc) incompatible)))
                    attrs))))
 
-(define symboloonstrained?
+(define symbol-constrained?
   (lambda (v attrs)
     (findf symbol-attr? attrs)))
 
@@ -59,7 +59,7 @@
         ((update-c (build-attr-oc numbero u number-uw?)) a))
        (else mzerom)))))
 
-(define numberoonstrained?
+(define number-constrained?
   (lambda (v attrs)
     (findf number-attr? attrs)))
  
@@ -88,8 +88,8 @@
             (cond
              [(get-attributes v c)
               => (lambda (attrs)
-                   (or (symboloonstrained? v attrs)
-                       (numberoonstrained? v attrs)))]
+                   (or (symbol-constrained? v attrs)
+                       (number-constrained? v attrs)))]
              [else #f]))
         (cond
          [(pair? u) a]

@@ -54,12 +54,12 @@
    [else (unify-two (caar e) (cdar e) (cdr e) s c)]))
 
 ;; unifies two things, u and v
-(define (unify-two u v e s c)
-  (let ([u (walk u s)] [v (walk v s)])
+(define-syntax-rule (unify-two u v e s c)
+  (let ([u^ (walk u s)] [v^ (walk v s)])
     (cond
-     [(and (var? u) (not (var? u)))
-      (unify-walked v u e s c)]
-     [else (unify-walked u v e s c)])))
+     [(and (var? u^) (not (var? u^)))
+      (unify-walked v^ u^ e s c)]
+     [else (unify-walked u^ v^ e s c)])))
 
 (define (unify-walked u v e s c)
   (cond
