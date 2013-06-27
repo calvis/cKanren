@@ -3,7 +3,8 @@
 (require racket/generic racket/vector)
 (require "substitution.rkt" "variables.rkt")
 
-(provide (all-defined-out))
+(provide (except-out (all-defined-out) walk*)
+         (rename-out [walk* walk*-internal]))
 
 ;; =============================================================================
 
@@ -47,7 +48,7 @@
   (cond
    [(mk-struct? t)
     (reify-mk-struct t r)]
-   [else (walk t r)]))
+   [else (walk-internal t r)]))
 
 (define (default-mk-struct? x)
   (or (pair? x) (vector? x)))
@@ -81,7 +82,7 @@
 
 ;; walks a possibly nested structure
 (define (walk* w s)
-  (let ((v (walk w s)))
+  (let ([v (walk-internal w s)])
     (cond
      ((mk-struct? v)
       (recur v 

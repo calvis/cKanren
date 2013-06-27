@@ -538,6 +538,22 @@
     [(update-args e (args ...) ((x fn) ...))
      ]))
 
+(define (walk u s [c #f] [e #f])
+  (cond
+   [e (walk-event u s e)]
+   [else (walk-internal u s)]))
+
+(define (walk* u s [c #f] [e #f])
+  (let ([v (walk u s c e)])
+    (cond
+     ((mk-struct? v)
+      (recur v 
+       (lambda (a d) 
+         ((constructor v)
+          (walk* a s)
+          (walk* d s)))))
+     (else v))))
+
 (define (walk-event u s e)
   (cond
    [(and (add-association-event? e)

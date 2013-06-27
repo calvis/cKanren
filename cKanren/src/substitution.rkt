@@ -2,7 +2,8 @@
 
 (require "helpers.rkt" "variables.rkt")
 
-(provide (all-defined-out))
+(provide (except-out (all-defined-out) walk)
+         (rename-out [walk walk-internal]))
 
 ;; == SUBSTITUTIONS ============================================================
 
