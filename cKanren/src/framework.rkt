@@ -103,16 +103,20 @@
 
 ;; s and c should be unwrapped
 (define (update-s-internal x v s c q t)
-  ((run-relevant-constraints (if (var? v) `(,x ,v) `(,x)) c)
-   (make-a (substitution (ext-s x v s)) (constraint-store c) q t)))
+  (let ([e (add-association-event x v)]
+        [x* (if (var? v) `(,x ,v) `(,x))])
+    (bindm
+      (make-a (substitution (ext-s x v s)) (constraint-store c) q t)
+      (run-relevant-constraints x* c e))))
 
 ;; returns an updated substitution and a function that will run all
 ;; the relevant constraints
 (define (update-s-prefix s c s^)
   (define p (prefix-s s s^))
   (define relevant-vars (map car p))
+  (define e (add-substitution-prefix-event p))
   (define run-constraints-fn
-    (run-relevant-constraints relevant-vars c))
+    (run-relevant-constraints relevant-vars c e))
   (values (ext-s* p s) run-constraints-fn))
 
 ;; a function that will safely extend the subsitution with
@@ -163,7 +167,7 @@
      (conj rest (rem/run oc)))]
    [else (error 'run-constraints "don't know how to run ~s" c)]))
 
-(define (run-relevant-constraints x* c)
+(define (run-relevant-constraints x* c [e #f])
   (for/fold 
    ([rest identitym])
    ([(key ocs) c])
@@ -172,13 +176,13 @@
      ([fn identitym])
      ([oc ocs]
       #:when (any-relevant/var? (oc-rands oc) x*))
-     (conj fn (rem/run oc)))
+     (conj fn (rem/run oc e)))
     rest)))
 
 ;; removes a constraint from the constraint store and then 
 ;; reruns it as if it was just being introduced (will add itself
 ;; back to the constraint store if it still is waiting on info)
-(define (rem/run oc)
+(define (rem/run oc e)
   (lambdam@/private (a : s c q t)
     (let ([ocs (constraint-store-c c)])
       (cond
@@ -186,7 +190,8 @@
         (bindm 
           (let ([new-c (constraint-store (remq-c oc ocs))])
             (make-a s new-c q t))
-          (oc-proc oc))]
+          (oc-proc oc)
+          e)]
        [else a]))))
 
 (define-syntax case/lazy
@@ -489,50 +494,57 @@
 (define-syntax-rule (use-constraints file ...) 
   (require file ...))
 
-#;
-(define gensym
-  (let ([counter 0])
-    (lambda ([x 'g])
-      (if (number? x)
-          (set! counter x)
-          (begin0 (string->unreadable-symbol
-                   (format "~a~a" x counter))
-                  (set! counter (add1 counter)))))))
+;; (define gensym
+;;   (let ([counter 0])
+;;     (lambda ([x 'g])
+;;       (if (number? x)
+;;           (set! counter x)
+;;           (begin0 (string->unreadable-symbol
+;;                    (format "~a~a" x counter))
+;;                   (set! counter (add1 counter)))))))
 
 ;; =============================================================================
 
-;; This is a version of application that will catch when users have
-;; misplaced goals.
 
-;; If the user is trying to apply a goal to something that is not a
-;; package, or trying to apply a goal to zero or many things, they
-;; will get an goal-as-fn-exn.  This will fix the stupid "incorrect
-;; number of arguments to #<procedure>" errors.
+(struct event ())
+(struct add-constraint-event event (oc))
+(struct add-association-event event (u v))
+(struct add-substitution-prefix-event (p))
 
-(struct exn:goal-as-fn exn:fail ())
-(define (raise-goal-as-fn-exn src)
-  (raise
-   (exn:goal-as-fn
-    (format "~s: goal applied as a procedure" (format-source src))
-    (current-continuation-marks))))
+(begin-for-syntax
+ (define-syntax-class package-splicer
+   (pattern (a : s) #:attr bds (list #'a #'s (generate-temporary #'?c)))
+   (pattern (a : s c) #:attr bds (list #'a #'s #'c))
+   (pattern a #:attr bds (list #'a (generate-temporary #'?s) (generate-temporary #'?c)))))
 
-;; The only correct application of a goal g is to a package a; i.e. (g a).
-(define-for-syntax (valid-app?-pred fn args) 
-  (syntax-case args ()
-    [(a) #`(or (not (constraint? #,fn)) (a? a))]
-    [(a* ...) #`(not (constraint? #,fn))]))
+(define-syntax (constraint stx)
+  (syntax-parse stx
+    [(constraint 
+      (~or (~optional (~seq #:package ps:package-splicer))
+           (~optional (~seq #:event e:id)))
+      ...
+      body ...)
+     (with-syntax 
+       ([(a s c) (attribute ps.bds)]
+        [e (or (attribute e) (generate-temporary #'?e))])
+       #'(lambdam@/private (a e)
+           (let ([s (substitution-s (a-s a))]
+                 [c (constraint-store-c (a-c a))])
+             (bindm a (begin body ...) e))))]))
 
-(define-syntax (#%app-safe x)
-  (syntax-case x () 
-    [(_ fn arg ...)
-     (with-syntax* ([(fn^ arg^ ...) 
-                     (generate-temporaries #'(fn arg ...))]
-                    [src (build-srcloc-stx #'fn)]
-                    [valid-app? (valid-app?-pred #'fn^ #'(arg^ ...))])
-       (syntax/loc x
-        (let ([fn^ fn])
-          (let ([arg^ arg] ...)
-            (cond
-             [valid-app? (#%app fn^ arg^ ...)]
-             [else (raise-goal-as-fn-exn src)])))))]))
+#;
+(define-syntax (update-args stx)
+  (syntax-parse stx
+    [(update-args e (args ...) ((x fn) ...))
+     ]))
+
+(define (walk-event u s e)
+  (cond
+   [(and (add-association-event? e)
+         (eq? (add-association-event-u e) u))
+    (add-association-event-v e)]
+   [(and (add-substitution-prefix-event? e)
+         (assq u (add-substitution-prefix-event-p e)))
+    => cdr]
+   [else u]))
 

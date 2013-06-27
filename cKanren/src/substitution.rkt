@@ -47,7 +47,6 @@
   (lambda (s)
     (length s)))
 
-;; walks an association list
 (define (walk v s)
   (cond
    ((and (var? v) (assq v s))

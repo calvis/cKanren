@@ -78,6 +78,7 @@
                                (any-relevant/var? d x*)))))
    (else (and (var? t) (memq t x*)))))
 
+
 ;; walks a possibly nested structure
 (define (walk* w s)
   (let ((v (walk w s)))
@@ -89,4 +90,3 @@
           (walk* a s)
           (walk* d s)))))
      (else v))))
-

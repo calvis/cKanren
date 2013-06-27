@@ -1,8 +1,10 @@
 #lang racket
 
 (require "helpers.rkt" "substitution.rkt" "constraint-store.rkt" "infs.rkt" "errors.rkt")
+(require (for-syntax syntax/parse racket/syntax))
 
-(provide (all-defined-out))
+(provide lambdam@ lambdam@/private mzerom identitym succeed fail 
+         bindm bindm* mplusm mplusm* start app-goal #%app-safe)
 
 ;; == CONSTRAINTS ==============================================================
 
@@ -15,29 +17,36 @@
 ;; splitting up the package
 (define-syntax lambdam@/private
   (syntax-rules (:)
-    [(_ (a) e ...)
-     (constraint (lambda (a) e ...))]
-    [(_ (a : s c q t) e ...)
+    [(_ (a) body ...)
+     (constraint (lambda (a [e #f]) body ...))]
+    [(_ (a e) body ...)
+     (constraint (lambda (a [e #f]) body ...))]
+    [(_ (a : s c q t) body ...)
      (lambdam@/private (a) 
        (let ([s (a-s a)] 
              [c (a-c a)]
              [q (a-q a)]
              [t (a-t a)])
-         e ...))]))
+         body ...))]))
 
 (define-syntax lambdam@
   (syntax-rules (:)
-    [(_ (a) e ...) 
-     (lambdam@/private (a) e ...)]
-    [(_ (a : s) e ...)
+    [(_ (a) body ...) 
+     (lambdam@/private (a) body ...)]
+    [(_ (a : s) body ...)
      (lambdam@/private (a) 
        (let ([s (substitution-s (a-s a))]) 
-         e ...))]
-    [(_ (a : s c) e ...)
+         body ...))]
+    [(_ (a : s c) body ...)
      (lambdam@/private (a) 
        (let ([s (substitution-s (a-s a))] 
              [c (constraint-store-c (a-c a))]) 
-         e ...))]))
+         body ...))]
+    [(_ (a : s c e) body ...)
+     (lambdam@/private (a e) 
+       (let ([s (substitution-s (a-s a))] 
+             [c (constraint-store-c (a-c a))]) 
+         body ...))]))
 
 ;; the failure value
 (define mzerom (mzerof))
@@ -51,12 +60,12 @@
 
 ;; applies a goal to an a-inf and returns an a-inf
 (define bindm
-  (lambda (a-inf g)
+  (lambda (a-inf g [e #f])
     (case-inf a-inf
       [() (mzerof)]
-      [(f) (delay (bindm (f) g))]
-      [(a) (app-goal g a)]
-      [(a f) (mplusm (app-goal g a) (delay (bindm (f) g)))])))
+      [(f) (delay (bindm (f) g e))]
+      [(a) (app-goal g a e)]
+      [(a f) (mplusm (app-goal g a e) (delay (bindm (f) g e)))])))
 
 ;; performs a conjunction over goals applied to an a-inf
 (define-syntax bindm*
@@ -86,7 +95,10 @@
   (syntax-case x ()
     [(_ g a) #`((wrap-goal g #,(build-srcloc-stx #'g)) a)]))
 
-(define-syntax-rule (app-goal g a) (g a))
+(define-syntax app-goal
+  (syntax-rules ()
+    [(_ g a) (g a)]
+    [(_ g a e) (g a e)]))
 
 (define (non-goal-error-msg val)
   (string-append
@@ -102,4 +114,39 @@
 
 (define-syntax-rule (start a g g* ...)
   (bindm* (app-goal g a) g* ...))
+
+;; This is a version of application that will catch when users have
+;; misplaced goals.
+
+;; If the user is trying to apply a goal to something that is not a
+;; package, or trying to apply a goal to zero or many things, they
+;; will get an goal-as-fn-exn.  This will fix the stupid "incorrect
+;; number of arguments to #<procedure>" errors.
+
+(struct exn:goal-as-fn exn:fail ())
+(define (raise-goal-as-fn-exn src)
+  (raise
+   (exn:goal-as-fn
+    (format "~s: goal applied as a procedure" (format-source src))
+    (current-continuation-marks))))
+
+;; The only correct application of a goal g is to a package a; i.e. (g a).
+(define-for-syntax (valid-app?-pred fn args) 
+  (syntax-case args ()
+    [(a) #`(or (not (constraint? #,fn)) (a? a))]
+    [(a* ...) #`(not (constraint? #,fn))]))
+
+(define-syntax (#%app-safe x)
+  (syntax-case x () 
+    [(_ fn arg ...)
+     (with-syntax* ([(fn^ arg^ ...) 
+                     (generate-temporaries #'(fn arg ...))]
+                    [src (build-srcloc-stx #'fn)]
+                    [valid-app? (valid-app?-pred #'fn^ #'(arg^ ...))])
+       (syntax/loc x
+        (let ([fn^ fn])
+          (let ([arg^ arg] ...)
+            (cond
+             [valid-app? (#%app fn^ arg^ ...)]
+             [else (raise-goal-as-fn-exn src)])))))]))
 

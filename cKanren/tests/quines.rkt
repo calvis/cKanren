@@ -125,5 +125,4 @@
                 4)))
 
 (module+ main
-  (require profile)
-  (profile-thunk test-quines-long))
+  (test-quines-long))

@@ -8,14 +8,14 @@
 (define recover/vars
   (lambda (p)
     (cond
-      ((null? p) '())
-      (else
-        (let ((x (car (car p)))
-              (v (cdr (car p)))
-              (r (recover/vars (cdr p))))
-          (cond
-            ((var? v) (ext/vars v (ext/vars x r)))
-            (else (ext/vars x r))))))))
+     [(null? p) '()]
+     [else
+      (let ([x (car (car p))]
+            [v (cdr (car p))]
+            [r (recover/vars (cdr p))])
+        (cond
+         [(var? v) (ext/vars v (ext/vars x r))]
+         [else (ext/vars x r)]))])))
 
 (define ext/vars
   (lambda (x r)
@@ -86,9 +86,9 @@
 (define subsumes?
   (lambda (p p^ c)
     (cond
-     ((unify p p^ c) => 
-      (lambda (s/c) (eq? (car s/c) p^)))
-     (else #f))))
+     [(unify p p^ c) => 
+      (lambda (s/c) (eq? (car s/c) p^))]
+     [else #f])))
 
 ;;; goals
 

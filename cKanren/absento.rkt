@@ -79,7 +79,7 @@
 ;; absento
 
 (define (absento u v)
-  (lambdam@ (a : s c)
+  (lambdam@ (a : s c e)
     (let ([u (walk* u s)]
           [v (walk v s)])
       (cond
