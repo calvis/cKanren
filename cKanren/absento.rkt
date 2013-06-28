@@ -3,78 +3,8 @@
 ;; Based on code provided by Jason Hemann and Dan Friedman
 ;; See: https://github.com/jasonhemann/miniKanren
 
-(require "ck.rkt" "tree-unify.rkt" "neq.rkt" "src/helpers.rkt")
-(provide symbolo numbero absento mem-check term=)
-
-;; symbolo
-
-(define (symbolo u)
-  (lambdam@ (a : s c)
-    (let ((u (walk u s)))
-      (cond
-       [(symbol? u) a]
-       [(not (var? u)) mzerom]
-       [(symbol-uw? u (get-attributes u c))
-        ((update-c (build-attr-oc symbolo u symbol-uw?)) a)]
-       [else mzerom]))))
- 
-(define (symbol-uw? x attrs)
-  (define incompatible '(numbero))
-  (and (not (pair? x)) 
-       (not (number? x))
-       (or (not attrs)
-           (andmap (lambda (aoc) 
-                     (not (memq (attr-oc-type aoc) incompatible)))
-                   attrs))))
-
-(define symbol-constrained?
-  (lambda (v attrs)
-    (findf symbol-attr? attrs)))
-
-(define (symbol-attr? oc)
-  (eq? (attr-oc-type oc) 'symbolo))
- 
-(define reify-symbolos
-  (default-reify-attr 'sym 'symbolo
-    (lambda (x* r) (remove-duplicates x*))))
-
-;; numbero
-
-(define (number-uw? x attrs)
-  (define incompatible '(symbolo))
-  (and (not (pair? x)) 
-       (not (symbol? x))
-       (or (not attrs) 
-           (andmap (lambda (aoc) 
-                     (not (memq (oc-rator aoc) incompatible)))
-                   attrs))))
-
-(define (numbero u)
-  (lambdam@ (a : s c)
-    (let ((u (walk u s)))
-      (cond
-       ((number? u) a)
-       ((not (var? u)) mzerom)
-       ((number-uw? u (get-attributes u c))
-        ((update-c (build-attr-oc numbero u number-uw?)) a))
-       (else mzerom)))))
-
-(define number-constrained?
-  (lambda (v attrs)
-    (findf number-attr? attrs)))
- 
-(define remove-duplicates
-  (lambda (l)
-    (for/fold ([s '()])
-              ([x l])
-      (if (member x s) s (cons x s)))))
-
-(define (number-attr? oc)
-  (eq? (attr-oc-type oc) 'numbero))
-
-(define reify-numberos
-  (default-reify-attr 'num 'numbero
-    (lambda (x* r) (remove-duplicates x*))))
+(require "ck.rkt" "tree-unify.rkt" "neq.rkt" "src/helpers.rkt" "attributes.rkt")
+(provide absento mem-check term=)
 
 ;; absento
 
@@ -153,16 +83,7 @@
    (absento u (cdr v))
    (=/= u v)))
 
-(define type-cs '(numbero symbolo))
-(define (rerun-type-cs x)
-  (conj
-   (elim-diseqs)
-   (lambdam@ (a : s c)
-     (let ([ocs (filter (lambda (oc) (memq (attr-oc-type oc) type-cs))
-                        (filter/rator attr-tag c))])
-       (bindm a (run-relevant-constraints (map (compose car oc-rands) ocs) c))))))
-
-(define (elim-diseqs)
+(define (elim-diseqs x)
   (lambdam@ (a : s c)
     (let ([neqs (filter/rator '=/=neq-c c)]
           [absentos (filter/rator 'absento c)])
@@ -184,19 +105,9 @@
             p)])
       (build-oc =/=neq-c p^))))
 
-;; etc
-
-(define booleano
-  (lambda (x)
-    (conde
-      ((== #f x) succeed)
-      ((== #t x) succeed))))
-         
 ;; ckanren stuffs
 
-(extend-enforce-fns 'absento rerun-type-cs)
-(extend-reify-fns 'numbero reify-numberos)
-(extend-reify-fns 'symbolo reify-symbolos)
+(extend-enforce-fns 'absento elim-diseqs)
 (extend-reify-fns 'absento reify-absentos)
 
 

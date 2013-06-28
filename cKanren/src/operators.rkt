@@ -120,7 +120,7 @@
 (define-syntax-rule (project (x ...) g g* ...) 
   (lambdam@ (a : s)
     (let ((x (walk*-internal x s)) ...)
-      ((conj g g* ...) a))))
+      (bindm a (conj g g* ...)))))
 
 ;; for debugging, a goal that prints the substitution and a goal
 ;; that prints a message.  both succeed.

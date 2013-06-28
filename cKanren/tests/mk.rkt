@@ -3,6 +3,7 @@
 (require
  "../miniKanren.rkt"
  "../absento.rkt"
+ "../attributes.rkt"
  "../neq.rkt" 
  "../tester.rkt")
 (provide test-mk test-mk-long)

@@ -41,12 +41,13 @@
        [else (unify e s c)]))]))
 
 (define (== u v)
-  (lambdam@ (a : s c)
-    (cond
-     [(unify `((,u . ,v)) s c)
-      => (lambda (s/c)
-           ((update-package s/c) a))]
-     [else mzerom])))
+  (constraint
+   #:package (a : s c)
+   (cond
+    [(unify `((,u . ,v)) s c)
+     => (lambda (s/c)
+          (update-package s/c))]
+    [else fail])))
 
 (define (unify e s c)
   (cond

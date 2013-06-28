@@ -3,6 +3,7 @@
 (require 
  "../ck.rkt"
  "../absento.rkt"
+ "../attributes.rkt"
  "../tree-unify.rkt"
  "../neq.rkt"
  "../tester.rkt"

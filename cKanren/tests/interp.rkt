@@ -5,6 +5,7 @@
  "../tree-unify.rkt"
  "../neq.rkt"
  "../absento.rkt"
+ "../attributes.rkt"
  "../tester.rkt")
 (provide test-interp test-interp-long)
 
