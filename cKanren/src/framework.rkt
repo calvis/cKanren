@@ -512,31 +512,69 @@
 (struct add-substitution-prefix-event (p))
 
 (begin-for-syntax
+ 
+ ;; package keyword matching
+ (define-splicing-syntax-class package-keyword
+   #:attributes (package)
+   (pattern (~seq #:package ps:package-splicer)
+            #:with package #'(ps.a ps.s ps.c)))
+
  (define-syntax-class package-splicer
-   (pattern (a : s) #:attr bds (list #'a #'s (generate-temporary #'?c)))
-   (pattern (a : s c) #:attr bds (list #'a #'s #'c))
-   (pattern a #:attr bds (list #'a (generate-temporary #'?s) (generate-temporary #'?c)))))
+   #:attributes (a s c)
+   (pattern (a : s c))
+   (pattern (a : s) #:with c (generate-temporary #'?c))
+   (pattern a  #:with (s c) (generate-temporaries #'(?s ?c))))
+
+ ;; event keyword matching
+ (define-splicing-syntax-class event-keyword
+   (pattern (~seq #:event e)))
+
+ ;; argument keyword matching
+ (define-splicing-syntax-class arguments-keyword
+   #:attributes (bindings)
+   (pattern (~seq #:args (bd:argument ...))
+            #:with bindings #'((bd.arg bd.fn) ...)))
+
+ (define-syntax-class argument
+   #:attributes (arg fn)
+   (pattern (arg fn))
+   (pattern arg #:with fn #'walk))
+
+ ;; constructor keyword matching
+ (define-splicing-syntax-class constructor-keyword
+   (pattern (~seq #:constructor oc-const-fn:expr))))
 
 (define-syntax (constraint stx)
   (syntax-parse stx
     [(constraint 
-      (~or (~optional (~seq #:package ps:package-splicer))
-           (~optional (~seq #:event e:id)))
+      (~or (~optional packagekw:package-keyword)
+           (~optional eventkw:event-keyword)
+           (~optional argskw:arguments-keyword)
+           (~optional constkw:constructor-keyword))
       ...
       body ...)
      (with-syntax 
-       ([(a s c) (attribute ps.bds)]
-        [e (or (attribute e) (generate-temporary #'?e))])
-       #'(lambdam@/private (a e)
-           (let ([s (substitution-s (a-s a))]
-                 [c (constraint-store-c (a-c a))])
-             (bindm a (begin body ...) e))))]))
+       ([(a s c) (or (attribute packagekw.package) 
+                     (generate-temporaries #'(?a ?s ?c)))]
+        [e (or (attribute eventkw.e) (generate-temporary #'?e))]
+        [((arg fn) ...) (or (attribute argskw.bindings) #'())]
+        [name (or (attribute constkw.oc-const-fn) (generate-temporary #'?fn))])
+       #'(letrec ([cstr (constraint/internal (a s c e) ((arg fn) ...) body ...)]
+                  [name (lambda (arg ...) cstr)])
+           cstr))]))
 
-#;
-(define-syntax (update-args stx)
+(define-syntax (constraint/internal stx)
   (syntax-parse stx
-    [(update-args e (args ...) ((x fn) ...))
-     ]))
+    [(constraint/internal (a s c e) ((args fns) ...) body ...)
+     #'(lambdam@ (a : s c e) 
+         (let ([args (fns args s c e)] ...)
+           (bindm a (begin body ...) e)))]))
+
+(define-syntax (define-constraint stx)
+  (syntax-parse stx
+    [(define-constraint (name args:argument ...) options+body ...)
+     #'(define (name args.arg ...)
+         (constraint #:args (args ...) options+body ...))]))
 
 (define (walk u s [c #f] [e #f])
   (cond
@@ -563,4 +601,6 @@
          (assq u (add-substitution-prefix-event-p e)))
     => cdr]
    [else u]))
+
+
 
