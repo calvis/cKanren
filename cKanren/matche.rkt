@@ -7,7 +7,7 @@
 
 (define-syntax (defmatche stx)
   (syntax-parse stx
-    [(_ (name args:id ...) clause ...)
+    [(defmatche (name:id args:id ...) clause ...)
      #'(define (name args ...)
          (matche (args ...) clause ...))]))
 
