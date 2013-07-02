@@ -56,9 +56,11 @@
     (quasisyntax/loc x
       (let ([expected #,er] [produced #,te])
         (cond
-         [(for/and 
-           ([e expected])
-           (member e produced))
+         [(and (= (length expected)
+                  (length produced))
+               (for/and 
+                ([e expected])
+                (member e produced)))
           (void)]
          [else
           (make-error #,(build-srcloc-stx x)

@@ -388,12 +388,23 @@
         (run* (q) (disjo (set '(1) (empty-set)) (set '(1) (empty-set))))
         '())
   
-  (test "test disjo 1"
-        (run* (q)
-          (fresh (x y z)
-            (== q `(,x ,y ,z))
-            (disjo (set `(,x ,y) (empty-set)) (set '(a) z))))
-        '(((_.0 _.1 s.2) : (!in (_.1 s.2)) (=/= ((_.0 . a)) ((_.1 . a))))))
+  (test "disjo 5"
+        (run* (x y z)
+          (disjo (make-set `(,x ,y)) (set '(a) z)))
+        '(((_.0 _.1 s.2) : (!in (_.0 s.2) (_.1 s.2)) (=/= ((_.0 . a)) ((_.1 . a))))))
+
+  (test-any-order
+   "disjo 6"
+   (run* (x y) (disjo x y))
+   ;; ((∅ ∅) ((∅ s.0) : (=/= (s.0 ∅))) ((s.0 ∅) : (=/= (s.0 ∅))) (({ _.0 | s.1 } { _.2 | s.3 }) : (!in (_.0 s.3) (_.2 s.1)) (=/= (_.0 _.2)) (disj (s.1 s.3))))
+   `((,(empty-set) ,(empty-set))
+     ((,(empty-set) s.0) : (=/= (s.0 ,(empty-set))))
+     ((s.0 ,(empty-set)) : (=/= (s.0 ,(empty-set))))
+     ((,(set '(_.0) 's.1) ,(set '(_.2) 's.3)) 
+      : 
+      (!in (_.0 s.3) (_.2 s.1)) 
+      (=/= (_.0 _.2))
+      (disj (s.1 s.3)))))
 
   ;; !uniono
 
@@ -463,6 +474,87 @@
      ((s.0 s.1) : (!in (b s.0) (b s.1)))
      ((,(set `(_.0) `s.1) s.2) : (!in (_.0 s.1)) (=/= ((_.0 . a)) ((_.0 . b))))
      ((s.0 ,(set `(_.1) `s.2)) : (!in (_.1 s.2)) (=/= ((_.1 . a)) ((_.1 . b))))))
+
+  (test-any-order
+   "union-disjo-1"
+   (run* (x y z)
+     (== y (make-set `(1)))
+     (uniono x z (make-set `(1)))
+     (uniono y z (make-set `(1)))
+     (disjo x y))
+   `((,(empty-set) ,(make-set '(1)) ,(make-set '(1)))))
+
+  (test-any-order
+   "union-disjo-2"
+   (run* (x y z)
+     (uniono x z (make-set `(1)))
+     (uniono y z (make-set `(1)))
+     (disjo x y))
+   `((,(empty-set) ,(empty-set) ,(make-set '(1)))
+     (,(empty-set) ,(make-set '(1)) ,(make-set '(1)))
+     (,(make-set '(1)) ,(empty-set) ,(make-set '(1)))))
+
+  #;
+  (test
+   "union-disjo-3"
+   (run* (q)
+     (fresh (R^ S^)
+       (uniono R^ q (make-set '(1)))
+       (uniono S^ q (make-set '(1)))
+       (disjo R^ S^)
+       (disjo R^ q)
+       (disjo S^ q)))
+   `(,(make-set '(1))))
+
+  (let ()
+    (define intersectiono
+      (lambda (R S T)
+        (fresh (R^ S^)
+          (uniono R^ T R)
+          (uniono S^ T S)
+          (disjo S^ T)
+          (disjo R^ T)
+          (disjo R^ S^))))
+    
+    (test
+     "intersectiono-1"
+     (run* (q)
+       (fresh (x y)
+         (== x (make-set '()))
+         (== y (make-set '()))
+         (intersectiono x y q)))
+     `(,(empty-set)))
+
+    (test
+     "intersectiono-2"
+     (run* (q)
+       (intersectiono (make-set '(1)) (make-set '(1)) q))
+     `(,(make-set '(1))))
+    
+    #;
+    (test
+     "intersectiono-3"
+     (run* (q)
+       (intersectiono (make-set '(1 2)) (make-set '(2 3)) q))
+     `(,(make-set '(2))))
+
+    #;
+    (test
+     "intersectiono-4"
+     (run* (q)
+       (intersectiono (make-set '(1 2 3)) (make-set '(2 3 4)) q))
+     `(,(make-set '(2 3))))
+
+    #;
+    (test
+     "intersectiono-5"
+     (run* (q)
+       (fresh (x y)
+         (== x (make-set '(1 2 3 4 5 6)))
+         (== y (make-set '(2 3 5 7 9)))
+         (intersectiono x y q)))
+     `(,(make-set '(2 3 5)))))
+
   )
 
 (define (test-sets-long)

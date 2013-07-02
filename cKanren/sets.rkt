@@ -196,24 +196,22 @@
    #:package (a : s c)
    (let ([X (update-set (car (oc-rands oc)) s)]
          [T (update-set (cadr (oc-rands oc)) s)])
-     (let ([t  (car (set-left X))]
-           [s  (set (cdr (set-left X)) (set-right X))]
-           [t^ (car (set-left T))]
-           [s^ (set (cdr (set-left T)) (set-right T))])
+     (let/set ([(x X^) X]
+               [(t T^) T])
        (conde
-        [(== t t^)
+        [(== x t)
          (conde
-          [(== s s^)]
-          [(== (set `(,t) s) s^)
-           (!ino t s)]
-          [(== s (set `(,t^) s^))
-           (!ino t^ s^)])]
+          [(== X^ T^)]
+          [(== (set `(,x) X^) T^)
+           (!ino x X^)]
+          [(== X^ (set `(,t) T^))
+           (!ino t T^)])]
         [(fresh (n)
            (proper-seto n)
-           (== s (set `(,t^) n))
-           (!ino t^ n)
-           (== (set `(,t) n) s^)
-           (!ino t n))])))))
+           (== X^ (set `(,t) n))
+           (!ino t n)
+           (== (set `(,x) n) T^)
+           (!ino x n))])))))
 
 ;; X = {t0 .. tm | M} 
 ;; T = {t'0 .. t'n | M}
@@ -253,6 +251,7 @@
 (define (enforce-set-cs x)
   (conj
    (loop 'union-fresh enforce-one-union-fresh)
+   (loop 'disjoint-fresh enforce-one-disjoint-fresh)
    (cycle)))
 
 (define (cycle)
@@ -266,7 +265,6 @@
     (loop 'lazy-union-set  enforce-lazy-union-set)
     ;; (loop 'lazy-union-neq  enforce-lazy-union-neq)
     (loop 'lazy-!union     enforce-!union)
-    (loop 'disj-c          enforce-disj)
     (constraint
      #:package (a : s c)
      (cond
@@ -280,7 +278,7 @@
                  lazy-union-set
                  lazy-union-neq
                  lazy-!union
-                 disj-c)
+                 disjoint)
                c))
        succeed]
       [else (cycle)]))))
@@ -488,9 +486,7 @@
         [(ino x V) (!ino x U)])))))
 
 (define (!ino x S)
-  (conj
-   (seto S)
-   (!in-c x S)))
+  (conj (seto S) (!in-c x S)))
 
 (define (!in-c x S)
   (constraint
@@ -528,11 +524,7 @@
     (conj (neq-? x (car t*)) (not-in-t* x (cdr t*)))]))
 
 (define (uniono u v w)
-  (conj
-   (seto u)
-   (seto v)
-   (seto w)
-   (union-fresh u v w)))
+  (conj (seto u) (seto v) (seto w) (union-fresh u v w)))
 
 ;; W is a set var
 (define (lazy-union-var U V W)
@@ -716,6 +708,15 @@
        (lazy-union-var U V W)]
       [else (update-c-nocheck (build-oc union-fresh U V W))]))))
 
+(define (split-set S)
+  (unless (set? S)
+    (error 'split-set "S is not a set"))
+  (let ([l (set-left S)])
+    (values (car l) (set (cdr l) (set-right S)))))
+
+(define-syntax-rule (let/set ([(s S^) S] ...) body ...)
+  (let-values ([(s S^) (split-set S)] ...) body ...))
+
 ;; W is a set
 (define (enforce-lazy-union-set oc)
   (constraint
@@ -723,20 +724,21 @@
    (let ([U (update-set (car (oc-rands oc)) s)]
          [V (update-set (cadr (oc-rands oc)) s)]
          [W (update-set (caddr (oc-rands oc)) s)])
-      (fresh (t N N1 N2)
-        (== t (car (set-left W)))
-        (== N (set (cdr (set-left W)) (set-right W)))
-        (!ino t N)
-        (!ino t N1)
-        (conde
-         [(== U (set `(,t) N1))
-          (uniono N1 V N)]
-         [(== V (set `(,t) N1))
-          (uniono U N1 N)]
-         [(== U (set `(,t) N1))
-          (== V (set `(,t) N2))
-          (!ino t N2)
-          (uniono N1 N2 N)])))))
+     (let ([t (car (set-left W))]
+           [N (set (cdr (set-left W)) (set-right W))])
+       (fresh (N1 N2)
+         (!ino t N1)
+         (conde
+          [(== U (set `(,t) N1))
+           (!ino t V)
+           (uniono N1 V N)]
+          [(== V (set `(,t) N1))
+           (!ino t U)
+           (uniono U N1 N)]
+          [(== U (set `(,t) N1))
+           (== V (set `(,t) N2))
+           (!ino t N2)
+           (uniono N1 N2 N)]))))))
 
 #;
 (define (enforce-lazy-union-neq oc)
@@ -759,102 +761,105 @@
             (loop (cdr t*)))])))))
 
 (define (disjo u v)
-  (conj
-   (seto u)
-   (seto v)
-   (disj-c u v)))
+  (conj (seto u) (seto v) (disjoint-fresh u v)))
 
-(define (disj-c U V)
-  (lambdam@ (a : s c)
-    (let ([U (update-set U s)]
-          [V (update-set V s)])
-      (cond
-       [(same-set? U V)
-        (bindm a
-          (conj
-           (== U (empty-set))
-           (== V (empty-set))))]
-       [(empty-set? U) a]
-       [(empty-set? V) a]
-       [(and (set? U) (set? V))
-        (let ([t1 (car (set-left U))]
-              [s1 (set (cdr (set-left U)) (set-right U))]
-              [t2 (car (set-left V))]
-              [s2 (set (cdr (set-left V)) (set-right V))])
-          (bindm a
-            (conj
-             (neq-? t1 t2)
-             (!in-c t1 s2)
-             (!in-c t2 s1)
-             (disj-c s1 s2))))]
+(define (disjoint-fresh U V)
+  (constraint
+   #:package (a : s c)
+   (let ([U (update-set U s)]
+         [V (update-set V s)])
+     (cond
+      [(or (set? U) (set? V))
+       (disjoint U V)]
+      [else (update-c (build-oc disjoint-fresh U V))]))))
+
+(define (enforce-one-disjoint-fresh oc)
+  (constraint
+   #:package (a : s c)
+   (let ([U (update-set (car (oc-rands oc)) s)]
+         [V (update-set (cadr (oc-rands oc)) s)])
+     (cond
+      [(and (set-var? U)
+            (set-var? V))
+       (conde
+        ;; X || X -> X == empty
+        [(== U V)
+         (== U (empty-set))
+         (== V (empty-set))]
+        ;; empty || t or t || empty -> succeed
+        [(conde
+          [(== U (empty-set))
+           (=/= V (empty-set))]
+          [(=/= U (empty-set))
+           (== V (empty-set))])]
+        ;; TODO
+        [(fresh (u v U^ V^)
+           (== U (set `(,u) U^))
+           (== V (set `(,v) V^))
+           (=/= u v)
+           (!ino u V^)
+           (!ino v U^)
+           (disjoint-fresh U^ V^))])]
+      [else (disjoint U V)]))))
+
+(define (disjoint U V)
+  (constraint
+   #:package (a : s c)
+   (let ([U (update-set U s)]
+         [V (update-set V s)])
+     (cond
+      [(same-set? U V)
+       (conj
+        (== U (empty-set))
+        (== V (empty-set)))]
+      [(or (empty-set? U)
+           (empty-set? V))
+       succeed]
+      [(and (set? U) (set? V))
+       (let ([t1 (car (set-left U))]
+             [s1 (set (cdr (set-left U)) (set-right U))]
+             [t2 (car (set-left V))]
+             [s2 (set (cdr (set-left V)) (set-right V))])
+         (conj
+          (neq-? t1 t2)
+          (!in-c t1 s2)
+          (!in-c t2 s1)
+          (disjoint s1 s2)))]
        [(set? U)
         (let ([t (car (set-left U))]
               [U^ (set (cdr (set-left U)) (set-right U))])
-          (bindm a
-            (conj
-             (!in-c t U^)
-             (disj-c U^ V))))]
+          (conj (!in-c t V) (disjoint U^ V)))]
        [(set? V)
         (let ([t (car (set-left V))]
               [V^ (set (cdr (set-left V)) (set-right V))])
-          (bindm a
-            (conj
-             (!in-c t V^)
-             (disj-c U V^))))]
-       [else ((update-c-nocheck (build-oc disj-c U V)) a)]))))
-
-(define (enforce-disj oc)
-  (lambdam@ (a : s c)
-    (let ([U (update-set (car (oc-rands oc)) s)]
-          [V (update-set (cadr (oc-rands oc)) s)])
-      (printf "enforce-disj: ~s ~s\n" U V)
-      (cond
-       [(and (set-var? U)
-             (set-var? V))
-        ((conde
-          [(== U V)
-           (== U (empty-set))
-           (== V (empty-set))]
-          [(fresh (u v U^ V^)
-             (== U (set `(,u) U^))
-             (== V (set `(,v) V^))
-             (=/= u v)
-             (!ino u V^)
-             (!ino v U^)
-             (disjo U^ V^))])
-         a)]
-       [else (oc-proc oc)]))))
+          (conj (!in-c t U) (disjoint U V^)))]
+       [else (update-c-nocheck (build-oc disjoint U V))]))))
 
 (define (!uniono u v w)
-  (conj
-   (seto u)
-   (seto v)
-   (seto w)
-   (lazy-!union u v w)))
+  (conj (seto u) (seto v) (seto w) (lazy-!union u v w)))
 
 (define (lazy-!union U V W)
-  (lambdam@ (a : s c)
-    (let ([U (update-set U s)]
-          [V (update-set V s)]
-          [W (update-set W s)])
-      ((update-c-nocheck (build-oc lazy-!union U V W)) a))))
+  (constraint
+   #:package (a : s c)
+   (let ([U (update-set U s)]
+         [V (update-set V s)]
+         [W (update-set W s)])
+     (update-c-nocheck (build-oc lazy-!union U V W)))))
 
 (define (enforce-!union oc)
-  (lambdam@ (a : s c)
-    (let ([U (update-set (car (oc-rands oc)) s)]
-          [V (update-set (cadr (oc-rands oc)) s)]
-          [W (update-set (caddr (oc-rands oc)) s)])
-      ((fresh (N)
-         (conde
-          [(!ino N U) (!ino N V)  (ino N W)]
-          [ (ino N U)            (!ino N W)]
-          [            (ino N V) (!ino N W)]))
-       a))))
+  (constraint
+   #:package (a : s c)
+   (let ([U (update-set (car (oc-rands oc)) s)]
+         [V (update-set (cadr (oc-rands oc)) s)]
+         [W (update-set (caddr (oc-rands oc)) s)])
+     (fresh (N)
+       (conde
+        [(!ino N U) (!ino N V)  (ino N W)]
+        [ (ino N U)            (!ino N W)]
+        [            (ino N V) (!ino N W)])))))
 
 (define (!disjo u v)
-  (fresh (n)
-    (ino n u)
-    (ino n v)))
+  (fresh (n) (ino n u) (ino n v)))
 
 (define (process-rands rands* r)
   (let ([rands* (map (lambda (rands) (map (lambda (t) (reify-term t r)) rands)) rands*)])
@@ -873,10 +878,13 @@
 (define reify-set-union
   (default-reify 'union '(union-fresh) process-rands))
 
+(define reify-disjoint
+  (default-reify 'disj '(disjoint-fresh) process-rands))
+
 (extend-enforce-fns 'sets enforce-set-cs)
 (extend-reify-fns 'set-neq reify-set-neq)
 (extend-reify-fns 'set-not-in reify-set-not-in)
 (extend-reify-fns 'set-union reify-set-union)
-
+(extend-reify-fns 'set-disj reify-disjoint)
 
 

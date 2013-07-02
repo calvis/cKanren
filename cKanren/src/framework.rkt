@@ -405,14 +405,16 @@
 ;; returns n answers to the goals g0 g1 ... where x is fresh
 (define-syntax run
   (syntax-rules ()
-    ((_ n (x) g0 g1 ...)
+    [(_ n (x) g0 g1 ...)
      (let ([stream (run/lazy (x) g0 g1 ...)])
-       (take n stream)))))
+       (take n stream))]
+    [(_ n (x ...) g ...)
+     (run n (q) (fresh (x ...) (update-s q `(,x ...)) g ...))]))
 
 ;; RUNS ALL THE THINGS
 (define-syntax run*
   (syntax-rules ()
-    ((_ (x) g ...) (run #f (x) g ...))))
+    [(_ (x ...) g ...) (run #f (x ...) g ...)]))
 
 (struct running (x a-inf)
   #:methods gen:custom-write 
