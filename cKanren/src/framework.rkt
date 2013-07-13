@@ -338,6 +338,13 @@
        [(null? rands) `()]
        [else `((,sym . ,(sort rands lex<=)))]))))
 
+(define-syntax-rule (define-reified-constraint name maybe-fn ...)
+  (begin
+    (define reify-fn
+      (default-reify 'name '(name)
+        (begin walk* maybe-fn ...)))
+    (extend-reify-fns 'name reify-fn)))
+
 ;; sorts the constraint store by lex<=
 (define (sort-store ocs) (sort ocs lex<= #:key car))
 
@@ -574,6 +581,24 @@
 
 (define-syntax (define-constraint stx)
   (syntax-parse stx
+    [(define-constraint (name args ...)
+       (~seq #:persistent))
+     #'(define-constraint
+         (name args ...)
+         (update-c (build-oc name args ...)))]
+    [(define-constraint (name args ...)
+       (~seq #:reified)
+       options+body ...)
+     #'(begin
+         (define-constraint (name args ...) options+body ...)
+         (define-reified-constraint name))]
+    [(define-constraint (name args ...) 
+       (~seq #:unique)
+       options+body ...)
+     #'(begin
+         (define-constraint (name args ...) options+body ...)
+         (define-constraint-interaction
+           [(name ,args ...) (name ,args ...)] => [(name args ...)]))]
     [(define-constraint (name args:argument ...) options+body ...)
      #'(define (name args.arg ...)
          (constraint #:args (args ...) options+body ...))]))

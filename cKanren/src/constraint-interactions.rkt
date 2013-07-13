@@ -22,16 +22,24 @@
 (define-syntax (define-constraint-interaction stx)
   (syntax-parse stx 
     [(define-constraint-interaction 
-       name:id
+       rest ...
+       [constraint-exprs ...] (~literal =>) [constraints ...])
+     #'(define-constraint-interaction
+         rest ...
+         [constraint-exprs ...]
+         [#t [constraints ...]])]
+    [(define-constraint-interaction 
+       (~or (~seq ci-name:id) (~seq))
        (constraint-exprs ...)
        (~or (~optional (~seq #:package (a:id : s:id c:id))))
        ...
        clauses ...)
+     (define name (or (attribute ci-name) (generate-temporary #'?name)))
      (define a-name (or (attribute a) (generate-temporary #'?a)))
      (define s-name (or (attribute s) (generate-temporary #'?s)))
      (define c-name (or (attribute c) (generate-temporary #'?c)))
      (with-syntax*
-       ([(a s c) (list a-name s-name c-name)]
+       ([(name a s c) (list name a-name s-name c-name)]
         [constraint-interaction-expr
          #`(parse-constraint-interaction
             name (constraint-exprs ...) (clauses ...)

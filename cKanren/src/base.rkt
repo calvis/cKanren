@@ -23,7 +23,8 @@
          update-package sort-by-lex<= lex<= default-reify bindm update-c
          extend-reify-fns run-relevant-constraints extend-enforce-fns
          define-lazy-goal reify-with-colon run run* run/lazy #%app-safe
-         use-constraints trace-define constraint)
+         use-constraints trace-define constraint define-reified-constraint
+         define-constraint)
 (provide (for-syntax search-strategy))
 
 ;; mk-structs
