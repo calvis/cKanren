@@ -6,8 +6,6 @@
 (require racket/generator)
 (require (for-syntax syntax/parse racket/syntax))
 
-(require optimization-coach)
-
 (provide (all-defined-out))
 (provide (for-syntax search-strategy))
 
@@ -539,38 +537,67 @@
    (pattern (~seq #:event e)))
 
  ;; argument keyword matching
- (define-splicing-syntax-class arguments-keyword
+ (define-splicing-syntax-class (arguments-keyword default-fn)
    #:attributes (bindings)
-   (pattern (~seq #:args (bd:argument ...))
+   (pattern (~seq #:args ((~var bd (argument default-fn)) ...))
             #:with bindings #'((bd.arg bd.fn) ...)))
 
- (define-syntax-class argument
+ (define-syntax-class (argument default-fn)
    #:attributes (arg fn)
    (pattern (arg fn))
-   (pattern arg #:with fn #'walk))
+   (pattern arg #:with fn default-fn))
 
  ;; constructor keyword matching
  (define-splicing-syntax-class constructor-keyword
    (pattern (~seq #:constructor oc-const-fn:expr))))
 
-(define-syntax (constraint stx)
+(define-syntax (define-constraint-type stx)
   (syntax-parse stx
-    [(constraint 
-      (~or (~optional packagekw:package-keyword)
-           (~optional eventkw:event-keyword)
-           (~optional argskw:arguments-keyword)
-           (~optional constkw:constructor-keyword))
-      ...
-      body ...)
-     (with-syntax 
-       ([(a s c) (or (attribute packagekw.package) 
-                     (generate-temporaries #'(?a ?s ?c)))]
-        [e (or (attribute eventkw.e) (generate-temporary #'?e))]
-        [((arg fn) ...) (or (attribute argskw.bindings) #'())]
-        [name (or (attribute constkw.oc-const-fn) (generate-temporary #'?fn))])
-       #'(letrec ([cstr (constraint/internal (a s c e) ((arg fn) ...) body ...)]
-                  [name (lambda (arg ...) cstr)])
-           cstr))]))
+    [(define-constraint-type name default-update-fn)
+     (with-syntax ([default-update-fn #'#'default-update-fn]
+                   [definer (format-id #'name "define-~a" (syntax-e #'name))])
+       #'(...
+          (begin
+            (define-syntax (name stx)
+              (syntax-parse stx
+                [(name 
+                  (~or (~optional packagekw:package-keyword)
+                       (~optional eventkw:event-keyword)
+                       (~optional (~var argskw (arguments-keyword default-update-fn)))
+                       (~optional constkw:constructor-keyword))
+                  ...
+                  body ...)
+                 (with-syntax 
+                   ([(a s c) (or (attribute packagekw.package) 
+                                 (generate-temporaries #'(?a ?s ?c)))]
+                    [e (or (attribute eventkw.e) (generate-temporary #'?e))]
+                    [((arg fn) ...) (or (attribute argskw.bindings) #'())]
+                    [c-name (or (attribute constkw.oc-const-fn) (generate-temporary #'?fn))])
+                   #'(letrec ([cstr (constraint/internal (a s c e) ((arg fn) ...) body ...)]
+                              [c-name (lambda (arg ...) cstr)])
+                       cstr))]))
+            (define-syntax (definer stx)
+              (syntax-parse stx
+                [(definer (fn-name args ...)
+                   (~seq #:persistent))
+                 #'(definer
+                     (fn-name args ...)
+                     (update-c (build-oc fn-name args ...)))]
+                [(definer (fn-name args ...) (~seq #:reified) options+body ...)
+                 #'(begin
+                     (definer (fn-name args ...) options+body ...)
+                     (define-reified-constraint fn-name))]
+                [(definer (fn-name args ...) (~seq #:unique) options+body ...)
+                 #'(begin
+                     (definer (fn-name args ...) options+body ...)
+                     (define-constraint-interaction
+                       [(fn-name ,args ...) (fn-name ,args ...)] => [(fn-name args ...)]))]
+                [(definer (fn-name (~var args (argument default-update-fn)) ...) 
+                   options+body ...)
+                 #'(define (fn-name args.arg ...)
+                     (name #:args (args ...) options+body ...))])))))]))
+
+(define-constraint-type constraint walk)
 
 (define-syntax (constraint/internal stx)
   (syntax-parse stx
@@ -578,30 +605,6 @@
      #'(lambdam@ (a : s c e) 
          (let ([args (fns args s c e)] ...)
            (bindm a (begin body ...) e)))]))
-
-(define-syntax (define-constraint stx)
-  (syntax-parse stx
-    [(define-constraint (name args ...)
-       (~seq #:persistent))
-     #'(define-constraint
-         (name args ...)
-         (update-c (build-oc name args ...)))]
-    [(define-constraint (name args ...)
-       (~seq #:reified)
-       options+body ...)
-     #'(begin
-         (define-constraint (name args ...) options+body ...)
-         (define-reified-constraint name))]
-    [(define-constraint (name args ...) 
-       (~seq #:unique)
-       options+body ...)
-     #'(begin
-         (define-constraint (name args ...) options+body ...)
-         (define-constraint-interaction
-           [(name ,args ...) (name ,args ...)] => [(name args ...)]))]
-    [(define-constraint (name args:argument ...) options+body ...)
-     #'(define (name args.arg ...)
-         (constraint #:args (args ...) options+body ...))]))
 
 (define (walk u s [c #f] [e #f])
   (cond

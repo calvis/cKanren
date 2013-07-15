@@ -32,7 +32,7 @@
       (mk-struct-unify u v e s c))]
    ;; mostly for constants: strings, numbers, booleans, etc.
    ;; they unify if they are eq? or equal?
-   [(lambda (x) #t)
+   [#t
     (define (compatible? u v s c)
       (or (var? v) (eq? u v) (equal? u v)))
     (define (gen-unify u v e s c)

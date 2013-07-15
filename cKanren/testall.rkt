@@ -67,7 +67,6 @@
   (run-all))
 
 (module+ test
-  (require optimization-coach)
-  (optimization-coach-profile (run-all-long)))
+  (run-all-long))
 
 

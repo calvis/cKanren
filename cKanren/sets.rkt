@@ -10,7 +10,7 @@
          enforce-lazy-unify-same =/= lazy-unify-same
          enforce-lazy-union-set lazy-union-set uniono
          enforce-lazy-union-var lazy-union-var disjo !disjo
-         !ino ino !uniono)
+         !ino ino !uniono define-set-constraint)
 
 ;; == DATA STRUCTURES ==========================================================
 
@@ -112,8 +112,10 @@
    [(set-var? s) s]
    [else (tail (set-right s))]))
 
-(define (update-set set s) 
-  (normalize (walk* set s)))
+(define (update-set set s . rest) 
+  (normalize (apply walk* set s rest)))
+
+(define-constraint-type set-constraint update-set)
 
 ;; == UNIFICATION ==============================================================
 
@@ -127,66 +129,56 @@
    (seto v)
    (unify-well-formed-sets u v)))
 
-(define (unify-well-formed-sets X T)
-  (constraint
-   #:package (a : s c)
-   (let ([X (update-set X s)]
-         [T (update-set T s)])
-     (cond
-      [(same-set? X T) succeed]
-      [(and (not (set? X)) (set? T))
-       (unify-well-formed-sets T X)]
-      ;; it is possible normalization gave us two set-vars
-      [(and (set-var? X) (set-var? T))
-       (== X T)]
-      [(set? T)
-       (cond
-        [(or (empty-set? X) (empty-set? T)) fail]
-        [(set-member? X T) fail]
-        [(same-set? (set-right X) (set-right T))
-         (lazy-unify-same X T)]
-        [else (lazy-unify-diff X T)])]
-      [(set-var? T)
-       (cond
-        [(same-set? (set-right X) T)
-         (let ([N (set-var (gensym 'n-unify))])
-           (conj
-            (proper-set (set (set-left X) N))
-            (unify-well-formed-sets (set (set-left X) N) T)))]
-        [else (update-s T X)])]
-      [else fail]))))
+(define-set-constraint (unify-well-formed-sets X T)
+  (cond
+   [(same-set? X T) succeed]
+   [(and (not (set? X)) (set? T))
+    (unify-well-formed-sets T X)]
+   ;; it is possible normalization gave us two set-vars
+   [(and (set-var? X) (set-var? T))
+    (== X T)]
+   [(set? T)
+    (cond
+     [(or (empty-set? X) 
+          (empty-set? T)
+          (set-member? X T))
+      fail]
+     [(same-set? (set-right X) (set-right T))
+      (lazy-unify-same X T)]
+     [else (lazy-unify-diff X T)])]
+   [(set-var? T)
+    (cond
+     [(same-set? (set-right X) T)
+      (let ([N (set-var (gensym 'n-unify))])
+        (conj
+         (proper-set (set (set-left X) N))
+         (unify-well-formed-sets (set (set-left X) N) T)))]
+     [else (update-s T X)])]
+   [else fail]))
 
-(define (lazy-unify-same X T)
-  (constraint
-   #:package (a : s c) 
-   (let ([X (update-set X s)]
-         [T (update-set T s)])
-     (cond
-      [(null? (set-left X))
-       (unify-walked (set-right X) T)]
-      [(and (set? T) (null? (set-left T)))
-       (unify-walked (set-right T) X)]
-      [else (update-c-nocheck (build-oc lazy-unify-same X T))]))))
+(define-set-constraint (lazy-unify-same X T)
+  (cond
+   [(null? (set-left X))
+    (unify-walked (set-right X) T)]
+   [(and (set? T) (null? (set-left T)))
+    (unify-walked (set-right T) X)]
+   [else (update-c-nocheck (build-oc lazy-unify-same X T))]))
 
-(define (lazy-unify-diff X T)
-  (constraint
-   #:package (a : s c) 
-   (let ([X (update-set X s)]
-         [T (update-set T s)])
-     (cond
-      [(null? (set-left X))
-       (== T (set-right X))]
-      [(null? (set-left T))
-       (== X (set-right T))]
-      ;; if there's only one thing in X or T, gtfo
-      [(or (and (empty-set? (set-right X))
-                (null? (cdr (set-left X))))
-           (and (empty-set? (set-right T))
-                (null? (cdr (set-left T)))))
-       (conj
-        (== (set-left  X) (set-left T))
-        (== (set-right X) (set-right T)))]
-      [else (update-c-nocheck (build-oc lazy-unify-diff X T))]))))
+(define-set-constraint (lazy-unify-diff X T)
+  (cond
+   [(null? (set-left X))
+    (== T (set-right X))]
+   [(null? (set-left T))
+    (== X (set-right T))]
+   ;; if there's only one thing in X or T, gtfo
+   [(or (and (empty-set? (set-right X))
+             (null? (cdr (set-left X))))
+        (and (empty-set? (set-right T))
+             (null? (cdr (set-left T)))))
+    (conj
+     (== (set-left  X) (set-left T))
+     (== (set-right X) (set-right T)))]
+   [else (update-c-nocheck (build-oc lazy-unify-diff X T))]))
 
 ;; =============================================================================
 
@@ -264,7 +256,6 @@
     (loop 'lazy-union-var  enforce-lazy-union-var)
     (loop 'lazy-union-set  enforce-lazy-union-set)
     ;; (loop 'lazy-union-neq  enforce-lazy-union-neq)
-    (loop 'lazy-!union     enforce-!union)
     (constraint
      #:package (a : s c)
      (cond
@@ -305,44 +296,34 @@
    [else (cons (car ls) (rem1 x (cdr ls)))]))
 
 (define (make-set ls)
-  (if (null? ls)
-      (empty-set)
-      (set ls (empty-set))))
+  (if (null? ls) (empty-set) (set ls (empty-set))))
 
-(define (seto u) 
-  (constraint
-   #:package (a : s c)
-   (let ([u (walk u s)])
-     (cond
-      [(set-var? u) succeed]
-      [(empty-set? u) succeed]
-      [(set? u)
-       (let loop ([l (set-left u)])
-         (cond
-          [(null? l)
-           (seto (set-right u))]
-          [(set? (car l))
-           (conj
-            (seto (car l))
-            (loop (cdr l)))]
-          [else (loop (cdr l))]))]
-      [(var? u)
-       (let ([u^ (set-var (var-x u))])
-         (update-s u u^))]
-      [else fail]))))
+(define-constraint (seto u) 
+  (cond
+   [(or (set-var? u) (empty-set? u)) succeed]
+   [(set? u)
+    (let loop ([l (set-left u)])
+      (cond
+       [(null? l)
+        (seto (set-right u))]
+       [(set? (car l))
+        (conj
+         (seto (car l))
+         (loop (cdr l)))]
+       [else (loop (cdr l))]))]
+   [(var? u)
+    (let ([u^ (set-var (var-x u))])
+      (update-s u u^))]
+   [else fail]))
 
 (define (ino t s)
   (conj (seto s) (in-set t s)))
 
-(define (in-set x S)
-  (constraint
-   #:package (a : s c)
-   (let ([x (walk x s)]
-         [S (update-set S s)])
-     (cond
-      [(empty-set? S) fail]
-      [(and (set? S) (memq x (set-left S))) succeed]
-      [else (update-c-nocheck (build-oc in-set x S))]))))
+(define-set-constraint (in-set [x walk] S)
+  (cond
+   [(empty-set? S) fail]
+   [(and (set? S) (memq x (set-left S))) succeed]
+   [else (update-c-nocheck (build-oc in-set x S))]))
 
 (define (enforce-in oc)
   (constraint
@@ -378,79 +359,59 @@
    (seto v)
    (=/=-well-formed u v)))
 
-(define (neq-? u v)
-  (constraint
-   #:package (a : s c)
-   (let ([u (walk u s)]
-         [v (walk v s)])
-     (cond
-      [(eq? u v) fail]
-      [(and (or (set? u) (set-var? u))
-            (or (set? v) (set-var? v)))
-       (=/=-set u v)]
-      [(or (and (not (var? v)) (not (set? v)))
-           (and (not (var? u)) (not (set? u))))
-       (=/=-other u v)]
-      [else (update-c-nocheck (build-oc neq-? u v))]))))
+(define-constraint (neq-? u v)
+  (cond
+   [(eq? u v) fail]
+   [(and (or (set? u) (set-var? u))
+         (or (set? v) (set-var? v)))
+    (=/=-set u v)]
+   [(or (and (not (var? v)) (not (set? v)))
+        (and (not (var? u)) (not (set? u))))
+    (=/=-other u v)]
+   [else (update-c-nocheck (build-oc neq-? u v))]))
 
 ;; unlike union, we don't know that U or V is a set
-(define (=/=-well-formed U V)
-  (constraint
-   #:package (a : s c)
-   (let ([U (update-set U s)]
-         [V (update-set V s)])
-     (cond
-      [(and (set? V) (set? U))
-       (lazy-neq-sets U V)]
-      [(set-var? U)
-       (lazy-neq-var U V)]
-      [(set-var? V)
-       (lazy-neq-var V U)]
-      [else fail]))))
+(define-set-constraint (=/=-well-formed U V)
+  (cond
+   [(and (set? V) (set? U))
+    (lazy-neq-sets U V)]
+   [(set-var? U)
+    (lazy-neq-var U V)]
+   [(set-var? V)
+    (lazy-neq-var V U)]
+   [else fail]))
 
-(define (set-neq U V)
-  (constraint
-   #:package (a : s c)
-   (let ([U (update-set U s)]
-         [V (update-set V s)])
-     (cond
-      [(same-set? U V) fail]
-      [else (update-c-nocheck (build-oc set-neq U V))]))))
+(define-set-constraint (set-neq U V)
+  (cond
+   [(same-set? U V) fail]
+   [else (update-c-nocheck (build-oc set-neq U V))]))
 
 ;; both U and V are sets: {s|r} != {u|t}
-(define (lazy-neq-sets U V)
-  (constraint
-   #:package (a : s c)
-   (let ([U (update-set U s)]
-         [V (update-set V s)])
-     (cond
-      [(same-set? U V) fail]
-      [(empty-set? U) succeed]
-      [(empty-set? V) succeed]
-      ;; {|r} != {u|t}
-      [(null? (set-left U))
-       (lazy-neq-var (set-right U) V)]
-      ;; {s|r} != {|t}
-      [(null? (set-left U))
-       (lazy-neq-var (set-right V) U)]
-      [else (update-c-nocheck (build-oc lazy-neq-sets U V))]))))
+(define-set-constraint (lazy-neq-sets U V)
+  (cond
+   [(same-set? U V) fail]
+   [(empty-set? U) succeed]
+   [(empty-set? V) succeed]
+   ;; {|r} != {u|t}
+   [(null? (set-left U))
+    (lazy-neq-var (set-right U) V)]
+   ;; {s|r} != {|t}
+   [(null? (set-left U))
+    (lazy-neq-var (set-right V) U)]
+   [else (update-c-nocheck (build-oc lazy-neq-sets U V))]))
 
 ;; U should be a set var, V might be a set or set var
-(define (lazy-neq-var U V)
-  (constraint
-   #:package (a : s c)
-   (let ([U (update-set U s)]
-         [V (update-set V s)])
-     (cond
-      [(same-set? U V) fail]
-      [(set? U)
-       (lazy-neq-sets U V)]
-      ;; V = {t0 .. tn | t} where U != t
-      [(and (set? V) 
-            (not (empty-set? V))
-            (memq U (set-left V))) 
-       succeed]
-      [else (update-c-nocheck (build-oc lazy-neq-var U V))]))))
+(define-set-constraint (lazy-neq-var U V)
+  (cond
+   [(same-set? U V) fail]
+   [(set? U)
+    (lazy-neq-sets U V)]
+   ;; V = {t0 .. tn | t} where U != t
+   [(and (set? V) 
+         (not (empty-set? V))
+         (memq U (set-left V))) 
+    succeed]
+   [else (update-c-nocheck (build-oc lazy-neq-var U V))]))
 
 ;; U is a set var, and V might be a set or a set var
 (define (enforce-lazy-neq-var oc)
@@ -488,29 +449,26 @@
 (define (!ino x S)
   (conj (seto S) (!in-c x S)))
 
-(define (!in-c x S)
-  (constraint
-   #:package (a : s c)
-   (let ([x (walk* x s)]
-         [S (update-set S s)])
-     (cond
-      [(empty-set? S) succeed]
-      [(and (set-var? S) (set? x) 
-            (occurs-check S (set-left x) s))
-       succeed]
-      [(set? S)
-       (cond
-        [(memq x (set-left S)) fail]
-        [(and (not (var? x))
-              (empty-set? (set-right S))
-              (not (any/var? (set-left S)))
-              (not (memq x (set-left S))))
-         succeed]
-        [else
-         (conj
-          (not-in-t* x (set-left S))
-          (!in-c x (set-right S)))])]
-      [else (update-c-nocheck (build-oc !in-c x S))]))))
+(define-set-constraint (!in-c [x walk*] S)
+  #:package (a : s c)
+  (cond
+   [(empty-set? S) succeed]
+   [(and (set-var? S) (set? x) 
+         (occurs-check S (set-left x) s))
+    succeed]
+   [(set? S)
+    (cond
+     [(memq x (set-left S)) fail]
+     [(and (not (var? x))
+           (empty-set? (set-right S))
+           (not (any/var? (set-left S)))
+           (not (memq x (set-left S))))
+      succeed]
+     [else
+      (conj
+       (not-in-t* x (set-left S))
+       (!in-c x (set-right S)))])]
+   [else (update-c-nocheck (build-oc !in-c x S))]))
 
 (define (make-not-in-t* x t* s c)
   (cond
@@ -528,41 +486,35 @@
 
 ;; W is a set var
 (define (lazy-union-var U V W)
-  (constraint
-   #:package (a : s c)
-   (let ([U (update-set U s)]
-         [V (update-set V s)]
-         [W (update-set W s)])
-     (cond
-      [(set? W)
-       (lazy-union-set U V W)]
-      [(same-set? U V)
-       (== W U)]
-      [(empty-set? U)
-       (== W V)]
-      [(empty-set? V)
-       (== W U)]
-      [else 
-       (conj
-        ;; Not tested yet
-        ;; (check-set-neq U)
-        ;; (check-set-neq V)
-        ;; (check-set-neq W)
-        (update-c-nocheck (build-oc lazy-union-var U V W)))]))))
+  (set-constraint
+   #:args (U V W)
+   (cond
+    [(set? W)
+     (lazy-union-set U V W)]
+    [(same-set? U V)
+     (== W U)]
+    [(empty-set? U)
+     (== W V)]
+    [(empty-set? V)
+     (== W U)]
+    [else 
+     (conj
+      ;; Not tested yet
+      ;; (check-set-neq U)
+      ;; (check-set-neq V)
+      ;; (check-set-neq W)
+      (update-c-nocheck (build-oc lazy-union-var U V W)))])))
 
 ;; W is a set
 (define (lazy-union-set U V W)
-  (constraint 
-   #:package (a : s c)
-   (let ([U (update-set U s)]
-         [V (update-set V s)]
-         [W (update-set W s)])
-     (cond
-      [(empty-set? W)
-       (conj (== U W) (== V W))]
-      [(same-set? U V)
-       (== U W)]
-      [else (update-c-nocheck (build-oc lazy-union-set U V W))]))))
+  (set-constraint 
+   #:args (U V W)
+   (cond
+    [(empty-set? W)
+     (conj (== U W) (== V W))]
+    [(same-set? U V)
+     (== U W)]
+    [else (update-c-nocheck (build-oc lazy-union-set U V W))])))
 
 ;; Untested
 #;
@@ -675,38 +627,30 @@
 (define (proper-seto S)
   (conj (seto S) (proper-set S)))
 
-(define (proper-set S)
-  (constraint
-   #:package (a : s c)
-   (let ([S (update-set S s)])
-     (cond
-      ;; X = {t0 .. tn | N}
-      [(empty-set? S) succeed]
-      [(set? S)
-       (conj
-        (let loop ([t* (set-left S)])
-          (cond
-           [(null? t*) succeed]
-           [else
-            (conj
-             (not-in-t* (car t*) (rem1 (car t*) (set-left S)))
-             (!in-c (car t*) (set-right S))
-             (loop (cdr t*)))]))
-        (proper-set (set-right S)))]
-      [else (update-c-nocheck (build-oc proper-set S))]))))
+(define-set-constraint (proper-set S)
+  (cond
+   ;; X = {t0 .. tn | N}
+   [(empty-set? S) succeed]
+   [(set? S)
+    (conj
+     (let loop ([t* (set-left S)])
+       (cond
+        [(null? t*) succeed]
+        [else
+         (conj
+          (not-in-t* (car t*) (rem1 (car t*) (set-left S)))
+          (!in-c (car t*) (set-right S))
+          (loop (cdr t*)))]))
+     (proper-set (set-right S)))]
+   [else (update-c (build-oc proper-set S))]))
 
-(define (union-fresh U V W)
-  (constraint
-   #:package (a : s c)
-   (let ([U (update-set U s)]
-         [V (update-set V s)]
-         [W (update-set W s)])
-     (cond
-      [(set? W)
-       (lazy-union-set U V W)]
-      [(or (set? U) (set? W))
-       (lazy-union-var U V W)]
-      [else (update-c-nocheck (build-oc union-fresh U V W))]))))
+(define-set-constraint (union-fresh U V W)
+  (cond
+   [(set? W)
+    (lazy-union-set U V W)]
+   [(or (set? U) (set? W))
+    (lazy-union-var U V W)]
+   [else (update-c-nocheck (build-oc union-fresh U V W))]))
 
 (define (split-set S)
   (unless (set? S)
@@ -763,15 +707,11 @@
 (define (disjo u v)
   (conj (seto u) (seto v) (disjoint-fresh u v)))
 
-(define (disjoint-fresh U V)
-  (constraint
-   #:package (a : s c)
-   (let ([U (update-set U s)]
-         [V (update-set V s)])
-     (cond
-      [(or (set? U) (set? V))
-       (disjoint U V)]
-      [else (update-c (build-oc disjoint-fresh U V))]))))
+(define-set-constraint (disjoint-fresh U V)
+  (cond
+   [(or (set? U) (set? V))
+    (disjoint U V)]
+   [else (update-c (build-oc disjoint-fresh U V))]))
 
 (define (enforce-one-disjoint-fresh oc)
   (constraint
@@ -802,61 +742,39 @@
            (disjoint-fresh U^ V^))])]
       [else (disjoint U V)]))))
 
-(define (disjoint U V)
-  (constraint
-   #:package (a : s c)
-   (let ([U (update-set U s)]
-         [V (update-set V s)])
-     (cond
-      [(same-set? U V)
-       (conj
-        (== U (empty-set))
-        (== V (empty-set)))]
-      [(or (empty-set? U)
-           (empty-set? V))
-       succeed]
-      [(and (set? U) (set? V))
-       (let ([t1 (car (set-left U))]
-             [s1 (set (cdr (set-left U)) (set-right U))]
-             [t2 (car (set-left V))]
-             [s2 (set (cdr (set-left V)) (set-right V))])
-         (conj
-          (neq-? t1 t2)
-          (!in-c t1 s2)
-          (!in-c t2 s1)
-          (disjoint s1 s2)))]
-       [(set? U)
-        (let ([t (car (set-left U))]
-              [U^ (set (cdr (set-left U)) (set-right U))])
-          (conj (!in-c t V) (disjoint U^ V)))]
-       [(set? V)
-        (let ([t (car (set-left V))]
-              [V^ (set (cdr (set-left V)) (set-right V))])
-          (conj (!in-c t U) (disjoint U V^)))]
-       [else (update-c-nocheck (build-oc disjoint U V))]))))
+(define-set-constraint (disjoint U V)
+  (cond
+   [(same-set? U V)
+    (conj
+     (== U (empty-set))
+     (== V (empty-set)))]
+   [(or (empty-set? U)
+        (empty-set? V))
+    succeed]
+   [(and (set? U) (set? V))
+    (let/set ([(t1 s1) U]
+              [(t2 s2) V])
+      (conj
+       (neq-? t1 t2)
+       (!in-c t1 s2)
+       (!in-c t2 s1)
+       (disjoint s1 s2)))]
+   [(set? U)
+    (let/set ([(u U^) U])
+      (conj (!in-c u V) (disjoint U^ V)))]
+   [(set? V)
+    (let/set ([(v V^) V])
+      (conj (!in-c v U) (disjoint U V^)))]
+   [else (update-c-nocheck (build-oc disjoint U V))]))
 
 (define (!uniono u v w)
-  (conj (seto u) (seto v) (seto w) (lazy-!union u v w)))
-
-(define (lazy-!union U V W)
-  (constraint
-   #:package (a : s c)
-   (let ([U (update-set U s)]
-         [V (update-set V s)]
-         [W (update-set W s)])
-     (update-c-nocheck (build-oc lazy-!union U V W)))))
-
-(define (enforce-!union oc)
-  (constraint
-   #:package (a : s c)
-   (let ([U (update-set (car (oc-rands oc)) s)]
-         [V (update-set (cadr (oc-rands oc)) s)]
-         [W (update-set (caddr (oc-rands oc)) s)])
-     (fresh (N)
-       (conde
-        [(!ino N U) (!ino N V)  (ino N W)]
-        [ (ino N U)            (!ino N W)]
-        [            (ino N V) (!ino N W)])))))
+  (conj 
+   (seto u) (seto v) (seto w)
+   (fresh (t)
+     (conde
+      [(!ino t u) (!ino t v)  (ino t w)]
+      [ (ino t u)            (!ino t w)]
+      [            (ino t v) (!ino t w)]))))
 
 (define (!disjo u v)
   (fresh (n) (ino n u) (ino n v)))
