@@ -308,7 +308,7 @@
   (cond
     ((null? ocs) v)
     (else
-     (let ((ocs^ (run-reify-fns v r ocs)))
+     (let ([ocs^ (run-reify-fns v r ocs)])
        (cond
         [(null? ocs^) v] 
         [(reify-with-colon) `(,v : . ,(sort-store ocs^))]
@@ -322,11 +322,11 @@
 
 ;; defines a "default" reify function
 (define ((default-reify sym cs fn) v r ocs)
-  (let ((ocs (filter-memq/rator cs ocs)))
-    (let ((rands (filter-not any/var? (walk* (fn (map oc-rands ocs) r) r))))
+  (let ([ocs (filter-memq/rator cs ocs)])
+    (let ([rands (filter-not any/var? (walk* (fn (map oc-rands ocs) r) r))])
       (cond
-       ((null? rands) `())
-       (else `((,sym . ,(sort rands lex<=))))))))
+       [(null? rands) `()]
+       [else `((,sym . ,(sort rands lex<=)))]))))
 
 (define ((default-reify-attr sym type fn) v r ocs)
   (let ([ocs (filter (lambda (oc) (eq? (attr-oc-type oc) type))
@@ -336,7 +336,8 @@
        [(null? rands) `()]
        [else `((,sym . ,(sort rands lex<=)))]))))
 
-(define-syntax-rule (define-reified-constraint name maybe-fn ...)
+(define-syntax-rule 
+  (define-reified-constraint name maybe-fn ...)
   (begin
     (define reify-fn
       (default-reify 'name '(name)
