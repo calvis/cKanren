@@ -580,10 +580,9 @@
                        cstr))]))
             (define-syntax (definer stx)
               (syntax-parse stx
-                [(definer (fn-name args ...)
-                   (~seq #:persistent))
-                 #'(definer
-                     (fn-name args ...)
+                [(definer (fn-name args ...) (~seq #:persistent) options ...)
+                 #'(definer (fn-name args ...)
+                     options ...
                      (update-c (build-oc fn-name args ...)))]
                 [(definer (fn-name args ...) (~seq #:reified) options+body ...)
                  #'(begin
