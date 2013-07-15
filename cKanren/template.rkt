@@ -7,30 +7,27 @@
 ;; goal that will copy the "template" in t, i.e. the structure and
 ;; free variables, to x
 (define (templateo t x)
-  (let ([new-env-var (var 'env)])
-    (template t x new-env-var)))
+  (fresh (gensym)
+    (template t x gensym)))
 
 ;; if t is an mk-struct, copies that structure onto x.  if t is ground
 ;; or if there is already a (template x t) constraint, this constraint
 ;; turns into ==. otherwise, placed back in the store.
-(define (template t x env-var)
-  (lambdam@ (a : s c)
-    (let ([t (walk* t s)]
-          [x (walk x s)])
-      (bindm a
-        (cond
-         [(eq? t x) 
-          (update-c (build-oc template t x env-var))]
-         [(occurs-check x t s) fail]
-         [(pair? t)
-          (let ([first (var 'first)]
-                [rest  (var 'rest)])
-            (conj
-             (== x `(,first . ,rest))
-             (template (car t) first env-var)
-             (template (cdr t) rest env-var)))]
-         [(not (var? t)) (== t x)]
-         [else (update-c (build-oc template t x env-var))])))))
+(define-constraint 
+  (template [t walk*] x [env-var #:constant])
+  #:package (a : s c)
+  (cond
+   [(eq? t x) 
+    (update-c (build-oc template t x env-var))]
+   [(occurs-check x t s) fail]
+   [(pair? t)
+    (fresh (first rest)
+      (conj
+       (== x `(,first . ,rest))
+       (template (car t) first env-var)
+       (template (cdr t) rest env-var)))]
+   [(not (var? t)) (== t x)]
+   [else (update-c (build-oc template t x env-var))]))
 
 (define (get-env env-var s c)
   (let ([envs (filter/rator 'template-env c)])
@@ -44,85 +41,82 @@
       (walk* (cadr (oc-rands oc)) s))))
 
 (define-constraint-interaction
-  template-to-unify
-  [(template ,t ,x ,env1) (template ,x ,t ,env2)]
-  [#t ((== t x))])
+  [(template ,t ,x ,env1) (template ,x ,t ,env2)] => [(== t x)])
 
 (define-constraint-interaction
-  same-template
-  [(template ,x ,y ,env-var) (template ,x ,z ,env-var)]
-  [#t ((== y z)
-       (template x y env-var))])
+  [(template ,x ,y ,env-var) (template ,x ,z ,env-var)] 
+  => 
+  [(== y z) (template x y env-var)])
 
-(define (specific-templateo t x)
-  (conj (specifico t) (templateo t x)))
-
-(define (specifico t)
-  (specific t))
-
-(define (specific t)
-  (lambdam@ (a : s c)
-    (let ([t (walk t s)])
-      ((update-c (build-oc specific t)) a))))
-
-(define (enforce-specifics x)
-  (lambdam@ (a : s c)
-    ((let loop ([specs (filter/rator 'specific c)])
-       (cond
-        [(null? specs) succeed]
-        [else 
-         (conj 
-          (make-specifico (car (oc-rands (car specs))))
-          (loop (cdr specs)))]))
-     a)))
-
-(define (make-specifico spec)
-  (make-specific spec))
-
-(define (make-specific t)
-  (lambdam@ (a : s c)
-    (let ([ts (filter (lambda (oc) (eq? (car (oc-rands oc)) t))
-                      (filter/rator 'template c))])
-      (cond
-       [(null? ts) a]
-       [else
-        (let ([specific-pattern
-               (for/fold 
-                ([specific-pattern (cadr (oc-rands (car ts)))])
-                ([pat (cdr ts)])
-                (union-pattern specific-pattern (cadr (oc-rands pat)) s c))])
-          (bindm a (== t specific-pattern)))]))))
-
-(define (union-pattern spec pat s c)
-  (cond
-   ;; check to see if spec and pat already unify.. if they do we don't
-   ;; have to change anything in spec
-   [(unify `((,spec . ,pat)) s c)
-    => (lambda (s/c) spec)]
-   ;; if they are compatible but do not unify, we have to figure out
-   ;; which sub-expressions fail to unify and replace those with fresh
-   ;; variables
-   [(and (unifiable? spec)
-         (unifiable? pat)
-         (compatible? spec pat s c)
-         (compatible? pat spec s c))
-    (gen-anti-unify spec pat s c)]
-   ;; if they are unifiable but not compatible, or just not unifiable,
-   ;; return the most general answer
-   [else (var (gensym 'union-fail))]))
-
-(define (gen-anti-unify spec pat s c)
-  (cond
-   [(and (mk-struct? spec)
-         (mk-struct? pat))
-    (recur spec
-           (lambda (ua ud)
-             (recur pat
-                    (lambda (va vd)
-                      ((constructor spec)
-                       (union-pattern ua va s c)
-                       (union-pattern ud vd s c))))))]
-   [else (var (gensym 'gen-fail))]))
+;; (define (specific-templateo t x)
+;;   (conj (specifico t) (templateo t x)))
+;; 
+;; (define (specifico t)
+;;   (specific t))
+;; 
+;; (define (specific t)
+;;   (lambdam@ (a : s c)
+;;     (let ([t (walk t s)])
+;;       ((update-c (build-oc specific t)) a))))
+;; 
+;; (define (enforce-specifics x)
+;;   (lambdam@ (a : s c)
+;;     ((let loop ([specs (filter/rator 'specific c)])
+;;        (cond
+;;         [(null? specs) succeed]
+;;         [else 
+;;          (conj 
+;;           (make-specifico (car (oc-rands (car specs))))
+;;           (loop (cdr specs)))]))
+;;      a)))
+;; 
+;; (define (make-specifico spec)
+;;   (make-specific spec))
+;; 
+;; (define (make-specific t)
+;;   (lambdam@ (a : s c)
+;;     (let ([ts (filter (lambda (oc) (eq? (car (oc-rands oc)) t))
+;;                       (filter/rator 'template c))])
+;;       (cond
+;;        [(null? ts) a]
+;;        [else
+;;         (let ([specific-pattern
+;;                (for/fold 
+;;                 ([specific-pattern (cadr (oc-rands (car ts)))])
+;;                 ([pat (cdr ts)])
+;;                 (union-pattern specific-pattern (cadr (oc-rands pat)) s c))])
+;;           (bindm a (== t specific-pattern)))]))))
+;; 
+;; (define (union-pattern spec pat s c)
+;;   (cond
+;;    ;; check to see if spec and pat already unify.. if they do we don't
+;;    ;; have to change anything in spec
+;;    [(unify `((,spec . ,pat)) s c)
+;;     => (lambda (s/c) spec)]
+;;    ;; if they are compatible but do not unify, we have to figure out
+;;    ;; which sub-expressions fail to unify and replace those with fresh
+;;    ;; variables
+;;    [(and (unifiable? spec)
+;;          (unifiable? pat)
+;;          (compatible? spec pat s c)
+;;          (compatible? pat spec s c))
+;;     (gen-anti-unify spec pat s c)]
+;;    ;; if they are unifiable but not compatible, or just not unifiable,
+;;    ;; return the most general answer
+;;    [else (var (gensym 'union-fail))]))
+;; 
+;; (define (gen-anti-unify spec pat s c)
+;;   (cond
+;;    [(and (mk-struct? spec)
+;;          (mk-struct? pat))
+;;     (recur spec
+;;            (lambda (ua ud)
+;;              (recur pat
+;;                     (lambda (va vd)
+;;                       ((constructor spec)
+;;                        (union-pattern ua va s c)
+;;                        (union-pattern ud vd s c))))))]
+;;    [else (var (gensym 'gen-fail))]))
 
 ;; (extend-enforce-fns 'specifics enforce-specifics)
 

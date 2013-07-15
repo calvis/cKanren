@@ -545,6 +545,7 @@
 
  (define-syntax-class (argument default-fn)
    #:attributes (arg fn)
+   (pattern (arg #:constant) #:with fn #'(lambda (x . rest) x))
    (pattern (arg fn))
    (pattern arg #:with fn default-fn))
 
