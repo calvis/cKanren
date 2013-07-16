@@ -22,14 +22,14 @@
      (define args (syntax-e #'(v ...)))
      (define depth 1)
      (with-syntax*
-      ([((pat (x ...)) ...) 
+      ([((pat (x ...) (c ...)) ...) 
         (map (lambda (pat) (wpat pat args depth))
              (syntax-e #'(pat ...)))]
        [((x ...) ...) (map (lambda (ls) 
                              (remove-duplicates (syntax-e ls) free-identifier=?))
                            (syntax-e #'((x ...) ...)))])
       #'(let ([ls (list v ...)])
-          (conde [(fresh (x ...) (== `pat ls) g ...)] ...)))]))
+          (conde [(fresh (x ...) (== `pat ls) c ... g ...)] ...)))]))
 
 (define-for-syntax (guard-pattern-var-is-arg x args depth)
   (when (and (or (not depth) (not (zero? depth)))
@@ -38,27 +38,30 @@
            (syntax-e x))))
 
 (define-for-syntax (wpat pat args depth)
-  (syntax-case pat (unquote _)
+  (syntax-case pat (unquote _ ?)
     [(unquote _)
      (guard-pattern-var-is-arg #'x args depth)
      (with-syntax ([_new (generate-temporary #'?_)])
-       #'((unquote _new) (_new)))]
+       #'((unquote _new) (_new) ()))]
+    [(unquote (? c x))
+     (guard-pattern-var-is-arg #'x args depth)
+     #'((unquote x) (x) ((c x)))]
     [(unquote x)
      (guard-pattern-var-is-arg #'x args depth)
-     #'((unquote x) (x))]
+     #'((unquote x) (x) ())]
     [(a ...)
      (let ([depth (and depth (> depth 0) (sub1 depth))])
        (with-syntax
-         ([((pat (x ...)) ...)
+         ([((pat (x ...) (c ...)) ...)
            (map (lambda (a) (wpat a args depth)) (syntax-e #'(a ...)))])
-         #'((pat ...) (x ... ...))))]
+         #'((pat ...) (x ... ...) (c ... ...))))]
     [(a . d)
      (let ([depth #f])
        (with-syntax
-         ([((pat1 (x1 ...)) (pat2 (x2 ...)))
+         ([((pat1 (x1 ...) (c1 ...)) (pat2 (x2 ...) (c2 ...)))
            (map (lambda (a) (wpat a args depth)) (syntax-e #'(a d)))])
-         #'((pat1 . pat2) (x1 ... x2 ...))))]
-    [x #'(x ())]))
+         #'((pat1 . pat2) (x1 ... x2 ...) (c1 ... c2 ...))))]
+    [x #'(x () ())]))
 
 
 
