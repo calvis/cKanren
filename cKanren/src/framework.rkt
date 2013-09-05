@@ -615,12 +615,12 @@
 (define (walk* u s [c #f] [e #f])
   (let ([v (walk u s c e)])
     (cond
-     ((mk-struct? v)
-      (recur v 
-       (lambda (a d) 
-         ((constructor v)
-          (walk* a s)
-          (walk* d s)))))
+     [(mk-struct? v)
+      (define (k a d) 
+        ((constructor v)
+         (walk* a s)
+         (walk* d s)))
+      (recur v k)]
      (else v))))
 
 (define (walk-event u s e)
