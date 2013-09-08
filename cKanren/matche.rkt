@@ -14,7 +14,7 @@
 (define-syntax lambdae
   (syntax-rules ()
     ((_ (x ...) c c* ...)
-     (lambda (x ...) (matche (x ...) (c c* ...))))))
+     (lambda (x ...) (matche (x ...) c c* ...)))))
 
 (define-syntax (matche stx)
   (syntax-parse stx
