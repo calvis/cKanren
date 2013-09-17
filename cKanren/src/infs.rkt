@@ -4,17 +4,7 @@
 
 (require "helpers.rkt")
 
-#;
-(provide (struct-out a-inf)
-         (struct-out mzerof)
-         (struct-out choiceg)
-         (struct-out inc)
-         (struct-out a)
-         empty-f
-         delay
-         case-inf)
-
-(provide (all-defined-out))
+(provide (except-out (all-defined-out) a))
 
 ;; the stream miniKanren runs on
 ;; (struct a-inf ())
@@ -31,7 +21,7 @@
 (define mzerof (lambda () #f))
 (define choiceg cons)
 
-(struct a #;a-inf (s c q t)
+(struct a #;a-inf (s c q t e)
   #:extra-constructor-name make-a
   #:methods gen:custom-write 
   [(define (write-proc . args) (apply write-package args))])
@@ -40,8 +30,8 @@
 (define (write-package a port mode)
   (let ([fn (lambda (s) ((parse-mode mode) s port))])
     (if (debug?)
-        (fn (format "#a{ ~s ~a ~a }" (a-t a) (a-s a) (a-c a)))
-        (fn (format "#a{ ~a ~a }" (a-s a) (a-c a))))))
+        (fn (format "#a{ ~s ~a ~a ~a }" (a-t a) (a-s a) (a-c a) (a-e a)))
+        (fn (format "#a{ ~a ~a ~a }" (a-s a) (a-c a) (a-e a))))))
 
 ;; macro that delays expressions
 (define-syntax lambdaf@

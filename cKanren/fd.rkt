@@ -1,9 +1,6 @@
 #lang racket
 
-(require 
- "interval-domain.rkt"
- "ck.rkt"
- (only-in rackunit check-false))
+(require "interval-domain.rkt" "ck.rkt")
 
 (provide infd domfd =fd =/=fd <=fd <fd
          plusfd timesfd distinctfd range

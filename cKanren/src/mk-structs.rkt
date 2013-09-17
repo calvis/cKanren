@@ -79,6 +79,15 @@
                                (any-relevant/var? d x*)))))
    (else (and (var? t) (memq t x*)))))
 
+(define (filter*/var? t)
+  (cond
+   [(var? t) `(,t)]
+   [(mk-struct? t)
+    (define (k a d) 
+      (append (filter*/var? a)
+              (filter*/var? d)))
+    (recur t k)]
+   [else `()]))
 
 ;; walks a possibly nested structure
 (define (walk* w s)

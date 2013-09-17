@@ -41,11 +41,11 @@
 
 (define (== u v)
   (constraint
-   #:package (a : s c)
+   #:package (a [s c e])
    (cond
     [(unify `((,u . ,v)) s c)
      => (lambda (s/c)
-          (update-package s/c))]
+          (update-package (car s/c) (cdr s/c)))]
     [else fail])))
 
 (define (unify e s c)

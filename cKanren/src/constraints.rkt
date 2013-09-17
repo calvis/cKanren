@@ -3,8 +3,9 @@
 (require "helpers.rkt" "substitution.rkt" "constraint-store.rkt" "infs.rkt" "errors.rkt")
 (require (for-syntax syntax/parse racket/syntax))
 
-(provide lambdam@ lambdam@/private mzerom identitym succeed fail 
-         bindm bindm* mplusm mplusm* start app-goal #%app-safe)
+(provide lambda@ succeed fail 
+         bindm bindm* mplusm mplusm* start 
+         app-goal #%app-safe constraint?)
 
 ;; == CONSTRAINTS ==============================================================
 
@@ -15,57 +16,37 @@
      ((parse-mode mode) "#<constraint>" port)]))
 
 ;; splitting up the package
-(define-syntax lambdam@/private
-  (syntax-rules (:)
-    [(_ (a) body ...)
-     (constraint (lambda (a [e #f]) body ...))]
-    [(_ (a e) body ...)
-     (constraint (lambda (a [e #f]) body ...))]
-    [(_ (a : s c q t) body ...)
-     (lambdam@/private (a) 
-       (let ([s (a-s a)] 
-             [c (a-c a)]
-             [q (a-q a)]
-             [t (a-t a)])
-         body ...))]))
-
-(define-syntax lambdam@
-  (syntax-rules (:)
-    [(_ (a) body ...) 
-     (lambdam@/private (a) body ...)]
-    [(_ (a : s) body ...)
-     (lambdam@/private (a) 
-       (let ([s (substitution-s (a-s a))]) 
-         body ...))]
-    [(_ (a : s c) body ...)
-     (lambdam@/private (a) 
-       (let ([s (substitution-s (a-s a))] 
-             [c (constraint-store-c (a-c a))]) 
-         body ...))]
-    [(_ (a : s c e) body ...)
-     (lambdam@/private (a e) 
-       (let ([s (substitution-s (a-s a))] 
-             [c (constraint-store-c (a-c a))]) 
-         body ...))]))
+(define-syntax (lambda@ stx)
+  (syntax-parse stx
+    [(_ (a:id) body:expr ...)
+     #'(constraint (lambda (a) body ...))]
+    [(_ (a [s:id c:id q:id t:id e:id]) body:expr ...)
+     #'(lambda@ (a)
+         (let ([s (a-s a)] 
+               [c (a-c a)]
+               [q (a-q a)]
+               [t (a-t a)]
+               [e (a-e a)])
+           body ...))]))
 
 ;; the failure value
 (define mzerom (mzerof))
 
 ;; the identity constraint
-(define identitym (lambdam@ (a) a))
+(define identitym (lambda@ (a) a))
 
 ;; succeed and fail are the simplest succeeding and failing constraint
 (define succeed identitym)
-(define fail    (lambdam@ (a) mzerom))
+(define fail    (lambda@ (a) mzerom))
 
 ;; applies a goal to an a-inf and returns an a-inf
 (define bindm
-  (lambda (a-inf g [e #f])
+  (lambda (a-inf g)
     (case-inf a-inf
       [() (mzerof)]
-      [(f) (delay (bindm (f) g e))]
-      [(a) (app-goal g a e)]
-      [(a f) (mplusm (app-goal g a e) (delay (bindm (f) g e)))])))
+      [(f) (delay (bindm (f) g))]
+      [(a) (app-goal g a)]
+      [(a f) (mplusm (app-goal g a) (delay (bindm (f) g)))])))
 
 ;; performs a conjunction over goals applied to an a-inf
 (define-syntax bindm*
@@ -97,8 +78,7 @@
 
 (define-syntax app-goal
   (syntax-rules ()
-    [(_ g a) (g a)]
-    [(_ g a e) (g a e)]))
+    [(_ g a) (g a)]))
 
 (define (non-goal-error-msg val)
   (string-append

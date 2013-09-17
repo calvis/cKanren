@@ -37,15 +37,7 @@
   (syntax-rules ()
     [(_ g) g]
     [(_ g g* ...)
-     (lambdam@ (a) (delay (start a g g* ...)))]))
-
-#;
-(define-syntax disj
-  (syntax-rules ()
-    [(_ g) g]
-    [(_ g* ...+)
-     (lambdam@ (a)
-       (delay (mplusm* (app-goal g* a) ...)))]))
+     (lambda@ (a) (delay (start a g g* ...)))]))
 
 (define-syntax-parameter conde
   (lambda (stx)
@@ -56,14 +48,14 @@
           (with-syntax ([(branches ...) (attribute branch-name)])
             #'(debug-conde [#:name branches g g* ...] ...))]
          [else 
-          #'(lambdam@ (a) 
+          #'(lambda@ (a) 
               (delay (mplusm* (start a g g* ...) ...)))])])))
 
 (define-syntax (debug-conde stx)
   (syntax-parse stx
     [(_ ((~optional (~seq #:name branch-name)) g g* ...) ...+)
      (with-syntax ([(labels ...) (attribute branch-name)])
-       #'(lambdam@/private (a : s c q t) 
+       #'(lambda@ (a [s c q t e])
            (delay 
             (mplusm* 
              (let ([a (make-a s c q (add-level t 'labels))])
@@ -85,13 +77,13 @@
           expr ...))]))
 
 (define-syntax-rule (conda (g0 g ...) (g1 g^ ...) ...)
-  (lambdam@ (a)
+  (lambda@ (a)
     (delay (ifa ((app-goal g0 a) g ...) 
                 ((app-goal g1 a) g^ ...) ...))))
 
 (define-syntax ifa
   (syntax-rules ()
-    ((_) mzerom)
+    ((_) fail)
     ((_ (e g ...) b ...)
      (let loop ((a-inf e))
        (case-inf a-inf
@@ -101,14 +93,14 @@
          ((a f) (bindm* a-inf g ...)))))))
 
 (define-syntax-rule (condu (g0 g ...) (g1 g^ ...) ...)
-  (lambdam@ (a)
+  (lambda@ (a)
     (delay
      (ifu ((start a g0) g ...)
           ((start a g1) g^ ...) ...))))
 
 (define-syntax ifu
   (syntax-rules ()
-    ((_) mzerom)
+    ((_) fail)
     ((_ (e g ...) b ...)
      (let loop ((a-inf e))
        (case-inf a-inf
@@ -118,7 +110,7 @@
          ((a f) (bindm* a g ...)))))))
 
 (define-syntax-rule (project (x ...) g g* ...) 
-  (lambdam@ (a : s)
+  (lambda@ (a : s)
     (let ((x (walk*-internal x s)) ...)
       (bindm a (conj g g* ...)))))
 
@@ -126,11 +118,11 @@
 ;; that prints a message.  both succeed.
 
 (define prt  
-  (lambdam@ (a) (begin (printf "~a\n" a) a)))
+  (lambda@ (a) (begin (printf "~a\n" a) a)))
 (define (prtm . m) 
-  (lambdam@ (a) (begin (apply printf m) a)))
+  (lambda@ (a) (begin (apply printf m) a)))
 
 (define (prtt . m) 
-  (lambdam@/private (a : s c q t) 
+  (lambda@ (a [s c q t e]) 
     (begin (display t) (display " ") (apply printf m) a)))
 

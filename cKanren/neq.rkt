@@ -27,18 +27,17 @@
 (define (oc-prefix oc)
   (car (oc-rands oc)))
 
-(define reify-prefix-dot (make-parameter #t))
+(define reify-prefix-dot 
+  (make-parameter #t))
 
-(define (remove-dots p*)
+(define (remove-dots p)
   (cond
-   [(reify-prefix-dot) p*]
-   [else (map (lambda (p) (list (car p) (cdr p))) p*)]))
+   [(reify-prefix-dot) p]
+   [else (list (car p) (cdr p))]))
 
-(define (sort-ps p*)
-  (map (lambda (p)
-         (sort-by-lex<=
-          (map (lambda (a) (sort-diseq (car a) (cdr a))) p)))
-       p*))
+(define (sort-p p)
+  (sort-by-lex<=
+   (map (lambda (a) (sort-diseq (car a) (cdr a))) p)))
 
 (define (sort-diseq u v)
   (cond
@@ -49,36 +48,29 @@
    ((lex<= u v) (cons u v))
    (else (cons v u))))
 
-(define reify-constraintsneq 
-  (default-reify 
-    '=/=
-    '(=/=neq-c)
-    (lambda (rands r)
-      (let ([p* (walk* (map car rands) r)])
-        (map remove-dots (sort-ps p*))))))
-
-(define (=/=neq-c p)
-  (lambdam@ (a : s c)
-    (let ([p (walk* p s)])
+(define-constraint (=/=neq-c [p walk*])
+  #:package (a [s c e])
+  #:reification-function
+  (lambda (v r)
+    (values '=/= (remove-dots (sort-p p))))
+  (cond
+   [(unify p s c)
+    =>
+    (lambda (s/c)
+      (define p (prefix-s s (car s/c)))
       (cond
-       [(unify p s c)
-        =>
-        (lambda (s/c)
-          (let ([p (prefix-s s (car s/c))])
-            (cond
-             [(null? p) mzerom]
-             [else (bindm a (update-c (build-oc =/=neq-c p)))])))]
-       [else a]))))
+       [(null? p) fail]
+       [else (update-c (=/=neq-c p))]))]
+   [else succeed]))
 
 ;; how to read this: 
 ;; neq-subsume defines an interaction between =/=neq-c constraints
 ;; if there are two =/=neq-c constraints with prefixes p and p^
 ;; in the constraint store, if the first subsumes the second, keep
 ;; only the first constraint.  this is reflexive by default.
-(define-constraint-interaction
-  neq-subsume
+(define-constraint-interaction neq-subsume
   ((=/=neq-c ,p) (=/=neq-c ,p^))
-  #:package (a : s c)
+  #:package (a [s c e])
   [(subsumes? p p^ c) ((=/=neq-c p))])
 
 (define (subsumes? p p^ c)
@@ -91,12 +83,11 @@
 
 (define (=/= u v)
   (constraint
-   #:package (a : s c)
+   #:package (a [s c e])
    (cond
     [(unify `((,u . ,v)) s c)
      => (lambda (s/c)
           (=/=neq-c (prefix-s s (car s/c))))]
     [else succeed])))
 
-(extend-reify-fns 'neq reify-constraintsneq)
 

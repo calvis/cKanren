@@ -1,7 +1,7 @@
 #lang racket
 
 (require "helpers.rkt" "package.rkt" "ocs.rkt" "constraint-store.rkt"
-         "constraints.rkt" "operators.rkt")
+         "constraints.rkt" "operators.rkt" "framework.rkt")
 (require (for-syntax syntax/parse racket/syntax))
 
 (provide (all-defined-out))
@@ -11,13 +11,6 @@
 
 (define extend-constraint-interactions
   (extend-parameter constraint-interactions))
-
-#;
-(define-constraint-interaction
-  same-template
-  [(template ,x ,y ,env-var) (template ,x ,z ,env-var)]
-  [#t ((== y z)
-       (template x y env-var))])
 
 (define-syntax (define-constraint-interaction stx)
   (syntax-parse stx 
@@ -31,7 +24,7 @@
     [(define-constraint-interaction 
        (~or (~seq ci-name:id) (~seq))
        (constraint-exprs ...)
-       (~or (~optional (~seq #:package (a:id : s:id c:id))))
+       (~or (~optional (~seq #:package (a:id [s:id c:id e:id]))))
        ...
        clauses ...)
      (define name (or (attribute ci-name) (generate-temporary #'?name)))
@@ -60,16 +53,16 @@
            (define (run-interaction . arg*)
              (match (map oc-rands arg*)
                [`((rands ...) ...)
-                (lambdam@/private (a : ?s ?c ?q ?t)
+                (lambda@ (a [?s ?c ?q ?t ?e])
                   (let ([s (substitution-s ?s)]
                         [c (constraint-store-c ?c)])
                     (cond
                      [pred? 
                       (let ([new-c (remq*-c arg* c)])
-                        (let ([new-a (make-a ?s (constraint-store new-c) ?q ?t)])
+                        (let ([new-a (make-a ?s (constraint-store new-c) ?q ?t ?e)])
                           (bindm new-a (conj constraints ...))))]
                      ...
-                     [else mzerom])))]
+                     [else #f])))]
                ;; when the rators are all correct but the pattern
                ;; is more strict than we were expecting, we should
                ;; fail instead of erroring
@@ -95,8 +88,9 @@
        [pattern-applies? #'(eq? 'rator this-rator)])
       (with-syntax
         ([run-rule
-          #'(lambdam@ (a : s c)
-              (bindm a
+          #'(constraint
+             #:package (a [s c e])
+             (bindm a
                 (for*/fold
                  ([fn fail])
                  ([pre    pre-ocs] ...

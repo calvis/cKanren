@@ -4,7 +4,7 @@
 
 ;; attributed variables
 (require "attributes.rkt") 
-(provide (struct-out attr-oc) build-attr-oc get-attributes default-reify-attr)
+(provide (struct-out attr-oc) build-attr-oc get-attributes)
 
 ;; constraint interactions
 (require "constraint-interactions.rkt") 
@@ -12,20 +12,16 @@
 
 ;; constraints
 (require "constraints.rkt") 
-(provide succeed fail identitym mzerom lambdam@)
+(provide succeed fail constraint?)
 
 ;; debugging
 (require "debugging.rkt") 
 
 ;; framework
 (require "framework.rkt") 
-(provide update-s replace-s reify-cvar update-c-nocheck
-         update-package sort-by-lex<= lex<= default-reify bindm update-c
-         extend-reify-fns run-relevant-constraints extend-enforce-fns
-         define-lazy-goal reify-with-colon run run* run/lazy #%app-safe
-         use-constraints trace-define constraint define-reified-constraint
-         define-constraint define-constraint-type)
-(provide (for-syntax search-strategy))
+(provide update-s update-c constraint update-package run run*
+         sort-by-lex<= lex<= define-constraint)
+;; (provide (for-syntax search-strategy))
 
 ;; mk-structs
 (require "mk-structs.rkt") 
@@ -47,7 +43,7 @@
 (require "package.rkt") 
 (provide empty-a make-a)
 (provide occurs-check walk prefix-s ext-s ext-s*)
-(provide empty-c ext-c ext-c* memq-c remq-c remq*-c replace-ocs c->list
+(provide empty-c ext-c ext-c* memq-c remq-c remq*-c c->list
          filter/rator filter-not/rator filter-memq/rator filter-not-memq/rator)
 
 ;; variables
