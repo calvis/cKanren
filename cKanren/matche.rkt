@@ -14,51 +14,68 @@
 (define-syntax lambdae
   (syntax-rules ()
     ((_ (x ...) c c* ...)
-     (lambda (x ...) (matche (x ...) (c c* ...))))))
+     (lambda (x ...) (matche (x ...) c c* ...)))))
 
 (define-syntax (matche stx)
   (syntax-parse stx
-    [(matche (v:id ...) (pat g ...) ...)
-     (define args (syntax-e #'(v ...)))
-     (define depth 1)
-     (with-syntax*
-      ([((pat (x ...)) ...) 
-        (map (lambda (pat) (wpat pat args depth))
-             (syntax-e #'(pat ...)))]
-       [((x ...) ...) (map (lambda (ls) 
-                             (remove-duplicates (syntax-e ls) free-identifier=?))
-                           (syntax-e #'((x ...) ...)))])
-      #'(let ([ls (list v ...)])
-          (conde [(fresh (x ...) (== `pat ls) g ...)] ...)))]))
+    [(matche (v:id ...) ([pat ...] g ...) ...)
+     (define/with-syntax (([pat^ ...] (x ...)) ...)
+       (map (curry parse-pattern (syntax-e #'(v ...)))
+            (syntax-e #'([pat ...] ...))))
+     (define/with-syntax ((x^ ...) ...) 
+       (map (compose (lambda (ls) 
+                       (remove-duplicates ls free-identifier=?))
+                     syntax-e)
+            (syntax-e #'((x ...) ...))))
+     (define/with-syntax body 
+       #'(conde
+          [(fresh (x^ ...) (== `[pat^ ...] ls) g ...)]
+          ...))
+     #'(let ([ls (list v ...)]) body)]
+    [(matche v:id (pat g ...) ...)
+     #'(matche (v) ([pat] g ...) ...)]))
 
-(define-for-syntax (guard-pattern-var-is-arg x args depth)
-  (when (and (or (not depth) (not (zero? depth)))
-             (ormap ((curry free-identifier=?) x) args))
-    (error 'matche "argument ~s appears more than once at different depths" 
-           (syntax-e x))))
+(define-for-syntax (parse-pattern args pat)
+  (syntax-parse #`(#,args #,pat)
+    [(() ()) #'(() ())]
+    [((a args ...) [p pat ...])
+     (define/with-syntax (p^ (x ...))
+       (parse-patterns-for-arg #'a #'p))
+     (define/with-syntax ([pat^ ...] (x^ ...))
+       (parse-pattern #'(args ...) #'[pat ...]))
+     #'([p^ pat^ ...] (x ... x^ ...))]))
 
-(define-for-syntax (wpat pat args depth)
-  (syntax-case pat (unquote _)
-    [(unquote _)
-     (guard-pattern-var-is-arg #'x args depth)
-     (with-syntax ([_new (generate-temporary #'?_)])
-       #'((unquote _new) (_new)))]
-    [(unquote x)
-     (guard-pattern-var-is-arg #'x args depth)
-     #'((unquote x) (x))]
-    [(a ...)
-     (let ([depth (and depth (> depth 0) (sub1 depth))])
-       (with-syntax
-         ([((pat (x ...)) ...)
-           (map (lambda (a) (wpat a args depth)) (syntax-e #'(a ...)))])
-         #'((pat ...) (x ... ...))))]
-    [(a . d)
-     (let ([depth #f])
-       (with-syntax
-         ([((pat1 (x1 ...)) (pat2 (x2 ...)))
-           (map (lambda (a) (wpat a args depth)) (syntax-e #'(a d)))])
-         #'((pat1 . pat2) (x1 ... x2 ...))))]
-    [x #'(x ())]))
+(define-for-syntax (parse-patterns-for-arg v pat)
+  (define (loop pat)
+    (syntax-parse pat
+      [((~literal unquote) (~literal _))
+       (define/with-syntax _new (generate-temporary #'?_))
+       #'((unquote _new) (_new))]
+      [((~literal unquote) x:id)
+       (when (free-identifier=? #'x v)
+         (error 'matche "argument ~s appears in pattern at an invalid depth" 
+                (syntax-e #'x)))
+       #'((unquote x) (x))]
+      [(a ...)
+       (define/with-syntax ((pat (x ...)) ...)
+         (map loop (syntax-e #'(a ...))))
+       #'((pat ...) (x ... ...))]
+      [(a . d)
+       (define/with-syntax ((pat1 (x1 ...)) (pat2 (x2 ...)))
+         (map loop (syntax-e #'(a d))))
+       #'((pat1 . pat2) (x1 ... x2 ...))]
+      [x #'(x ())]))
+  (cond
+   [(and (identifier? pat)
+         (free-identifier=? v pat))
+    #'(v ())]
+   [else (loop pat)]))
+
+(module+ test
+  (defmatche (foo a b)
+    [[5 5]])
+
+  (run* (x y) (foo x y)))
 
 
 
