@@ -7,199 +7,186 @@
  "../tester.rkt"
  "nominal/nnf.rkt" 
  "nominal/alphaleantap.rkt"
+ "../src/operators.rkt"
  (only-in "../ck.rkt" run run* fresh conde))
 
 (provide test-ak test-ak-long)
 
 (define (test-ak)
-  (test 1
-          (run 1 (q) (== 3 3))
-          '(_.0))
+  (test (run 1 (q) (== 3 3)) '(_.0))
 
-  (test 2
-          (run 1 (q) (== 5 6))
-          '())
+  (test (run 1 (q) (== 5 6)) '())
 
-  (test 3
-          (run 1 (q) (== q 3))
-          '(3))
+  (test (run 1 (q) (== q 3)) '(3))
 
-  (test 4
-          (run 1 (q) (fresh (x) (== x q)))
-          '(_.0))
+  (test (run 1 (q) (fresh (x) (== x q))) '(_.0))
 
-  (test 5
-          (run 1 (q) (fresh (x y z) (== x z) (== 3 y)))
-          '(_.0))
+  (test (run 1 (q) (fresh (x y z) (== x z) (== 3 y))) '(_.0))
 
-  (test 6
-          (run 1 (q) (fresh (x y) (== x q) (== 3 y)))
-          '(_.0))
+  (test (run 1 (q) (fresh (x y) (== x q) (== 3 y))) '(_.0))
 
-  (test 7
-          (run 1 (y)
-            (fresh (x z) 
-              (== x z)
-              (== 3 y)))
-          '(3))
+  (test (run 1 (y)
+          (fresh (x z) 
+            (== x z)
+            (== 3 y)))
+        '(3))
 
-  (test 8
-          (run 1 (q)
-            (fresh (x z)
-              (== x z)
-              (== 3 z)
-              (== q x)))
-          '(3))
+  (test
+   (run 1 (q)
+     (fresh (x z)
+       (== x z)
+       (== 3 z)
+       (== q x)))
+   '(3))
 
-  (test 9 
-          (run 1 (y)
-            (fresh (x y)
-              (== 4 x)
-              (== x y))
-            (== 3 y))
-          '(3))
+  (test (run 1 (y)
+          (fresh (x y)
+            (== 4 x)
+            (== x y))
+          (== 3 y))
+        '(3))
 
-  (test 10
-          (run 1 (x) (== 4 3))
-          '())
-
-  (test 11
-          (run 2 (q)
-            (fresh (x y z)
-              (conde
-               ((== `(,x ,y ,z ,x) q))
-               ((== `(,z ,y ,x ,z) q)))))
-          '((_.0 _.1 _.2 _.0)
-            (_.0 _.1 _.2 _.0)))
-
-  (test 12
-          (run 5 (q)
-            (let loop ()
-              (conde
-               ((== #f q))
-               ((== #t q))
-               ((loop)))))
-          '(#f #t #f #t #f))
-
+  (test (run 1 (x) (== 4 3))
+        '())
+  
+  (test
+   (run 2 (q)
+     (fresh (x y z)
+       (conde
+        ((== `(,x ,y ,z ,x) q))
+        ((== `(,z ,y ,x ,z) q)))))
+   '((_.0 _.1 _.2 _.0)
+     (_.0 _.1 _.2 _.0)))
+  
+  (test
+   (run 5 (q)
+     (let loop ()
+       (conde
+        ((== #f q))
+        ((== #t q))
+        ((loop)))))
+   '(#f #t #f #t #f))
+  
   (define anyo 
     (lambda (g)
       (conde
        (g)
        ((anyo g)))))
 
-  (test 13
-          (run 5 (q)
-            (conde
-             ((anyo (== #f q)))
-             ((== #t q))))
-          '(#t #f #f #f #f))
+  (test
+   (run 5 (q)
+     (conde
+      ((anyo (== #f q)))
+      ((== #t q))))
+   '(#t #f #f #f #f))
+  
+  (test
+   (run 10 (q)
+     (anyo 
+      (conde
+       ((== 1 q))
+       ((== 2 q))
+       ((== 3 q)))))
+   '(1 2 3 1 2 3 1 2 3 1))
+  
+  (test
+   (run 3 (q)
+     (let ((nevero (anyo (== #f #t))))
+       (conde
+        ((== 1 q))
+        (nevero)
+        ((conde
+          ((== 2 q))
+          (nevero)
+          ((== 3 q)))))))
+   '(1 2 3))
+  
+  (test
+   (run* (q) (fresh-nom (a) (== a a)))
+   '(_.0))
+  
+  (test
+   (run* (q) (fresh-nom (a) (== a 5)))
+   '())
+  
+  (test
+   (run* (q) (fresh-nom (a b) (== a b)))
+   '())
 
-  (test 14
-          (run 10 (q)
-            (anyo 
-             (conde
-              ((== 1 q))
-              ((== 2 q))
-              ((== 3 q)))))
-          '(1 2 3 1 2 3 1 2 3 1))
+  (test
+   (run* (q) (fresh-nom (a b) (== b q)))
+   '(a.0))
 
-  (test 15
-          (run 3 (q)
-            (let ((nevero (anyo (== #f #t))))
-              (conde
-               ((== 1 q))
-               (nevero)
-               ((conde
-                 ((== 2 q))
-                 (nevero)
-                 ((== 3 q)))))))
-          '(1 2 3))
+  (test
+   (run* (q)
+     (fresh (x y z)
+       (fresh-nom (a)
+                  (== x a)
+                  (fresh-nom (a b)
+                             (== y a)
+                             (== `(,x ,y ,z ,a ,b) q)))))
+   '((a.0 a.1 _.2 a.1 a.3)))
 
-  (test 16
-          (run* (q) (fresh-nom (a) (== a a)))
-          '(_.0))
+  (test
+   (run* (q)
+     (fresh-nom (a b)
+                (== (tie a `(foo ,a 3 ,b)) q)))
+   '((tie a.0 (foo a.0 3 a.1))))
+  
+  (test
+   (run* (q) (fresh-nom (a b) (== `(foo ,a ,a) `(foo ,b ,b))))
+   '())
+  
+  (test
+   (run* (q) (fresh-nom (a b) (== (tie a a) (tie b b))))
+   '(_.0))
+  
+  (test
+   (run* (q) (fresh-nom (a b) (== (tie a q) (tie b b))))
+   '(a.0))
+  
+  (test
+   (run* (q)
+     (fresh (t u)
+       (fresh-nom (a b c d)
+                  (== `(lam ,(tie a `(lam ,(tie b `(var ,a))))) t)
+                  (== `(lam ,(tie c `(lam ,(tie d `(var ,c))))) u)
+                  (== t u))))
+   '(_.0))
+  
+  (test
+   (run* (q)
+     (fresh (t u)
+       (fresh-nom (a b c d)
+                  (== `(lam ,(tie a `(lam ,(tie b `(var ,a))))) t)
+                  (== `(lam ,(tie c `(lam ,(tie d `(var ,d))))) u)
+                  (== t u))))
+   '())
+  
+  (test
+   (run* (q) (fresh-nom (a) (hash a a)))
+   '())
+  
+  (test
+   (run* (q) (fresh-nom (a) (hash a 5)))
+   '(_.0))
 
-  (test 17
-          (run* (q) (fresh-nom (a) (== a 5)))
-          '())
-
-  (test 18
-          (run* (q) (fresh-nom (a b) (== a b)))
-          '())
-
-  (test 19
-          (run* (q) (fresh-nom (a b) (== b q)))
-          '(a.0))
-
-  (test 20
-          (run* (q)
-            (fresh (x y z)
-              (fresh-nom (a)
-                         (== x a)
-                         (fresh-nom (a b)
-                                    (== y a)
-                                    (== `(,x ,y ,z ,a ,b) q)))))
-          '((a.0 a.1 _.2 a.1 a.3)))
-
-  (test 21
-          (run* (q)
-            (fresh-nom (a b)
-                       (== (tie a `(foo ,a 3 ,b)) q)))
-          '((tie a.0 (foo a.0 3 a.1))))
-
-  (test 22
-          (run* (q) (fresh-nom (a b) (== `(foo ,a ,a) `(foo ,b ,b))))
-          '())
-
-  (test 23
-          (run* (q) (fresh-nom (a b) (== (tie a a) (tie b b))))
-          '(_.0))
-
-  (test 24
-          (run* (q) (fresh-nom (a b) (== (tie a q) (tie b b))))
-          '(a.0))
-
-  (test 25
-          (run* (q)
-            (fresh (t u)
-              (fresh-nom (a b c d)
-                         (== `(lam ,(tie a `(lam ,(tie b `(var ,a))))) t)
-                         (== `(lam ,(tie c `(lam ,(tie d `(var ,c))))) u)
-                         (== t u))))
-          '(_.0))
-
-  (test 26
-          (run* (q)
-            (fresh (t u)
-              (fresh-nom (a b c d)
-                         (== `(lam ,(tie a `(lam ,(tie b `(var ,a))))) t)
-                         (== `(lam ,(tie c `(lam ,(tie d `(var ,d))))) u)
-                         (== t u))))
-          '())
-
-  (test 27
-          (run* (q) (fresh-nom (a) (hash a a)))
-          '())
-
-  (test 28
-          (run* (q) (fresh-nom (a) (hash a 5)))
-          '(_.0))
-
-  (test 29
-          (run* (q) (fresh-nom (a) (hash a (tie a a))))
-          '(_.0))
-
-  (test 30
-          (run* (q) (fresh-nom (a b) (hash a (tie b a))))
-          '())
-
-  (test 31
-          (run* (k)
-            (fresh (t)
-              (fresh-nom (a)
-                         (hash a k)
-                         (== `(5 ,(tie a a) ,t) k))))
-          '(((5 (tie a.0 a.0) _.1) : (alpha (hash (a.0 _.1))))))
+  (test
+   (run* (q) (fresh-nom (a) (hash a (tie a a))))
+   '(_.0))
+  
+  (test
+   (run* (q) (fresh-nom (a b) (hash a (tie b a))))
+   '())
+  
+  (test-highlight
+   (run* (k)
+     (fresh (t)
+       (fresh-nom (a)
+         (hash a k)
+         (== `(5 ,(tie a a) ,t) k)
+         prt)))
+   '(((5 (tie a.0 a.0) _.1) : (alpha (hash (a.0 _.1))))))
 
   (test 32
           (run* (k)

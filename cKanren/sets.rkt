@@ -4,13 +4,14 @@
 ;; See: https://github.com/namin/clpset-miniKanren
 
 (require "ck.rkt" "tree-unify.rkt"
-         (rename-in (only-in "neq.rkt" =/=) [=/= =/=-other])
-         (only-in rackunit check-equal?))
+         (rename-in (only-in "neq.rkt" =/= subsumes?) [=/= =/=-other])
+         (only-in rackunit check-equal?)
+         "src/framework.rkt" "src/events.rkt")
 (provide set seto set-var normalize empty-set make-set
          enforce-lazy-unify-same =/= lazy-unify-same
          enforce-lazy-union-set lazy-union-set uniono
          enforce-lazy-union-var lazy-union-var disjo !disjo
-         !ino ino !uniono define-set-constraint)
+         !in ino !uniono define-set-constraint)
 
 ;; == DATA STRUCTURES ==========================================================
 
@@ -78,6 +79,7 @@
    [(var? s) s]
    [(set-var? s) s]
    [(empty-set? s) s]
+   [(symbol? s) s]
    [(null? (set-left s)) 
     (normalize (set-right s))]
    [else
@@ -121,7 +123,7 @@
 
 ;; unifis a set u and a term v
 (define (unify-set u v e s c)
-  (unify e s (ext-c (build-oc safe-unify-set u v) c)))
+  (unify e s (ext-c (build-oc safe-unify-set identity identity u v) c)))
 
 (define (safe-unify-set u v)
   (conj
@@ -157,88 +159,94 @@
    [else fail]))
 
 (define-set-constraint (lazy-unify-same X T)
+  #:extend-subscriptions 
+  (curry findf enforce-event?)
+  #:package (a [s c e])
   (cond
-   [(null? (set-left X))
-    (unify-walked (set-right X) T)]
-   [(and (set? T) (null? (set-left T)))
-    (unify-walked (set-right T) X)]
-   [else (update-c-nocheck (build-oc lazy-unify-same X T))]))
+   [(findf enforce-event? e)
+    (enforce-lazy-unify-same X T)]
+   [else
+    (cond
+     [(null? (set-left X))
+      (unify-walked (set-right X) T)]
+     [(and (set? T) (null? (set-left T)))
+      (unify-walked (set-right T) X)]
+     [else (add-constraint (lazy-unify-same X T))])]))
 
 (define-set-constraint (lazy-unify-diff X T)
+  #:extend-subscriptions 
+  (curry findf enforce-event?)
+  #:package (a [s c e])
   (cond
-   [(null? (set-left X))
-    (== T (set-right X))]
-   [(null? (set-left T))
-    (== X (set-right T))]
-   ;; if there's only one thing in X or T, gtfo
-   [(or (and (empty-set? (set-right X))
-             (null? (cdr (set-left X))))
-        (and (empty-set? (set-right T))
-             (null? (cdr (set-left T)))))
-    (conj
-     (== (set-left  X) (set-left T))
-     (== (set-right X) (set-right T)))]
-   [else (update-c-nocheck (build-oc lazy-unify-diff X T))]))
+   [(findf enforce-event? e)
+    (enforce-lazy-unify-diff X T)]
+   [else
+    (cond
+     [(null? (set-left X))
+      (== T (set-right X))]
+     [(null? (set-left T))
+      (== X (set-right T))]
+     ;; if there's only one thing in X or T, gtfo
+     [(or (and (empty-set? (set-right X))
+               (null? (cdr (set-left X))))
+          (and (empty-set? (set-right T))
+               (null? (cdr (set-left T)))))
+      (conj
+       (== (set-left  X) (set-left T))
+       (== (set-right X) (set-right T)))]
+     [else (add-constraint (lazy-unify-diff X T))])]))
 
 ;; =============================================================================
 
 ;; X = {t|s} = {t'|s'} = T
-(define (enforce-lazy-unify-diff oc)
-  (constraint
-   #:package (a : s c)
-   (let ([X (update-set (car (oc-rands oc)) s)]
-         [T (update-set (cadr (oc-rands oc)) s)])
-     (let/set ([(x X^) X]
-               [(t T^) T])
-       (conde
-        [(== x t)
-         (conde
-          [(== X^ T^)]
-          [(== (set `(,x) X^) T^)
-           (!ino x X^)]
-          [(== X^ (set `(,t) T^))
-           (!ino t T^)])]
-        [(fresh (n)
-           (proper-seto n)
-           (== X^ (set `(,t) n))
-           (!ino t n)
-           (== (set `(,x) n) T^)
-           (!ino x n))])))))
+(define (enforce-lazy-unify-diff X T)
+  (let/set ([(x X^) X] [(t T^) T])
+    (conde
+     [(== x t)
+      (conde
+       [(== X^ T^)]
+       [(== (set `(,x) X^) T^)
+        (!in x X^)]
+       [(== X^ (set `(,t) T^))
+        (!in t T^)])]
+     [(fresh (n)
+        (proper-seto n)
+        (!in t n)
+        (!in x n)
+        (== X^ (set `(,t) n))
+        (== (set `(,x) n) T^))])))
 
 ;; X = {t0 .. tm | M} 
 ;; T = {t'0 .. t'n | M}
-(define (enforce-lazy-unify-same oc)
-  (constraint 
-   #:package (a : s c)
-   (let ([X (update-set (car (oc-rands oc)) s)]
-         [T (update-set (cadr (oc-rands oc)) s)])
-     (let ([t0  (car (set-left X))]
-           [ts  (set-left X)]
-           [t^s (set-left T)]
-           [M   (set-right X)])
-       (let loop ([tjs (set-left T)])
-         (cond
-          [(null? tjs) fail]
-          [else
-           (let ([tj (car tjs)])
-             (conde
-              [(== t0 tj)
-               (!ino t0 M)
-               (!ino tj M)
-               (conde
-                [(== (set (cdr ts) M) (set (rem1 tj t^s) M))]
-                [(== (set ts M) (set (rem1 tj t^s) M))]
-                [(== (set (cdr ts) M) (set t^s M))])]
-              ;; M = {t0 | N}, {t1 .. tm | N} = {t'0 .. t'n | N}
-              [(fresh (N N^)
-                 (proper-seto N)
-                 (proper-seto N^)
-                 (== M (set `(,t0) N))
-                 (!ino t0 N)
-                 (== N (set (cdr ts) N^))
-                 (== (set (cdr ts) N^)
-                     (set t^s N)))]
-              [(loop (cdr tjs))]))]))))))
+
+(define (enforce-lazy-unify-same X T)
+  (let ([t0  (car (set-left X))]
+        [ts  (set-left X)]
+        [t^s (set-left T)]
+        [M   (set-right X)])
+    (let loop ([tjs (set-left T)])
+      (cond
+       [(null? tjs) fail]
+       [else
+        (let ([tj (car tjs)])
+          (conde
+           [(== t0 tj)
+            (!in t0 M)
+            (!in tj M)
+            (conde
+             [(== (set (cdr ts) M) (set (rem1 tj t^s) M))]
+             [(== (set ts M) (set (rem1 tj t^s) M))]
+             [(== (set (cdr ts) M) (set t^s M))])]
+           ;; M = {t0 | N}, {t1 .. tm | N} = {t'0 .. t'n | N}
+           [(fresh (N N^)
+              (proper-seto N)
+              (proper-seto N^)
+              (!in t0 N)
+              (== M (set `(,t0) N))
+              (== N (set (cdr ts) N^))
+              (== (set (cdr ts) N^)
+                  (set t^s N)))]
+           [(loop (cdr tjs))]))]))))
 
 (define (enforce-set-cs x)
   (conj
@@ -257,7 +265,7 @@
     (loop 'lazy-union-set  enforce-lazy-union-set)
     ;; (loop 'lazy-union-neq  enforce-lazy-union-neq)
     (constraint
-     #:package (a : s c)
+     #:package (a [s c e])
      (cond
       [(null? (filter-memq/rator
                '(in-set
@@ -276,10 +284,10 @@
 
 (define (loop sym fn)
   (constraint
-   #:package (a : s c)
+   #:package (a [s c e])
    (let ([ocs (filter/rator sym c)])
      (conj
-      (replace-ocs sym '())
+      ;; (replace-ocs sym '()) TODO
       (let inner ([ocs ocs])
         (cond
          [(null? ocs) 
@@ -323,11 +331,11 @@
   (cond
    [(empty-set? S) fail]
    [(and (set? S) (memq x (set-left S))) succeed]
-   [else (update-c-nocheck (build-oc in-set x S))]))
+   [else (add-constraint (in-set x S))]))
 
 (define (enforce-in oc)
   (constraint
-   #:package (a : s c)
+   #:package (a [s c e])
    (let ([x (walk (car (oc-rands oc)) s)]
          [S (update-set (cadr (oc-rands oc)) s)])
      (cond
@@ -343,7 +351,7 @@
         (fresh (N)
           (proper-seto N)
           (== (set `(,x) N) S)
-          (!ino x N))]))))
+          (!in x N))]))))
 
 (define (one-of-terms x t*)
   (cond
@@ -360,6 +368,9 @@
    (=/=-well-formed u v)))
 
 (define-constraint (neq-? u v)
+  #:reification-function
+  (lambda (ans r)
+    (values '=/= (cons u v)))
   (cond
    [(eq? u v) fail]
    [(and (or (set? u) (set-var? u))
@@ -368,7 +379,13 @@
    [(or (and (not (var? v)) (not (set? v)))
         (and (not (var? u)) (not (set? u))))
     (=/=-other u v)]
-   [else (update-c-nocheck (build-oc neq-? u v))]))
+   [else (add-constraint (neq-? u v))]))
+
+(define-constraint-interaction neq-?-subsume
+  [(neq-? ,u ,v) (neq-? ,u^ ,v^)]
+  #:package (a [s c e])
+  [(subsumes? (list (cons u v)) (list (cons u^ v^)) c)
+   [(neq-? u v)]])
 
 ;; unlike union, we don't know that U or V is a set
 (define-set-constraint (=/=-well-formed U V)
@@ -384,7 +401,7 @@
 (define-set-constraint (set-neq U V)
   (cond
    [(same-set? U V) fail]
-   [else (update-c-nocheck (build-oc set-neq U V))]))
+   [else (add-constraint (set-neq U V))]))
 
 ;; both U and V are sets: {s|r} != {u|t}
 (define-set-constraint (lazy-neq-sets U V)
@@ -398,7 +415,7 @@
    ;; {s|r} != {|t}
    [(null? (set-left U))
     (lazy-neq-var (set-right V) U)]
-   [else (update-c-nocheck (build-oc lazy-neq-sets U V))]))
+   [else (add-constraint (lazy-neq-sets U V))]))
 
 ;; U should be a set var, V might be a set or set var
 (define-set-constraint (lazy-neq-var U V)
@@ -411,12 +428,12 @@
          (not (empty-set? V))
          (memq U (set-left V))) 
     succeed]
-   [else (update-c-nocheck (build-oc lazy-neq-var U V))]))
+   [else (add-constraint (lazy-neq-var U V))]))
 
 ;; U is a set var, and V might be a set or a set var
 (define (enforce-lazy-neq-var oc)
   (constraint
-   #:package (a : s c)
+   #:package (a [s c e])
    (let ([U (update-set (car (oc-rands oc)) s)]
          [V (update-set (cadr (oc-rands oc)) s)])
      (conde
@@ -429,7 +446,7 @@
             [(null? ts) fail]
             [else 
              (conde
-              [(!ino (car ts) U)]
+              [(!in (car ts) U)]
               [(loop (cdr ts))])]))]
         [else fail])]
       ;; V = {t0 .. tn | t} where U != t
@@ -438,19 +455,17 @@
 ;; both U and V are sets
 (define (enforce-lazy-neq-sets oc)
   (constraint
-   #:package (a : s c)
+   #:package (a [s c e])
    (let ([U (update-set (car (oc-rands oc)) s)]
          [V (update-set (cadr (oc-rands oc)) s)])
      (fresh (x)
        (conde
-        [(ino x U) (!ino x V)]
-        [(ino x V) (!ino x U)])))))
+        [(ino x U) (!in x V)]
+        [(ino x V) (!in x U)])))))
 
-(define (!ino x S)
-  (conj (seto S) (!in-c x S)))
-
-(define-set-constraint (!in-c [x walk*] S)
-  #:package (a : s c)
+(define-set-constraint (!in [x walk] S)
+  #:package (a [s c e])
+  #:reified
   (cond
    [(empty-set? S) succeed]
    [(and (set-var? S) (set? x) 
@@ -467,8 +482,12 @@
      [else
       (conj
        (not-in-t* x (set-left S))
-       (!in-c x (set-right S)))])]
-   [else (update-c-nocheck (build-oc !in-c x S))]))
+       (!in x (set-right S)))])]
+   [else (add-constraint (!in x S))]))
+
+(define-constraint-interaction
+  !in-unique
+  [(!in ,x ,S) (!in ,x ,S)] => [(!in x S)])
 
 (define (make-not-in-t* x t* s c)
   (cond
@@ -477,44 +496,50 @@
 
 (define (not-in-t* x t*)
   (cond
-   [(null? t*) identitym]
-   [else
-    (conj (neq-? x (car t*)) (not-in-t* x (cdr t*)))]))
+   [(null? t*) succeed]
+   [else (conj (neq-? x (car t*)) (not-in-t* x (cdr t*)))]))
 
 (define (uniono u v w)
   (conj (seto u) (seto v) (seto w) (union-fresh u v w)))
 
 ;; W is a set var
-(define (lazy-union-var U V W)
-  (set-constraint
-   #:args (U V W)
-   (cond
-    [(set? W)
-     (lazy-union-set U V W)]
-    [(same-set? U V)
-     (== W U)]
-    [(empty-set? U)
-     (== W V)]
-    [(empty-set? V)
-     (== W U)]
-    [else 
-     (conj
-      ;; Not tested yet
-      ;; (check-set-neq U)
-      ;; (check-set-neq V)
-      ;; (check-set-neq W)
-      (update-c-nocheck (build-oc lazy-union-var U V W)))])))
+(define-set-constraint (lazy-union-var U V W)
+  #:extend-subscriptions
+  (curry findf enforce-event?)
+  #:package (a [s c e])
+  (printf "lazy-union-var: ~a ~a ~a\n" U V W)
+  (cond
+   [(set? W)
+    (lazy-union-set U V W)]
+   [(same-set? U V)
+    (== W U)]
+   [(empty-set? U)
+    (== W V)]
+   [(empty-set? V)
+    (== W U)]
+   [(findf enforce-event? e)
+    (enforce-lazy-union-var U V W)]
+   [else 
+    (conj
+     ;; Not tested yet
+     ;; (check-set-neq U)
+     ;; (check-set-neq V)
+     ;; (check-set-neq W)
+     (add-constraint (lazy-union-var U V W)))]))
 
 ;; W is a set
-(define (lazy-union-set U V W)
-  (set-constraint 
-   #:args (U V W)
-   (cond
-    [(empty-set? W)
-     (conj (== U W) (== V W))]
-    [(same-set? U V)
-     (== U W)]
-    [else (update-c-nocheck (build-oc lazy-union-set U V W))])))
+(define-set-constraint (lazy-union-set U V W)
+  #:extend-subscriptions 
+  (curry findf enforce-event?)
+  #:package (a [s c e])
+  (cond
+   [(empty-set? W)
+    (conj (== U W) (== V W))]
+   [(same-set? U V)
+    (== U W)]
+   [(findf enforce-event? e)
+    (enforce-lazy-union-set U V W)]
+   [else (add-constraint (lazy-union-set U V W))]))
 
 ;; Untested
 #;
@@ -542,53 +567,57 @@
   (update-c-nocheck (build-oc lazy-union-neq X X-neqs)))
 
 ;; W should be a var
-(define (enforce-lazy-union-var oc)
-  (constraint
-   #:package (a : s c)
-   (let ([U (update-set (car (oc-rands oc)) s)]
-         [V (update-set (cadr (oc-rands oc)) s)]
-         [W (update-set (caddr (oc-rands oc)) s)])
-     (cond
-      [(set? W)
-       (enforce-lazy-union-set oc)]
-      [(or (set? U) (set? V))
-       (let ([U (if (not (set? U)) V U)]
-             [V (if (not (set? U)) U V)])
-         (let ([t (car (set-left U))]
-               [ts (cdr (set-left U))]
-               [m  (set-right U)])
-           (conde
-            [(== W (empty-set))
-             (== V (empty-set))
-             (== U (empty-set))]
-            [(fresh (N)
-               (== W (set `(,t) N))
-               (proper-seto N)
-               (!ino t N)
-               (conde
-                [(fresh (N1)
-                   (proper-seto N1)
-                   (== N1 (set ts m))
-                   (!ino t N1)
-                   (uniono N1 V N))]
-                [(fresh (N1)
-                   (proper-seto N1)
-                   (== V (set `(,t) N1))
-                   (!ino t N1)
-                   (uniono U N1 N))]
-                [(fresh (N1 N2)
-                   (proper-seto N1)
-                   (proper-seto N2)
-                   (== N1 (set ts m))
-                   (!ino t N1)
-                   (== V (set `(,t) N2))
-                   (!ino t N2)
-                   (uniono N1 N2 N))]))])))]
-      [else (union-fresh U V W)]))))
+(define-set-constraint (enforce-lazy-union-var U V W)
+  #:package (a [s c e])
+  (printf "enforce-lazy-union-var: ~a ~a ~a ~a\n" U V W a)
+  (cond
+   [(set? W)
+    (enforce-lazy-union-set U V W)]
+   [(or (set? U) (set? V))
+    ;; U must be a set
+    (let ([U (if (set? U) U V)]
+          [V (if (set? U) V U)])
+      (let ([t (car (set-left U))]
+            [ts (cdr (set-left U))]
+            [m  (set-right U)])
+        (conde
+         [(== W (empty-set))
+          (== V (empty-set))
+          (== U (empty-set))]
+         [(fresh (N)
+            (== W (set `(,t) N))
+            (proper-seto N)
+            (!in t N)
+            (conde
+             [(fresh (N1)
+                (proper-seto N1)
+                (== N1 (set ts m))
+                (!in t N1)
+                (uniono N1 V N))]
+             [(fresh (N1)
+                (proper-seto N1)
+                (== V (set `(,t) N1))
+                (!in t N1)
+                (constraint
+                 #:package (a [s c e])
+                 (printf "<=====================\n")
+                 (pretty-print a)
+                 (printf "=====================>\n")
+                 fail)
+                (uniono U N1 N))]
+             [(fresh (N1 N2)
+                (proper-seto N1)
+                (proper-seto N2)
+                (!in t N1)
+                (!in t N2)
+                (== N1 (set ts m))
+                (== V (set `(,t) N2))
+                (uniono N1 N2 N))]))])))]
+   [else (union-fresh U V W)]))
 
 (define (enforce-one-union-fresh oc)
   (constraint
-   #:package (a : s c)
+   #:package (a [s c e])
    (let ([U (update-set (car (oc-rands oc)) s)]
          [V (update-set (cadr (oc-rands oc)) s)]
          [W (update-set (caddr (oc-rands oc)) s)])
@@ -603,25 +632,25 @@
    [(fresh (t N)
       (== t t-val)
       (== W (set `(,t) N))
-      (!ino t N)
+      (!in t N)
       (conde
        [(fresh (N1)
           (proper-seto N1)
           (== U (set `(,t) N1))
-          (!ino t N1)
+          (!in t N1)
           (uniono N1 V N))]
        [(fresh (N1)
           (proper-seto N1)
           (== V (set `(,t) N1))
-          (!ino t N1)
+          (!in t N1)
           (uniono U N1 N))]
        [(fresh (N1 N2)
           (proper-seto N1)
           (proper-seto N2)
           (== U (set `(,t) N1))
-          (!ino t N1)
+          (!in t N1)
           (== V (set `(,t) N2))
-          (!ino t N2)
+          (!in t N2)
           (uniono N1 N2 N))]))]))
 
 (define (proper-seto S)
@@ -639,18 +668,19 @@
         [else
          (conj
           (not-in-t* (car t*) (rem1 (car t*) (set-left S)))
-          (!in-c (car t*) (set-right S))
+          (!in (car t*) (set-right S))
           (loop (cdr t*)))]))
      (proper-set (set-right S)))]
-   [else (update-c (build-oc proper-set S))]))
+   [else (add-constraint (proper-set S))]))
 
 (define-set-constraint (union-fresh U V W)
+  (printf "union-fresh: ~a ~a ~a\n" U V W)
   (cond
    [(set? W)
     (lazy-union-set U V W)]
    [(or (set? U) (set? W))
     (lazy-union-var U V W)]
-   [else (update-c-nocheck (build-oc union-fresh U V W))]))
+   [else (add-constraint (union-fresh U V W))]))
 
 (define (split-set S)
   (unless (set? S)
@@ -662,27 +692,23 @@
   (let-values ([(s S^) (split-set S)] ...) body ...))
 
 ;; W is a set
-(define (enforce-lazy-union-set oc)
-  (constraint
-   #:package (a : s c)
-   (let ([U (update-set (car (oc-rands oc)) s)]
-         [V (update-set (cadr (oc-rands oc)) s)]
-         [W (update-set (caddr (oc-rands oc)) s)])
-     (let ([t (car (set-left W))]
-           [N (set (cdr (set-left W)) (set-right W))])
-       (fresh (N1 N2)
-         (!ino t N1)
-         (conde
-          [(== U (set `(,t) N1))
-           (!ino t V)
-           (uniono N1 V N)]
-          [(== V (set `(,t) N1))
-           (!ino t U)
-           (uniono U N1 N)]
-          [(== U (set `(,t) N1))
-           (== V (set `(,t) N2))
-           (!ino t N2)
-           (uniono N1 N2 N)]))))))
+(define-set-constraint (enforce-lazy-union-set U V W)
+  #:package (a [s c e])
+  (let ([t (car (set-left W))]
+        [N (set (cdr (set-left W)) (set-right W))])
+    (fresh (N1 N2)
+      (!in t N1)
+      (conde
+       [(== U (set `(,t) N1))
+        (!in t V)
+        (uniono N1 V N)]
+       [(== V (set `(,t) N1))
+        (!in t U)
+        (uniono U N1 N)]
+       [(== U (set `(,t) N1))
+        (== V (set `(,t) N2))
+        (!in t N2)
+        (uniono N1 N2 N)]))))
 
 #;
 (define (enforce-lazy-union-neq oc)
@@ -697,9 +723,9 @@
           (fresh (N)
             (conde
              [(ino N Z)
-              (!ino N (car t*))]
+              (!in N (car t*))]
              [(ino N (car t*))
-              (!ino N Z)]
+              (!in N Z)]
              [(== Z (empty-set))
               (=/= (car t*) (empty-set))])
             (loop (cdr t*)))])))))
@@ -715,7 +741,7 @@
 
 (define (enforce-one-disjoint-fresh oc)
   (constraint
-   #:package (a : s c)
+   #:package (a [s c e])
    (let ([U (update-set (car (oc-rands oc)) s)]
          [V (update-set (cadr (oc-rands oc)) s)])
      (cond
@@ -737,8 +763,8 @@
            (== U (set `(,u) U^))
            (== V (set `(,v) V^))
            (=/= u v)
-           (!ino u V^)
-           (!ino v U^)
+           (!in u V^)
+           (!in v U^)
            (disjoint-fresh U^ V^))])]
       [else (disjoint U V)]))))
 
@@ -756,25 +782,25 @@
               [(t2 s2) V])
       (conj
        (neq-? t1 t2)
-       (!in-c t1 s2)
-       (!in-c t2 s1)
+       (!in t1 s2)
+       (!in t2 s1)
        (disjoint s1 s2)))]
    [(set? U)
     (let/set ([(u U^) U])
-      (conj (!in-c u V) (disjoint U^ V)))]
+      (conj (!in u V) (disjoint U^ V)))]
    [(set? V)
     (let/set ([(v V^) V])
-      (conj (!in-c v U) (disjoint U V^)))]
-   [else (update-c-nocheck (build-oc disjoint U V))]))
+      (conj (!in v U) (disjoint U V^)))]
+   [else (add-constraint (disjoint U V))]))
 
 (define (!uniono u v w)
   (conj 
    (seto u) (seto v) (seto w)
    (fresh (t)
      (conde
-      [(!ino t u) (!ino t v)  (ino t w)]
-      [ (ino t u)            (!ino t w)]
-      [            (ino t v) (!ino t w)]))))
+      [(!in t u) (!in t v)  (ino t w)]
+      [ (ino t u)            (!in t w)]
+      [            (ino t v) (!in t w)]))))
 
 (define (!disjo u v)
   (fresh (n) (ino n u) (ino n v)))
@@ -787,22 +813,22 @@
         [(member rand new) new]
         [else (cons rand new)]))))
 
-(define reify-set-neq
-  (default-reify '=/= '(set-neq neq-?) process-rands))
+;; (define reify-set-neq
+;;   (default-reify '=/= '(set-neq neq-?) process-rands))
+;; 
+;; (define reify-set-not-in
+;;   (default-reify '!in '(!in-c) process-rands))
+;; 
+;; (define reify-set-union
+;;   (default-reify 'union '(union-fresh) process-rands))
+;; 
+;; (define reify-disjoint
+;;   (default-reify 'disj '(disjoint-fresh) process-rands))
 
-(define reify-set-not-in
-  (default-reify '!in '(!in-c) process-rands))
-
-(define reify-set-union
-  (default-reify 'union '(union-fresh) process-rands))
-
-(define reify-disjoint
-  (default-reify 'disj '(disjoint-fresh) process-rands))
-
-(extend-enforce-fns 'sets enforce-set-cs)
-(extend-reify-fns 'set-neq reify-set-neq)
-(extend-reify-fns 'set-not-in reify-set-not-in)
-(extend-reify-fns 'set-union reify-set-union)
-(extend-reify-fns 'set-disj reify-disjoint)
+;; (extend-enforce-fns 'sets enforce-set-cs)
+;; (extend-reify-fns 'set-neq reify-set-neq)
+;; (extend-reify-fns 'set-not-in reify-set-not-in)
+;; (extend-reify-fns 'set-union reify-set-union)
+;; (extend-reify-fns 'set-disj reify-disjoint)
 
 

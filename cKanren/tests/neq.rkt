@@ -5,36 +5,37 @@
  "../ck.rkt"
  "../tree-unify.rkt"
  "../neq.rkt"
- "../matche.rkt")
+ "../matche.rkt"
+ "../src/operators.rkt")
 
 (provide distincto rembero test-neq test-neq-long)
 
 (defmatche (distincto l)
-  [(())]
-  [((,a))]
-  [((,a ,ad . ,dd))
+  [[()]]
+  [[(,a)]]
+  [[(,a ,ad . ,dd)]
    (=/= a ad)
    (distincto `(,a . ,dd))
    (distincto `(,ad . ,dd))])
 
-(define rembero
-  (lambda (x ls out)
-    (conde
-     ((== '() ls) (== '() out))
-     ((fresh (a d res)
-        (== `(,a . ,d) ls)
-        (rembero x d res)
-        (conde
-         ((== a x) (== out res))
-         ((=/= a x) (== `(,a . ,res) out))))))))
+(defmatche (rembero x ls out)
+  [[,x () ()]]
+  [[,x (,x . ,d) ,out]
+   (rembero x d out)]
+  [[,x (,a . ,d) ,out]
+   (=/= a x)
+   (fresh (res)
+     (rembero x d res)
+     (== `(,a . ,res) out))])
 
 (define (test-neq)
 
   ;; SIMPLE
 
   (test (run* (q) (=/= 5 6)) '(_.0))
+  
   (test (run* (q) (=/= 3 3)) '())
-
+  
   (test (run* (q) (== q 3) (=/= 3 q))
         '())
   
@@ -192,9 +193,9 @@
   
   (test
    (run* (x y z)
-     (=/= `(,x 2 ,z)  `(1 ,z 3))
-     (=/= `(,x 6 ,z)  `(4 ,z 6))
-     (=/= `(,x ,y ,z)  `(7 ,z 9))
+     (=/= `(,x 2 ,z) `(1 ,z 3))
+     (=/= `(,x 6 ,z) `(4 ,z 6))
+     (=/= `(,x ,y ,z) `(7 ,z 9))
      (== x z))
    '((_.0 _.1 _.0)))
   
@@ -213,34 +214,34 @@
    '(_.0))
 
   ;; MEDIUM
-  
+
+  ;; these test reification
   (test
    (run* (q) (=/= q #f))
    '((_.0 : (=/= ((_.0 . #f))))))
-  
-  #;
-  (test
-   (run* (q) (=/= q 5) (=/= 5 q))
-   '((_.0 : (=/= ((_.0 . 5))))))
   
   (test
    (run* (x y) (=/= x y))
    '(((_.0 _.1) : (=/= ((_.0 . _.1))))))
   
-  #;
+  ;; this tests the constraint-interaction
+  (test
+   (run* (q) 
+     (=/= q 5)
+     (=/= 5 q))
+   '((_.0 : (=/= ((_.0 . 5))))))
+
   (test
    (run* (x y)
      (=/= y x))
    '(((_.0 _.1) : (=/= ((_.0 . _.1))))))
 
-  #;
   (test
    (run* (x y)
      (=/= x y)
      (=/= x y))
    '(((_.0 _.1) : (=/= ((_.0 . _.1))))))
   
-  #;
   (test
    (run* (x y)
      (=/= x y)
@@ -257,8 +258,7 @@
      (=/= 4 q)
      (=/= 3 q))
    '((_.0 : (=/= ((_.0 . 3)) ((_.0 . 4))))))
-  
-  #;
+
   (test
    (run* (q) (=/= q 5) (=/= q 5))
    '((_.0 : (=/= ((_.0 . 5))))))
@@ -280,21 +280,18 @@
        (== `(,x ,z) q)))
    '(((5 _.0) : (=/= ((_.0 . 5))))))
   
-  #;
   (test
    (run* (x y)
      (=/= `(,x ,y) `(5 6))
      (=/= x 5))
    '(((_.0 _.1) : (=/= ((_.0 . 5))))))
   
-  #;
   (test
    (run* (x y)
      (=/= x 5)
      (=/= `(,x ,y) `(5 6)))
    '(((_.0 _.1) : (=/= ((_.0 . 5))))))
   
-  #;
   (test
    (run* (x y)
      (=/= 5 x)
@@ -328,13 +325,35 @@
    '((_.0 : (=/= ((_.0 . 2)) ((_.0 . 3))))))
   
   (test
+   (run* (q) (rembero 'x '() q))
+   '(()))
+
+  (test
+   (run* (q) (rembero 'x '(x) '()))
+   '(_.0))
+  
+  (test
    (run* (q) (rembero 'a '(a b a c) q))
    '((b c)))
   
   (test
    (run* (q) (rembero 'a '(a b c) '(a b c)))
    '())
-  
+
+  (test
+   (run* (w x y z)
+     (=/= `(,w . ,x) `(,y . ,z)))
+   '(((_.0 _.1 _.2 _.3)
+      :
+      (=/= ((_.0 . _.2) (_.1 . _.3))))))
+
+  (test
+   (run* (w x y z)
+     (=/= `(,w . ,x) `(,y . ,z))
+     (== w y))
+   '(((_.0 _.1 _.0 _.2)
+      :
+      (=/= ((_.1 . _.2))))))
   )
 
 (define (test-neq-long)

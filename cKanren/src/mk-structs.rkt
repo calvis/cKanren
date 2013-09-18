@@ -1,10 +1,9 @@
 #lang racket/base
 
 (require racket/generic racket/vector)
-(require "substitution.rkt" "variables.rkt")
+(require "substitution.rkt" "variables.rkt" "events.rkt")
 
-(provide (except-out (all-defined-out) walk*)
-         (rename-out [walk* walk*-internal]))
+(provide (all-defined-out))
 
 ;; =============================================================================
 
@@ -48,7 +47,7 @@
   (cond
    [(mk-struct? t)
     (reify-mk-struct t r)]
-   [else (walk-internal t r)]))
+   [else (walk/internal t r)]))
 
 (define (default-mk-struct? x)
   (or (pair? x) (vector? x)))
@@ -89,14 +88,52 @@
     (recur t k)]
    [else `()]))
 
-;; walks a possibly nested structure
-(define (walk* w s)
-  (let ([v (walk-internal w s)])
+;; walks an entire mk-struct
+(define walk*
+  (case-lambda
+   [(u s)
+    (define v (walk u s))
     (cond
-     ((mk-struct? v)
-      (recur v 
-       (lambda (a d) 
-         ((constructor v)
-          (walk* a s)
-          (walk* d s)))))
-     (else v))))
+     [(mk-struct? v)
+      (define (k a d) 
+        ((constructor v)
+         (walk* a s)
+         (walk* d s)))
+      (recur v k)]
+     [else v])]
+   [(u s c e)
+    (unless (event? e)
+      (error 'walk* "uhhhhh ~a\n" e))
+    (define v (walk u s c e))
+    (cond
+     [(mk-struct? v)
+      (define (k a d) 
+        ((constructor v)
+         (walk* a s c e)
+         (walk* d s c e)))
+      (recur v k)]
+     [else v])]))
+
+(module+ test
+  (require (prefix-in ru: rackunit))
+  
+  (let ([x (var 'x)] [y (var 'y)])
+    (ru:check-equal?
+     (walk*
+      `((,x 1 . ,y))
+      `()
+      #f
+      (running-event 
+       (add-substitution-prefix-event `((,y 2 . 3)))
+       (chain-event 
+        (add-substitution-prefix-event `((,y 2 . 3)))
+        (composite-event 
+         (list (add-constraint-event/internal
+                (lambda (x) x) `(((,x 2 . 3))))
+               (add-constraint-event/internal
+                (lambda (x) x) `(((,x . 3))))
+               (add-constraint-event/internal
+                (lambda (x) x) `(((,x . 2))))
+               (remove-constraint-event/internal
+                (lambda (x) x) `(,x ,y)))))))
+     `((,x 1 2 . 3)))))

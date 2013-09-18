@@ -1,94 +1,114 @@
 #lang racket
 
-(require "ck.rkt" racket/generic)
-(provide == unify gen:unifiable gen-unify compatible? unify-two unify-walked unifiable?)
+(require "ck.rkt" racket/generic "src/framework.rkt" "src/events.rkt" "src/mk-structs.rkt"
+         "attributes.rkt")
+(provide == unify gen:unifiable gen-unify compatible? unify-two unify-walked unifiable?
+         unify-change)
 
 ;; a generic that defines when things are unifiable!
 (define-generics unifiable
-  (compatible? unifiable v s c)
-  (gen-unify unifiable v e s c)
+  (compatible? unifiable v s c e)
+  (gen-unify unifiable v p s c e)
   #:defaults 
   (;; vars are compatible with structs that it does not appear in, or
    ;; structs that override the occurs check (ex. sets).
    [var?
-    (define (compatible? u v s c)
-      (and (check-attributes u v s c)
+    (define (compatible? u v s c e)
+      (and (check-attributes u v s c e) 
            (cond
             [(mk-struct? v)
              (or (override-occurs-check? v)
                  (not (occurs-check u v s)))]
             [else #t])))
-    (define (gen-unify u v e s c)
+    (define (gen-unify u v p s c e)
       (cond
-       [(var? v) (unify e (ext-s u v s) c)]
-       [else (unify-walked v u e s c)]))]
+       [(var? v) (unify p (ext-s u v s) c e)]
+       [else (unify-walked v u p s c e)]))]
    ;; anything that is a default mk-struct will unify just fine if
    ;; unified with something of the same type
    [default-mk-struct?
-    (define (compatible? p v s c)
+    (define (compatible? p v s c e)
       (or (var? v) (same-default-type? p v)))
-    (define (gen-unify u v e s c)
-      (mk-struct-unify u v e s c))]
+    (define (gen-unify u v p s c e)
+      (mk-struct-unify u v p s c e))]
    ;; mostly for constants: strings, numbers, booleans, etc.
    ;; they unify if they are eq? or equal?
    [(lambda (x) #t)
-    (define (compatible? u v s c)
+    (define (compatible? u v s c e)
       (or (var? v) (eq? u v) (equal? u v)))
-    (define (gen-unify u v e s c)
+    (define (gen-unify u v p s c e)
       (cond
-       [(var? v) (unify e (ext-s v u s) c)]
-       [else (unify e s c)]))]))
+       [(var? v) (unify p (ext-s v u s) c e)]
+       [else (unify p s c e)]))]))
 
 (define (== u v)
-  (constraint
+  (transformer
    #:package (a [s c e])
    (cond
-    [(unify `((,u . ,v)) s c)
-     => (lambda (s/c)
-          (update-package (car s/c) (cdr s/c)))]
+    [(unify `((,u . ,v)) s c e)
+     => (match-lambda
+          [(cons s c) (update-package s c)])]
     [else fail])))
 
-(define (unify e s c)
+(define (unify p s c e)
   (cond
-   [(null? e) (cons s c)]
-   [else (unify-two (caar e) (cdar e) (cdr e) s c)]))
+   [(null? p) (cons s c)]
+   [else (unify-two (caar p) (cdar p) (cdr p) s c e)]))
 
 ;; unifies two things, u and v
-(define-syntax-rule (unify-two u v e s c)
-  (let ([u^ (walk u s)] [v^ (walk v s)])
+(define-syntax-rule (unify-two u v p s c e)
+  (let ([u^ (walk u s c e)] [v^ (walk v s c e)])
     (cond
      [(and (var? u^) (not (var? u^)))
-      (unify-walked v^ u^ e s c)]
-     [else (unify-walked u^ v^ e s c)])))
+      (unify-walked v^ u^ p s c e)]
+     [else (unify-walked u^ v^ p s c e)])))
 
-(define (unify-walked u v e s c)
+(define (unify-walked u v p s c e)
   (cond
-   [(eq? u v) (unify e s c)]
+   [(eq? u v) (unify p s c e)]
    [else
     (and (unifiable? u)
          (unifiable? v)
-         (compatible? u v s c)
-         (compatible? v u s c)
-         (gen-unify u v e s c))]))
+         (compatible? u v s c e)
+         (compatible? v u s c e)
+         (gen-unify u v p s c e))]))
 
 ;; unifies mk-structs that are the same type
-(define (mk-struct-unify u v e s c)
+(define (mk-struct-unify u v p s c e)
   (cond
-   [(var? v) (unify e (ext-s v u s) c)]
+   [(var? v) (unify p (ext-s v u s) c e)]
    [else
     (recur u 
      (lambda (ua ud)
        (recur v
         (lambda (va vd)
-          (unify-two ua va `((,ud . ,vd) . ,e) s c)))))]))
+          (unify-two ua va `((,ud . ,vd) . ,p) s c e)))))]))
 
-;; returns #t if attributes are ok
-(define (check-attributes u v s c)
-  (let ([ua (get-attributes u c)]
-        [va (get-attributes v c)])
-    (and (or (not ua) (no-conflicts? v va ua))
-         (or (not va) (no-conflicts? u ua va)))))
+(define (unify-new-prefix thing s c e)
+  (match (unify (walk* thing s c e) s c e)
+    [(cons s^ c^)
+     (cons (prefix-s s s^)
+           (prefix-c c c^))]
+    [#f #f]
+    [_ (error 'unify-new-prefix "got something strange")]))
 
-(define (no-conflicts? u ua va)
-  (andmap (lambda (aoc) ((attr-oc-uw? aoc) u ua)) va))
+(define-trigger (unify-change thing)
+  #:package (a [s c e])
+  [(add-association-event u v)
+   (=> abort)
+   (unless (memq u (filter*/var? thing))
+     (abort))
+   (unify-new-prefix thing s c e)]
+  [(add-substitution-prefix-event p)
+   (=> abort)
+   (unless (ormap (lambda (x) (memq (car x) (filter*/var? thing))) p)
+     (abort))
+   (unify-new-prefix thing s c e)]
+  [(add-attribute-constraint-event rator (list x))
+   (=> abort)
+   (unless (memq x (filter*/var? thing))
+     (abort))
+   (unify-new-prefix thing s c e)]
+  [(empty-event) ;; empty is not synonymous to new
+   (unify-new-prefix thing s c e)])
 

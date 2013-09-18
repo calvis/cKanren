@@ -1,14 +1,29 @@
 #lang racket
 
 (require "src/errors.rkt")
-(provide test (rename-out [test test-check]) test-divergence test-disable test-any-order)
+(provide test 
+         (rename-out [test test-check])
+         test-divergence
+         test-disable
+         test-any-order
+         test-highlight)
 
 (define max-ticks 10000000)
 
 (define-syntax (test x)
   (define (test-syntax te er)
+    (define new-te
+      (quasisyntax/loc x
+        (with-handlers 
+         ([(lambda (x) #t)
+           (lambda (e) 
+             (cond
+              [(format-source #,(build-srcloc-stx x))
+               => (lambda (loc) (printf "encountered exception while running ~a\n" loc))])
+             (raise e))])
+         #,te)))
     (quasisyntax/loc x
-      (let ([expected #,er] [produced #,te])
+      (let ([expected #,er] [produced #,new-te])
         (cond
          [(equal? expected produced) (void)] 
          [else
@@ -26,6 +41,16 @@
     ((_ tested-expression expected-result)
      (quasisyntax/loc x
        #,(test-syntax #'tested-expression #'expected-result)))))
+
+(define-syntax (test-highlight x)
+  (syntax-case x ()
+    [(k stuff ...)
+     (syntax/loc x
+       (begin (printf (make-string 80 #\=))
+              (newline)
+              (test stuff ...)
+              (printf (make-string 80 #\=))
+              (newline)))]))
 
 (define (make-error src msg . exprs)
   (cond

@@ -8,6 +8,7 @@
          map-sum null-dom? singleton-dom? singleton-element-dom
          min-dom max-dom memv-dom? intersection-dom diff-dom
          copy-before-dom drop-before-dom disjoint-dom? make-dom
+         remq-dom
          
          ;; interval helpers
          interval-difference interval-union interval-intersection
@@ -210,6 +211,10 @@
          (diff-dom
           (append-dom a1 (cdr dom1))
           (append-dom a2 (cdr dom2))))))))
+
+(define remq-dom
+  (lambda (x dom)
+    (diff-dom dom (make-dom (list x)))))
 
 (define copy-before-dom
   (lambda (pred dom)

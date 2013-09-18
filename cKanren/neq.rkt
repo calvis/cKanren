@@ -1,8 +1,8 @@
 #lang racket
 
-(require "ck.rkt" (only-in "tree-unify.rkt" unify))
-(provide =/= =/=neq-c oc-prefix reify-prefix-dot
-         (rename-out [=/= !=]))
+(require "ck.rkt" (only-in "tree-unify.rkt" unify unify-change) "src/events.rkt"
+         "src/framework.rkt")
+(provide =/= !=/prefix reify-prefix-dot (rename-out [=/= !=]) subsumes?)
 
 ;;; little helpers
 
@@ -23,9 +23,6 @@
    (else (cons x r))))
 
 ;;; serious functions
-
-(define (oc-prefix oc)
-  (car (oc-rands oc)))
 
 (define reify-prefix-dot 
   (make-parameter #t))
@@ -48,46 +45,47 @@
    ((lex<= u v) (cons u v))
    (else (cons v u))))
 
-(define-constraint (=/=neq-c [p walk*])
+(define-constraint (!=/prefix p)
   #:package (a [s c e])
+  #:reaction
+  [(unify-change p)
+   =>
+   (match-lambda
+     [(cons new-p c)
+      ;; (printf "\n!=/prefix: ~a ~a ~a\n" new-p c e)
+      (cond
+       [(null? new-p) fail]
+       [else (add-constraint (!=/prefix new-p))])]
+     [#f succeed])]
   #:reification-function
   (lambda (v r)
-    (values '=/= (remove-dots (sort-p p))))
-  (cond
-   [(unify p s c)
-    =>
-    (lambda (s/c)
-      (define p (prefix-s s (car s/c)))
-      (cond
-       [(null? p) fail]
-       [else (update-c (=/=neq-c p))]))]
-   [else succeed]))
+    (values '=/= (sort-p p))))
 
 ;; how to read this: 
-;; neq-subsume defines an interaction between =/=neq-c constraints
-;; if there are two =/=neq-c constraints with prefixes p and p^
+;; neq-subsume defines an interaction between !=/prefix constraints
+;; if there are two !=/prefix constraints with prefixes p and p^
 ;; in the constraint store, if the first subsumes the second, keep
 ;; only the first constraint.  this is reflexive by default.
 (define-constraint-interaction neq-subsume
-  ((=/=neq-c ,p) (=/=neq-c ,p^))
+  [(!=/prefix ,p) (!=/prefix ,p^)]
   #:package (a [s c e])
-  [(subsumes? p p^ c) ((=/=neq-c p))])
+  [(subsumes? p p^ c) [(!=/prefix p)]])
 
 (define (subsumes? p p^ c)
   (cond
-   [(unify p p^ c) => 
+   [(unify p p^ empty-c empty-e) => 
     (lambda (s/c) (eq? (car s/c) p^))]
    [else #f]))
 
 ;;; goals
 
 (define (=/= u v)
-  (constraint
+  (transformer
    #:package (a [s c e])
    (cond
-    [(unify `((,u . ,v)) s c)
+    [(unify `((,u . ,v)) s c e)
      => (lambda (s/c)
-          (=/=neq-c (prefix-s s (car s/c))))]
+          (!=/prefix (prefix-s s (car s/c))))]
     [else succeed])))
 
 

@@ -1,83 +1,21 @@
 #lang racket
 
-(require "attributes.rkt" "constraints.rkt" "goals.rkt" "package.rkt" 
-         "mk-structs.rkt" "ocs.rkt" "variables.rkt" "errors.rkt" 
-         "infs.rkt" "helpers.rkt" "operators.rkt" "events.rkt")
-(require racket/generator (prefix-in ru: rackunit))
-(require (for-syntax syntax/parse racket/syntax racket/match))
-(require syntax/parse racket/syntax)
+(require "constraints.rkt" "package.rkt" 
+         "mk-structs.rkt" "variables.rkt" "errors.rkt" 
+         (except-in "infs.rkt" make-a) (except-in "helpers.rkt" debug?) "operators.rkt" 
+         "events.rkt" "substitution.rkt" "lex.rkt")
+(require racket/generator (prefix-in ru: rackunit) racket/stxparam)
+(require (for-syntax racket syntax/parse racket/syntax racket/match racket/pretty racket/function))
+(require syntax/parse racket/syntax racket/pretty)
 
-(provide (all-defined-out))
+(provide (except-out (all-defined-out) debug?))
+(provide (for-syntax (all-defined-out)))
 
-;; runs all the constraints on the event in the store, 
-;; accumulating all their new events and then recurring
-(define send-event
-  (lambda@ (a [s c q t e-orig])
-    (cond
-     [(not e-orig) a]
-     [else 
-      (define store (constraint-store-c c))
-      (define apply-to-store
-        (for/fold ([fn send-event]) ([(keys ocs) store])
-          (for/fold ([fn fn]) ([oc ocs])
-            (lambda@ (a [s c q t e])
-              (cond
-               [((oc-subs oc) e-orig)
-                (bindm 
-                  (make-a s c q t e-orig) 
-                  (conj (rem/run oc) (add-event e)))]
-               [else a])))))
-      (bindm (make-a s c q t #f) apply-to-store)])))
+(define debug? #t)
 
-;; adds an event to the event in the package
-(define (add-event e^)
-  (lambda@ (a [s c q t e])
-    (make-a s c q t (compose-events e e^))))
-
-;; removes oc from the constraint store and then runs it
-(define (rem/run oc)
-  (lambda@ (a [s c q t e])
-    (define ocs (constraint-store-c c))
-    (cond
-     [(memq-c oc ocs)
-      (define new-c (constraint-store (remq-c oc ocs)))
-      (define new-e (compose-events (remove-constraint-event oc) e))
-      (bindm (make-a s new-c q t new-e) (oc-proc oc))]
-     [else a])))
-
-;; updates the substitution with a binding of x to v
-(define (update-s x v)
-  (lambda@ (a [s c q t e])
-    (define old-s (substitution-s s))
-    (define new-s (substitution (ext-s x v old-s)))
-    (define new-e (compose-events (add-association-event x v) e))
-    (bindm (make-a new-s c q t new-e) send-event)))
-
-(define (update-c oc)
-  (lambda@ (a [s c q t e])
-    (cond
-     [(event? oc)
-      (define old-c (constraint-store-c c))
-      (define new-c (ext-c (remove-constraint-event-oc oc) old-c))
-      (make-a s (constraint-store new-c) q t (remove-remove-event oc e))]
-     [else 
-      (define old-c (constraint-store-c c))
-      (define new-c (ext-c oc old-c))
-      (define new-e (add-constraint-event oc))
-      (bindm 
-        (make-a s (constraint-store new-c) q t new-e)
-        send-event)])))
-
-;; TODO: not efficient
-(define (remove-remove-event oc e)
-  (match e
-    [(remove-constraint-event oc^)
-     (cond
-      [(eq? oc oc^) #f]
-      [else e])]
-    [(composite-event ls)
-     (map (curry remove-remove-event oc) ls)]
-    [_ e]))
+(define (sum lsct)
+  (for/fold ([out succeed]) ([ct lsct])
+    (conj ct out)))
 
 (begin-for-syntax
  
@@ -93,25 +31,21 @@
             #:with (a s c e) (generate-temporaries #'(?a ?s ?c ?e))
             #:with package #'(a [s c e])))
  
- ;; argument keyword matching
- (define-splicing-syntax-class (arguments-keyword default-fn)
-   #:attributes (bindings)
-   (pattern (~seq #:args ((~var bd (argument default-fn)) ...))
-            #:with bindings #'((bd.arg1 bd.arg2 bd.fn) ...))
-   (pattern (~seq)
-            #:with bindings #'()))
+ (define-splicing-syntax-class reaction-keyword
+   #:attributes (name [args 1] subs [response 1])
+   (pattern (~seq #:reaction 
+                  [(name args ...)
+                   response ...])
+            #:with subs
+            #'(trigger-subs name)))
 
  (define-syntax-class (argument default-fn)
-   #:attributes (arg1 arg2 fn)
-   (pattern (arg1:id #:constant) 
-            #:with fn #'(lambda (x . rest) x)
-            #:with arg2 #'arg1)
-   (pattern (arg1:id arg2:id fn:id))
-   (pattern (arg1:id fn:id)
-            #:with arg2 (generate-temporary #'?arg^))
-   (pattern arg1:id 
-            #:with fn default-fn
-            #:with arg2 (generate-temporary #'?arg^)))
+   #:attributes (arg fn)
+   (pattern [arg:id #:constant] 
+            #:with fn #'identity-update-fn)
+   (pattern [arg:id fn])
+   (pattern arg:id
+            #:with fn default-fn))
 
  ;; constructor keyword matching
  (define-splicing-syntax-class constructor-keyword
@@ -125,189 +59,267 @@
    (pattern (~seq) #:with persistent? #'#f))
  
  (define-splicing-syntax-class reification-keyword
-   #:attributes (rfn)
-   (pattern (~seq (~and #:reified rfn:keyword)))
-   (pattern (~seq #:reification-function rfn:expr))
-   (pattern (~seq) #:with rfn #'#f))
+   #:attributes (reified)
+   (pattern (~seq #:reified)
+            #:with reified #'#t)
+   (pattern (~seq #:reification-function reified:expr))
+   (pattern (~seq) #:with reified #'#f))
 
- (define-splicing-syntax-class (constraint-options ufn)
-   #:attributes (options)
-   (pattern (~seq (~or
-                   (~once pkgkw:package-keyword)
-                   (~once pkw:persistent-keyword)
-                   (~once rkw:reification-keyword)
-                   (~once ckw:constructor-keyword)
-                   (~once (~var argskw (arguments-keyword ufn))))
-                  ...)
-            #:with options
-            #`(#:package pkgkw.package
-               #:args argskw.bindings
-               #:constructor ckw.constructor
-               #:persistent pkw.persistent? 
-               #:reified rkw.rfn)))
-
- (define-splicing-syntax-class define-constraint-options
-   (pattern (~seq (~or
-                   (~once pkw:persistent-keyword)
-                   (~once rkw:reification-keyword)
-                   (~once pkgkw:package-keyword))
-                  ...)))
+ (define-splicing-syntax-class subscriptions-keyword
+   #:attributes (subfn)
+   (pattern (~seq #:subscriptions new-subfn:expr)
+            #:attr subfn
+            (lambda (vars)
+              #'new-subfn))
+   (pattern (~seq #:extend-subscriptions ex-subfn:expr)
+            #:attr subfn 
+            (lambda (vars)
+              #`(lambda (e)
+                  (or (ex-subfn e)
+                      (and (association-event? e)
+                           (contains-relevant-var? 
+                            e
+                            (filter*/var? #,vars)))))))
+   (pattern (~seq)
+            #:attr subfn 
+            (lambda (vars)
+              #`(lambda (e)
+                  (and (association-event? e)
+                       (contains-relevant-var? e (filter*/var? #,vars)))))))
 )
 
-;; given a name and a way to update the constraint arguments
-;; default-update-fn, expands to two macros to define constraints of
-;; that type: one "name-constraint" macro that simply returns a
-;; constraint, and one "define-name-constraint" that defines a
-;; function that returns a constraint
-(define-syntax (define-constraint-type stx)
-  (syntax-parse stx
-    [(define-constraint-type name:id default-update-fn:expr)
-     (define/with-syntax definer 
-       (format-id #'name "define-~a" (syntax-e #'name)))
-     #'(begin
-         (define fn default-update-fn)
-         (create-constraint name fn)
-         (create-define-constraint definer name fn))]))
-
-(define-syntax (create-constraint stx)
-  (syntax-parse stx
-    [(create-constraint name ufn)
-     #'(...
-        (define-syntax (name stx)
-          (syntax-parse stx
-            [(name (~var opts (constraint-options #'ufn)) body:expr ...)
-             (define/with-syntax (options ...) #'opts.options)
-             #'(constraint/internal 
-                [options ...] 
-                body ...)])))]))
-
-(define-syntax (create-define-constraint stx)
-  (syntax-parse stx
-    [(create-define-constraint definer name fn)
-     (syntax/loc stx
-       (...
-        (define-syntax (definer stx)
-          (syntax-parse stx
-            [(definer (fn-name (~var args (argument #'fn)) ...)
-               opt:define-constraint-options
-               body:expr ...)
-             (define/with-syntax (options ...) #'opt)
-             (syntax/loc stx
-               (define (fn-name args.arg2 ...)
-                 (name
-                  options ...
-                  #:constructor fn-name
-                  #:args ((args.arg1 args.arg2 args.fn) ...)
-                  body ...)))]))))]))
-
-(define-syntax (constraint/internal stx)
-  (syntax-parse stx
-    [(create/internal
-      [#:package (a [s c e])
-       #:args ((args:id args^:id fn:id) ...)
-       #:constructor constfn
-       #:persistent stx-persistent?
-       #:reified stx-reified
-       ;; #:unique stx-unique?
-       ] 
-      body ...)
-     ;; (define persistent? (syntax-e stx-persistent?))
-     ;; (define reified? (syntax-e stx-reified?))
-     ;; (define unique? (syntax-e stx-unique?))
-     (define/with-syntax reify-body
-       (match (syntax-e #'stx-reified)
-         ['#:reified #'(default-reify 'constfn args ...)]
-         [#f #f]
-         [_ #'stx-reified]))
-     (define/with-syntax entire-body
-       (cond
-        [(syntax-e #'stx-persistent?)
-         #'(conj
-            (let () succeed body ...)
-            (update-c (constfn args ...)))]
-        [else #'(let () succeed body ...)]))
-     #`(letrec ([constraint-expression
-                 (lambda@ (a [subst store q t e])
-                   (define s (substitution-s subst))
-                   (define c (constraint-store-c store))
-                   (define reifyfn 
-                     #,(cond
-                        [(syntax-e #'reify-body) 
-                         #'(lambda (args^ ...)
-                             (lambda (ans r)
-                               (let ([args (fn args^ r c e)] ...)
-                                 (reify-body ans r))))]
-                        [else #'#f]))
-                   (let ([constfn
-                          (lambda (args ...)
-                            (define old-args (list args^ ...))
-                            (define new-args (list args ...))
-                            (define event (no-op-event 'constfn new-args old-args e))
-                            (or event (build-oc constfn reifyfn args ...)))]
-                         [args (fn args^ s c e)] ...)
-                     (bindm a entire-body)))]
-                [constfn (lambda (args ...) constraint-expression)])
-         constraint-expression)]))
-
-(define (no-op-event name args args^ e)
-  (define (contains-remove-event e)
-    (match e
-      [(remove-constraint-event (oc _ rator rands _ _))
-       (and (eq? rator name)
-            (andmap eq? args rands)
-            e)]
-      [(composite-event ls)
-       (ormap contains-remove-event ls)]
-      [_ #f]))
-  (and 
-   e
-   (andmap eq? args args^)
-   (contains-remove-event e)))
-
-(define (default-reify sym . args)
-  (define var-free-rands
-    (filter-not any/var? args))
-  (cond
-   [(null? var-free-rands) `()]
-   [else `((,sym . ,(sort var-free-rands lex<=)))]))
-
-(define (walk u s [c #f] [e #f])
-  (cond
-   [e (walk-event u s e)]
-   [else (walk-internal u s)]))
-
-(define-constraint-type constraint walk)
-
-(define (walk* u s [c #f] [e #f])
-  (let ([v (walk u s c e)])
+;; Event -> ConstraintTransformer
+;; runs all the constraints on the event in the store, 
+;; accumulating all their new events and then recurring
+(define (send-event new-e)
+  (lambda@ (a [s c q t e-orig])
     (cond
-     [(mk-struct? v)
-      (define (k a d) 
-        ((constructor v)
-         (walk* a s)
-         (walk* d s)))
-      (recur v k)]
-     (else v))))
+     ;; is the thing we are trying to send empty? if so, why send it
+     [(empty-event? new-e) a]
+     ;; if e-orig is empty we can run!
+     [(empty-event? e-orig)
+      (define store (constraint-store-c c))
+      (define running-e (start-running new-e))
+      (when debug? (printf "SEND-EVENT: \n"))
+      (when debug? (pretty-print running-e))
+      (bindm (make-a s c q t running-e)
+             (conj send-to-running
+                   send-to-store
+                   solidify-event))]
+     ;; if we are already running, don't try to run again. just add
+     ;; the event we are trying to send to the waiting events
+     [(running-event? e-orig)
+      (make-a s c q t (compose-events new-e e-orig))]
+     [else (error 'send-event "found unsent event: ~a\n" e-orig)])))
 
-(define (walk-event u s e)
+(define send-to-running
+  (lambda@ (a [s c q t e])
+    (unless (running-event? e)
+      (error 'send-to-running "internal error: ~a\n" e))
+    (match-define (running-event r w) e)
+    (cond
+     [(composite-event? r)
+      (bindm a (send-to-comp-event r))]
+     [else a])))
+
+(define (send-to-comp-event r)
+  (match-define (composite-event es) r)
+  (define (loop pre post)
+    (match post
+      [(list) succeed]
+      [(cons e rest)
+       (conj (send-to-other-events e (append pre rest))
+             (loop (cons e pre) rest))]))
+  (loop (list) es))
+
+(define (send-to-other-events e es)
+  ;; is e^ interested in e?
+  (define addcs 
+    (filter add-constraint-event/internal? 
+            (composite-event es))) ;; TODO: hack
+  (define maybe-response
+    (match-lambda
+      [(add-constraint-event/internal rator rands)
+       (define reaction (-constraint-reaction rator))
+       (cond
+        ;; is our kind of constraint generally interested in anything
+        ;; inside of the event we have?
+        [(reaction e)
+         => ;; Response -> ConstraintTransformer
+         (lambda (response)
+           (run-response response rator (list rands)))]
+        ;; if not, just use the accumulator
+        [else succeed])]))
+  (sum (map maybe-response addcs)))
+
+;; ConstraintTransformer
+(define solidify-event
+  (lambda@ (a [s c q t e])
+    (unless (running-event? e)
+      (error 'solidify-event "internal error: ~a\n" e))
+    (match-define (running-event r w) e)
+    (define old-r
+      (cond
+       [(composite-event? r)
+        (composite-event-es r)]
+       [else (list r)]))
+    (define new-r (solidify old-r w))
+    (when debug? (printf "SOLIDIFYING:\n"))
+    (when debug? (pretty-print old-r))
+    (bindm (make-a s c q t (empty-event))
+           (conj (sum (map solidify-atomic-event old-r))
+                 (send-event new-r)))))
+
+;; Event ConstraintStore -> ConstraintTransformer
+(define send-to-store
+  (lambda@ (a [s c q t e])
+    (bindm a
+           (for/fold 
+             ([ct succeed]) 
+             ([(rator rands*) (constraint-store-c c)])
+             (lambda@ (a [s c q t e])
+               (unless (running-event? e)
+                 (error 'send-to-store "internal error: ~a\n" e))
+               (match-define (running-event r w) e)
+               (define reaction (-constraint-reaction rator))
+               (cond
+                ;; is our kind of constraint generally interested in anything
+                ;; inside of the event we have?
+                [(reaction r)
+                 => ;; Response -> ConstraintTransformer
+                 (lambda (response)
+                   (when debug? (printf "RESPONSE FROM: ~a\n" rator))
+                   (bindm a (conj (run-response response rator rands*) ct)))]
+                ;; if not, just use the accumulator
+                [else (bindm a ct)]))))))
+
+;; Response Rator [List-of Rands] -> ConstraintTransformer
+(define (run-response r rator rands*)
+  (for/fold ([ct succeed]) ([rands rands*])
+    (lambda@ (a [s c q t e]) ;; we need the e?
+      (define removing-self?
+        (match-lambda
+          [(remove-constraint-event/internal rator^ rands^)
+           (eq? rands rands^)]
+          [else #f]))
+      (when debug? (printf "CHECKING ~a: " (cons rator rands)))
+      (cond
+       ;; are we witnessing ourself be removed
+       [(findf removing-self? e)
+        (when debug? (printf "removing self\n"))
+        (bindm a ct)]
+       ;; is our constraint actually subscribed to our event?
+       [(apply-response r rands a)
+        => (match-lambda 
+             [(list (cons tr* ct*) ...)
+              ;; run-response-ct performs the changes the constraint
+              ;; would like to see given the trigger.  our goal is to
+              ;; capture what events it causes and chain them after the
+              ;; trigger.
+              (when debug? (printf "#t: ~a\n" (map cons tr* ct*)))
+              (define ct^
+                (for/fold ([ct^ succeed]) ([tr (reverse tr*)] [ct (reverse ct*)])
+                  (cond
+                   [(findf (curry eq? tr) e)
+                    (conj (chain tr)
+                          (remove-constraint (oc rator rands))
+                          ct
+                          (unchain removing-self? ct^))]
+                   [else ct^])))
+              (bindm a (conj ct^ ct))]
+             [else (error 'run-response "~a" else)])]
+       [else (when debug? (printf "#f\n")) (bindm a ct)]))))
+
+(define (chain tr)
+  (lambda@ (a [s c q t e])
+    (match-define (running-event r w) e)
+    (define new-e 
+      (running-event r (build-chain-event tr w (empty-event))))
+    (when debug? (printf "CHAINING: ~a onto ~a\n" tr e))
+    (make-a s c q t new-e)))
+
+(define (unchain rs? ct)
+  (lambda@ (a [s c q t e])
+    (match-define (running-event r w) e)
+    (when debug? (printf "UNCHAINING: " ))
+    (match w
+      [(build-chain-event tr old new)
+       (define new-e (running-event r (apply-chain w)))
+       (when debug? (printf "~a\n" new-e))
+       (define new-a (make-a s c q t new-e))
+       (cond
+        [(findf rs? new) new-a]
+        [else (bindm new-a ct)])]
+      [_
+       ;; chain has been broken! wee
+       (when debug? (printf "(oops) ~a\n" e))
+       a])))
+
+(define (apply-response r rands a)
+  ((apply r rands) a))
+
+;; updates the substitution with a binding of x to v
+(define (add-association x v)
   (cond
-   [(and (add-association-event? e)
-         (eq? (add-association-event-u e) u))
-    (add-association-event-v e)]
-   [(and (add-substitution-prefix-event? e)
-         (assq u (add-substitution-prefix-event-p e)))
-    => cdr]
-   [else u]))
+   [(var? x)
+    (send-event (add-association-event x v))]
+   [else
+    (send-event (add-association-event v x))]))
+
+(define (add-constraint an-oc)
+  (match-define (oc rator rands) an-oc)
+  (send-event ((-constraint-add rator) rator rands)))
+
+(define update-s
+  (case-lambda
+   [(u v)
+    (lambda@ (a [s c q t e])
+      (define subst (ext-s u v (substitution-s s)))
+      (make-a (substitution subst) c q t e))]
+   [(p) 
+    (cond
+     [(empty? p) succeed]
+     [else
+      (conj (update-s (caar p) (cdar p)) 
+            (update-s (cdr p)))])]))
+
+(define (update-c new-oc)
+  (lambda@ (a [s c q t e])
+    (match-define (oc rator rands) new-oc)
+    (define old-c (constraint-store-c c))
+    (define new-c (ext-c new-oc old-c))
+    (make-a s (constraint-store new-c) q t e)))
+
+(define (remove-from-c an-oc)
+  (lambda@ (a [s c q t e])
+    (match-define (oc rator rands) an-oc)
+    (define old-c (constraint-store-c c))
+    (define new-c (remq-c rator rands old-c))
+    (make-a s (constraint-store new-c) q t e)))
+
+(define (remove-constraint* ocs)
+  (for/fold ([fn succeed]) ([oc ocs])
+    (conj (remove-constraint oc) fn)))
+
+(define (remove-constraint an-oc)
+  (match-define (oc rator rands) an-oc)
+  (send-event ((-constraint-rem rator) rator rands)))
 
 (define (enforce x)
-  (conj (add-event (enforce-event x)) send-event))
+  (lambda@ (a [s c q t e])
+    a
+    #;
+    (let ([x (filter*/var? (walk x (substitution-s s)))])
+      (bindm a (conj (add-event (enforce-event x)) send-event)))))
 
 (define (reify x)
   (lambda@ (a [s c q t e])
-    (when e (error 'reify "internal error, event not empty ~s" e))
+    (when (not (empty-event? e))
+      (error 'reify "internal error, event not empty ~a" e))
     (define subst (substitution-s s))
     (define store (constraint-store-c c))
-    (define v (walk* x subst))
+    (define v (walk* x subst store e))
+    (when debug? (printf "REIFY: ~a ~a\n" v subst))
     (define r (reify-s v empty-s))
     (define v^ (reify-term v r))
     (define answer
@@ -317,16 +329,16 @@
     (choiceg answer empty-f)))
 
 ;; reifies the substitution, returning the reified substitution
-(define (reify-s v s)
-  (let ((v (walk v s)))
-    (cond
-     [(var? v) 
-      `((,v . ,(reify-n v (size-s s))) . ,s)]
-     [(mk-struct? v) 
-      (define (k a d) 
-        (reify-s d (reify-s a s)))
-      (recur v k)]
-     [else s])))
+(define (reify-s v^ s)
+  (define v (walk v^ s))
+  (cond
+   [(var? v) 
+    `((,v . ,(reify-n v (size-s s))) . ,s)]
+   [(mk-struct? v) 
+    (define (k a d) 
+      (reify-s d (reify-s a s)))
+    (recur v k)]
+   [else s]))
 
 (define (reify-n cvar n)
   (string->symbol (format "~a.~a" (cvar->str cvar) (number->string n))))
@@ -341,122 +353,24 @@
 ;; sorts the constraint store by lex<=
 (define (sort-store ocs) (sort ocs lex<= #:key car))
 
-;; sorts a list by lex<=
-(define (sort-by-lex<= l) (sort l lex<=))
-
-;; for pretty reification
-(define lex<=
-  (lambda (x y)
-    (cond
-      ((vector? x) #t)
-      ((vector? y) #f)
-      ((port? x) #t)
-      ((port? y) #f)
-      ((procedure? x) #t)
-      ((procedure? y) #f)
-      ((boolean? x)
-       (cond
-         ((boolean? y) (or (not x) (eq? x y)))
-         (else #t)))
-      ((boolean? y) #f)
-      ((null? x) #t)
-      ((null? y) #f)
-      ((char? x)
-       (cond
-         ((char? y) (char<=? x y))
-         (else #t)))
-      ((char? y) #f)
-      ((number? x)
-       (cond
-         ((number? y) (<= x y))
-         (else #t)))
-      ((number? y) #f)
-      ((string? x)
-       (cond
-         ((string? y) (string<=? x y))
-         (else #t)))
-      ((string? y) #f)
-      ((symbol? x)
-       (cond
-         ((symbol? y)
-          (string<=? (symbol->string x)
-                     (symbol->string y)))
-         (else #t)))
-      ((symbol? y) #f)
-      ((pair? x)
-       (cond
-         ((pair? y)
-          (cond          
-            ((equal? (car x) (car y))
-             (lex<= (cdr x) (cdr y)))
-            (else (lex<= (car x) (car y)))))))
-      ((pair? y) #f)
-      (else #t))))
-
-(define (insert-in-lex-order x ls)
-  (cond
-   [(null? ls) (list x)]
-   [(lex<= x (car ls)) (cons x ls)]
-   [else (cons (car ls) (insert-in-lex-order x (cdr ls)))]))
-
 (define (run-reify-fns v r store)
+  (unless (hash-eq? store) 
+    (error 'run-reify-fns "internal error"))
+  (when debug? (printf "RUN-REIFY-FNS: ~a ~a ~a\n" v r store))
   (hash->list
    (for*/fold
     ([h (hasheq)])
-    ([(key ocs) store]
-     [oc ocs]
-     #:when (oc-reify oc))
+    ([(rator rands*) store]
+     #:when (-constraint-reifyfn rator)
+     [rands rands*])
+    (when debug? (printf "REIFYING ~a\n" (cons rator rands)))
     (define-values (sym ans)
-      ((oc-reify oc) v r))
-    #:break (any/var? ans)
-    (define updatefn (curry insert-in-lex-order ans))
-    (hash-update h sym updatefn '()))))
-
-(define-syntax run/lazy
-  (syntax-rules ()
-    ((_ (x) g ...) 
-     (let ([a-inf ((fresh (x) g ... (enforce x) (reify x)) empty-a)])
-       (generator () (take/lazy a-inf))))))
-
-;; convenience macro to integrate Scheme and cKanren, 
-;; returns n answers to the goals g0 g1 ... where x is fresh
-(define-syntax run
-  (syntax-rules ()
-    [(_ n (x) g0 g1 ...)
-     (let ([stream (run/lazy (x) g0 g1 ...)])
-       (take n stream))]
-    [(_ n (x ...) g ...)
-     (run n (q) (fresh (x ...) (update-s q `(,x ...)) g ...))]))
-
-;; RUNS ALL THE THINGS
-(define-syntax run*
-  (syntax-rules ()
-    [(_ (x ...) g ...) (run #f (x ...) g ...)]))
-
-(define-syntax case/lazy
-  (syntax-rules ()
-    [(_ gen [() no-answer-clause] [(x g) an-answer-clause])
-     (let ([g gen])
-       (call-with-values (lambda () (g))
-         (case-lambda
-          [() no-answer-clause]
-          [(x) an-answer-clause])))]))
-
-;; given a number n and a stream, takes n answers from f
-(define (take n stream)
-  (cond
-   [(and n (zero? n)) '()]
-   [else
-    (case/lazy stream
-     [() '()]
-     [(a _) (cons a (take (and n (- n 1)) stream))])]))
-
-(define (take/lazy f)
-  (case-inf (f)
-   [() (yield)]
-   [(f) (take/lazy f)]
-   [(a) (yield a)]
-   [(a f) (begin (yield a) (take/lazy f))]))
+      ((apply (-constraint-reifyfn rator) rands) v r))
+    (cond
+     [(any/var? ans) h]
+     [else
+      (define updatefn (curry insert-in-lex-order ans))
+      (hash-update h sym updatefn '())]))))
 
 (define (prefix-c c c^)
   (for/fold 
@@ -465,31 +379,273 @@
    (define ocs (hash-ref c key '()))
    (let prefix-loop ([ocs^ ocs^] [prefix prefix])
      (cond
-      [(eq? ocs ocs^) 
-       prefix]
-      [else
-       (prefix-loop (cdr ocs^) (cons (car ocs^) prefix))]))))
+      [(eq? ocs ocs^) prefix]
+      [else (prefix-loop (cdr ocs^) (cons (car ocs^) prefix))]))))
 
 ;; given a new substitution and constraint store, adds the prefixes of
 ;; each to the existing substitution and constraint store. the
 ;; constraints in c-prefix still need to run
 (define (update-package s^ c^)
   (lambda@ (a [s c q t e])
-    (define s-prefix (prefix-s (substitution-s s) s^))
-    (define c-prefix (prefix-c (constraint-store-c c) c^))
+    (define subst (substitution-s s))
+    (define store (constraint-store-c c))
+    (define s-prefix (prefix-s subst s^))
+    (define c-prefix (prefix-c store c^))
     (define e^ (add-substitution-prefix-event s-prefix))
-    (define new-e (compose-events e e^))
-    (define run-cs
-      (lambda@ (a)
-        (for/fold ([a-inf a]) ([oc c-prefix])
-          (bindm a-inf (oc-proc oc)))))
-    (define add-ss
-      (lambda@ (a)
-        (for/fold ([a-inf a]) ([p s-prefix])
-          (bindm a-inf (update-s (car p) (cdr p))))))
-    (bindm
-     (make-a s c q t new-e)
-     (conj run-cs add-ss send-event))))
+    (bindm a (conj (send-event e^)
+                   (for/fold ([fn succeed]) ([oc c-prefix])
+                     (conj oc fn))))))
 
+(define (identity-update-fn x . rest) x)
+
+;; given a name and a way to update the constraint arguments
+;; default-update-fn, expands to two macros to define constraints of
+;; that type: one "name-constraint" macro that simply returns a
+;; constraint, and one "define-name-constraint" that defines a
+;; function that returns a constraint
+(define-syntax (define-constraint-type stx)
+  (syntax-parse stx
+    [(define-constraint-type name:id default-update-fn:id)
+     (define/with-syntax (definer add-name remove-name)
+       (map (lambda (str) (format-id #'name str (syntax-e #'name)))
+            (list "define-~a" "add-~a-event" "remove-~a-event")))
+     #'(begin
+         (struct name -constraint ())
+         (define-constraint-events 
+          add-name remove-name)
+         (create-define-constraint 
+          definer name default-update-fn add-name remove-name)
+         (void))]))
+
+(struct trigger (subs interp))
+
+(define-for-syntax (parse-responses stx bindings)
+  (syntax-parse stx
+    [((~literal =>) stuff ...)
+     #`(lambda (ans) 
+         (unless (pair? ans)
+           (error 'parse-responses "internal error: ~a\n" ans))
+         ((let #,bindings stuff ...) 
+          (car ans)))]
+    [(stuff ...) 
+     #`(lambda (ans) (let #,bindings stuff ...))]))
+
+(define-syntax (create-define-constraint stx)
+  (syntax-parse stx
+    [(create-define-constraint definer struct-name ufn add rem)
+     (syntax/loc stx
+       (...
+        (define-syntax (definer stx)
+          (syntax-parse stx
+            [(definer 
+               (fn-name (~var args (argument #'ufn)) ...)
+               (~seq (~or rkw:reaction-keyword
+                          (~once pkgkw:package-keyword)
+                          (~once reifykw:reification-keyword))
+                     ...)
+               body:expr ...)
+             (define/with-syntax (a [s c e]) #'pkgkw.package)
+             (define/with-syntax bindings
+               #'([args.arg (args.fn args.arg s c e)] ...))
+             (define/with-syntax (response ...)
+               (map (curryr parse-responses #'bindings)
+                    (syntax->list #'((rkw.response ...) ...))))
+             ;; (pretty-print (syntax->datum #'(response ...)))
+             (define/with-syntax reify-body
+               (match (syntax-e #'reifykw.reified)
+                 [#t #'(default-reify 'fn-name args.arg ...)]
+                 [#f #f]
+                 [_ #'(reifykw.reified ans r)]))
+             (define/with-syntax reifyfn
+               (cond
+                [(syntax-e #'reify-body) 
+                 #'(lambda (args.arg ...)
+                     (lambda (ans r)
+                       (let ([args.arg (args.fn args.arg r)] ...)
+                         reify-body)))]
+                [else #'#f]))
+             (define should-sub-to-associations?
+               (null? (syntax-e #'(rkw.subs ...))))
+             (define/with-syntax reaction-length
+               (length (syntax-e #'(rkw.name ...))))
+             (define/with-syntax (index ...)
+               (range 0 (syntax-e #'reaction-length)))
+             (define/with-syntax reaction
+               ;; Event -> Response
+               ;; A Response is a 
+               ;;   Rands ... -> Package -> [Vector (cons Event ConstraintTransformer)]
+               ;; at this point, we are given an event that we vaguely
+               ;; care about
+               #`(lambda (e) 
+                   (define all-matching-events 
+                     (filter (lambda (e) 
+                               (or (rkw.subs e) ... 
+                                   #,@(cond
+                                       [should-sub-to-associations?
+                                        #'((association-event? e))]
+                                       [else #'()])))
+                             e))
+                   ;; responses is either false or a function that
+                   ;; takes the constraint arguments and then a
+                   ;; package
+                   (lambda (args.arg ...)
+                     (lambda@ (a [subst store q t e])
+                       (define s (substitution-s subst))
+                       (define c (constraint-store-c store))
+                       (define rets
+                         (for/fold 
+                           ([rets (make-vector (add1 reaction-length) (list))])
+                           ([an-e all-matching-events])
+                           (cond
+                            [((bindm a ((trigger-interp rkw.name) rkw.args ...)) an-e)
+                             => 
+                             (lambda (ans)
+                               (define ret (cons an-e (response ans)))
+                               (vector-set! rets index
+                                            (cons ret (vector-ref rets index)))
+                               rets)]
+                            ...
+                            [(and (association-event? an-e)
+                                  (contains-relevant-var?
+                                   an-e
+                                   (filter*/var? (list args.arg ...))))
+                             (define ret
+                               (cons an-e 
+                                     (let ([args.arg (args.fn args.arg s c an-e)] ...)
+                                       (add-constraint (fn-name args.arg ...)) 
+                                       body ...)))
+                             (vector-set! rets reaction-length 
+                                          (cons ret (vector-ref rets reaction-length)))
+                             rets]
+                            [else rets])))
+                       ;; rets
+                       (define rets^
+                         (for/fold ([all '()]) ([ls rets])
+                           (append all ls)))
+                       (and (not (null? rets^)) rets^)))))
+             (define/with-syntax pattern
+               #'(define fn-name
+                   (let ()
+                     (struct fn-name-struct struct-name ()
+                             #:methods gen:custom-write 
+                             [(define (write-proc this port mode)
+                                ((parse-mode mode) 'fn-name port))])
+                     (fn-name-struct
+                      (lambda (args.arg ...)
+                        (lambda@ (a [subst store q t e])
+                          (define s (substitution-s subst))
+                          (define c (constraint-store-c store))
+                          (when debug?
+                            (printf "ENTERING ~a: ~a ~a\n" 'fn-name (list args.arg ...) e))
+                          (define entire-body
+                            (let ([args.arg (args.fn args.arg s c e)] ...)
+                              (add-constraint (fn-name args.arg ...)) 
+                              body ...))
+                          (cond
+                           ;; okay HERE, do an EXHAUSTIVE search + the
+                           ;; empty-event and the an-es that you get
+                           ;; BACK from the reaction should include
+                           ;; all the chains they had to go thru to
+                           ;; exist.  unless it was the empty-event in
+                           ;; which case have a SPECIAL line for that
+                           ;; and attribute it to nothing.
+                           [(cond
+                             [(reaction e)
+                              => (lambda (a-response)
+                                   (when debug?
+                                     (printf "got a response to ~a\n" 
+                                             ((a-response args.arg ...) a)))
+                                   ((a-response args.arg ...) a))])
+                            => (match-lambda
+                                 [(list (cons an-e ct) (... ...))
+                                  (bindm a (sum ct))]
+                                 [else (error 'here "HERERERRR")])]
+                           [(cond
+                             [(reaction (empty-event))
+                              => (lambda (a-response)
+                                   (when debug?
+                                     (printf "got a response to empty-event: ~a\n" 
+                                             ((a-response args.arg ...) a)))
+                                   ((a-response args.arg ...) a))])
+                            => (match-lambda
+                                 [(list (cons an-e ct) (... ...))
+                                  (bindm a (sum ct))]
+                                 [else (error 'here "efdfHERERERRR")])]
+                           [else (bindm a entire-body)])))
+                      reaction
+                      reifyfn
+                      add 
+                      rem))))
+             ;; (pretty-print (syntax->datum #'pattern))
+             #'pattern]))))]))
+
+;; TODO, weird scope of package (should be an error to try to use it
+;; in event-names)
+(define-syntax (define-trigger stx)
+  (syntax-parse stx
+    [(define-trigger (name args ...)
+       (~seq (~or (~once pkgkw:package-keyword))
+             ...)
+       [(event-name:id event-arg ...)
+        (~optional ((~literal =>) abort)
+                   #:defaults ([abort (generate-temporary #'?abort)]))
+        answer answer* ...]
+       ...)
+     (define/with-syntax (a [s c e]) #'pkgkw.package)
+     (define/with-syntax pattern
+       #'(define name
+           (trigger 
+            (lambda (e)
+              (let ([ans (match e
+                           [(struct event-name _) #t]
+                           ...
+                           [_ #f])])
+                ans))
+            (lambda (args ...)
+              (lambda@ (a [subst store q t e]) 
+                (define s (substitution-s subst))
+                (define c (constraint-store-c store))
+                (match-lambda
+                  [(event-name event-arg ...)
+                   (=> abort)
+                   (let ([result (let () answer answer* ...)])
+                     (list result))]
+                  ;; TODO WRONGGGG, TODO: WHY
+                  ...
+                  [_ #f]))))))
+     #'pattern]))
+
+(define-syntax (transformer stx)
+  (syntax-parse stx
+    [(transformer 
+      (~seq (~or (~once pkgkw:package-keyword))
+            ...)
+      body:expr ...)
+     (define/with-syntax (a [s c e]) #'pkgkw.package)
+     #'(lambda@ (a [subst store q t e])
+         (define s (substitution-s subst))
+         (define c (constraint-store-c store))
+         (bindm a (let () body ...)))]))
+
+(define (default-reify sym . args)
+  (define reified-rands
+    (cond
+     [(null? args) args]
+     [(null? (cdr args)) (car args)]
+     [else args]))
+  (values sym reified-rands))
+
+(define-constraint-type constraint walk*)
+
+;; Event -> ConstraintTransformer
+(define/match (solidify-atomic-event e)
+  [((add-association-event u v)) (update-s u v)]
+  [((add-substitution-prefix-event p)) (update-s p)]
+  [((add-constraint-event/internal rator rands))
+   (update-c (oc rator rands))]
+  [((remove-constraint-event/internal rator rands)) 
+   (remove-from-c (oc rator rands))]
+  [((empty-event)) succeed]
+  [(e) (error 'solidify-atomic-event "not impl yet: ~a\n" e)])
 
 

@@ -3,7 +3,6 @@
 (require "helpers.rkt"
          "infs.rkt"
          "errors.rkt"
-         "goals.rkt"
          "variables.rkt"
          "mk-structs.rkt"
          "debugging.rkt"
@@ -17,11 +16,15 @@
 
 (provide (all-defined-out))
 
+;; succeed and fail are the simplest succeeding and failing ct
+(define succeed (lambda@ (a) a))
+(define fail    (lambda@ (a) mzerom))
+
 ;; defines a macro to create new unconstrained variables
 (define-syntax fresh-aux
   (syntax-rules ()
     [(_ constructor (x ...) g g* ...)
-     (let ([x (constructor 'x)] ...)
+     (let ([x (constructor (gensym 'x))] ...)
        (conj g g* ...))]))
 
 ;; miniKanren's "fresh" defined in terms of fresh-aux over vars
@@ -119,10 +122,19 @@
 
 (define prt  
   (lambda@ (a) (begin (printf "~a\n" a) a)))
+
+(require racket/pretty)
+(define pprt
+  (lambda@ (a [s c q t e])
+    (begin (pretty-print a) a)))
+
 (define (prtm . m) 
   (lambda@ (a) (begin (apply printf m) a)))
 
 (define (prtt . m) 
   (lambda@ (a [s c q t e]) 
     (begin (display t) (display " ") (apply printf m) a)))
+
+(define diaf
+  (lambda@ (a) (error 'diaf "dying: ~s" a)))
 

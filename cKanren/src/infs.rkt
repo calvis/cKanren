@@ -1,27 +1,28 @@
-#lang racket/base
+#lang racket
 
 ;; This file provides the minimum core of cKanren functionalities
 
 (require "helpers.rkt")
 
+(require (for-syntax syntax/parse racket/syntax racket/match))
 (provide (except-out (all-defined-out) a))
 
 ;; the stream miniKanren runs on
-;; (struct a-inf ())
+(struct a-inf ())
 
 ;; the simple manifestations of the stream
-;; (struct mzerof a-inf ())
-;; (struct choiceg a-inf (a f))
-;; (struct inc a-inf (e) 
-;;   #:property prop:procedure (struct-field-index e)
-;;   #:methods gen:custom-write 
-;;   [(define (write-proc i port mode) 
-;;      ((parse-mode mode) "#<inc>" port))])
+(struct mzerof a-inf ())
+(struct choiceg a-inf (a f))
+(struct inc a-inf (e) 
+        #:property prop:procedure (struct-field-index e)
+        #:methods gen:custom-write 
+        [(define (write-proc i port mode) 
+           ((parse-mode mode) "#<inc>" port))])
 
-(define mzerof (lambda () #f))
-(define choiceg cons)
+; (define mzerof (lambda () #f))
+; (define choiceg cons)
 
-(struct a #;a-inf (s c q t e)
+(struct a a-inf (s c q t e)
   #:extra-constructor-name make-a
   #:methods gen:custom-write 
   [(define (write-proc . args) (apply write-package args))])
@@ -41,14 +42,14 @@
 ;; delays an expression
 (define-syntax delay
   (syntax-rules ()
-    #;[(_ e) (inc (lambdaf@ () e))]
-    [(_ e) (lambdaf@ () e)]
+    [(_ e) (inc (lambdaf@ () e))]
+    ;; [(_ e) (lambdaf@ () e)]
     ))
 
 (define empty-f (delay (mzerof)))
 
 ;; convenience macro for dispatching on the type of a-inf
-#;
+
 (define-syntax case-inf
   (syntax-rules ()
     ((_ e (() e0) ((f^) e1) ((a^) e2) ((a f) e3))
@@ -60,6 +61,7 @@
         [(choiceg? a-inf) (let ([a (choiceg-a a-inf)] [f (choiceg-f a-inf)]) e3)]
         [else (error 'case-inf "not an a-inf ~s" e)])))))
 
+#;
 (define-syntax case-inf
   (syntax-rules ()
     ((_ e (() e0) ((f^) e1) ((a^) e2) ((a f) e3))

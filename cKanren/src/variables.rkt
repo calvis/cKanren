@@ -10,7 +10,7 @@
 (define-generics cvar (cvar->str cvar))
 
 ;; defines a normal miniKanren var as a cvar that is printed with "_"
-(struct var (x) 
+(struct var (x)
   #:methods gen:cvar 
   [(define (cvar->str x) "_")]
   #:methods gen:custom-write 

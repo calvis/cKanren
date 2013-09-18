@@ -1,6 +1,6 @@
 #lang racket
 
-(require "operators.rkt" "constraints.rkt")
+(require "operators.rkt")
 
 (provide empty-q empty-q? ext-q)
 

@@ -3,127 +3,106 @@
 ;; Based on code provided by Jason Hemann and Dan Friedman
 ;; See: https://github.com/jasonhemann/miniKanren
 
-(require "ck.rkt" "tree-unify.rkt" "neq.rkt" "src/helpers.rkt")
-(require (for-syntax racket/syntax syntax/parse))
+(require "ck.rkt" "src/helpers.rkt" "src/events.rkt" "src/framework.rkt"
+         "src/constraints.rkt" "src/constraint-store.rkt")
+(require (for-syntax racket/syntax syntax/parse "src/framework.rkt"))
 
-;; attributes
-(provide define-attribute)
+(provide (all-defined-out))
 
-;; constraints
-(provide eveno oddo symbolo numbero symbol-constrained? number-constrained?
-         booleano)
+(define-constraint-type attribute-constraint walk*)
 
-(define attributes (make-parameter '()))
-(define (extend-attributes new-attr)
-  (attributes (cons new-attr (attributes))))
+(define attributes-uw? 
+  (make-parameter '()))
+(define extend-attributes-uw? 
+  (extend-parameter attributes-uw?))
+
+;; returns #t if attributes are ok
+(define (check-attributes u v s c e)
+  (let ([uattr (get-attributes u c e)]
+        [vattr (get-attributes v c e)])
+    ;; four possibilities: 
+    ;; 1. u and v both have attributes
+    ;; 2, 3. either u or v does not have attributes
+    ;; 4. neither u nor v has attributes
+
+    ;; (printf "check-attributes: ~a ~a ~a ~a\n" u uattr v vattr)
+    (and (or (not uattr) (no-conflicts? uattr v vattr))
+         (or (not vattr) (no-conflicts? vattr u uattr)))))
+
+(define (get-attributes x c e)
+  (define ocs (filter-something/rator attribute-constraint? c))
+  (define events (filter (match-lambda 
+                           [(add-attribute-constraint-event rator (list y))
+                            (eq? x y)]
+                           [else #f])
+                         e))
+  (append (filter-map (match-lambda [(oc rator (list y)) (and (eq? x y) rator)]) ocs)
+          (map (match-lambda [(constraint-event rator rands) rator]) events)))
+
+;; [List-of Rator] Value [List-of Rator] -> Boolean
+(define (no-conflicts? vattr u uattr)
+  (andmap (lambda (rator) ((attr-oc-uw? rator) u uattr)) vattr))
+
+;; AtributeConstraintRator -> Boolean
+(define (attr-oc-uw? rator)
+  (cdr (assq rator (attributes-uw?))))
 
 (define-syntax (define-attribute stx)
   (syntax-parse stx 
-    [(define-attribute name 
-       (~or (~seq #:satisfied-when pred?:expr)
-            (~seq #:possible-values (pvals ...)))
-       (~or (~optional (~seq #:reify-name reify-name)
-                       #:defaults ([reify-name #'name]))
+    [(define-attribute name
+       (~or (~once (~seq #:satisfied-when pred?:id))
             (~optional (~seq #:incompatible-attributes (inc-attrs ...))
                        #:defaults ([(inc-attrs 1) '()]))
             (~optional (~seq #:causes (cause-attrs ...))
-                       #:defaults ([(cause-attrs 1) '()]))
-            (~optional (~seq #:no-reify no-reify?)))
+                       #:defaults ([(cause-attrs 1) '()])))
        ...)
-     (with-syntax*
-       ([(nameo name-constrained? name-attr? reify-nameos)
-         (map (lambda (str) (format-id #'name str (syntax-e #'name)))
-              (list "~ao" "~a-constrained?" "~a-attr?" "reify-~aos"))]
-        [possible-values (if (attribute pvals) #'(list pvals ...) #f)]
-        [pred? (or (attribute pred?) #'(lambda (x) (memq x possible-values)))])
-       #`(begin
-           (define (nameo u)
-             (define incompatible `(inc-attrs ...))
-             (define (check-inc-attrs u attrs)
-               (and attrs
-                    (ormap (lambda (aoc) 
-                             (memq (attr-oc-type aoc) incompatible))
-                           attrs)))
-             (define (unifies-with? x attrs)
-               (cond
-                [(var? x)
-                 (not (check-inc-attrs x attrs))]
-                [else (pred? x)]))
-             (conj
-              (cause-attrs u) ...
-              (constraint
-               #:package (a : s c)
-               (let ([u (walk u s)])
-                 (cond
-                  [(var? u)
-                   (cond
-                    [(check-inc-attrs u (get-attributes u c)) fail]
-                    [possible-values
-                     (let ([ps (map oc-prefix (filter/rator '=/=neq-c c))])
-                       (let loop ([ps (map cdar (filter (lambda (p) (and (null? (cdr p)) (eq? u (caar p)))) ps))]
-                                  [vals possible-values])
-                         (cond
-                          [(null? vals) fail]
-                          [(and (null? ps) (null? (cdr vals)))
-                           (== u (car vals))]
-                          [(null? ps) (update-c (build-attr-oc nameo u unifies-with?))]
-                          [else (loop (cdr ps) (remq (car ps) vals))])))]
-                    [else (update-c (build-attr-oc nameo u unifies-with?))])]
-                  [(pred? u) succeed]
-                  [else fail])))))
-           (define (name-constrained? v attrs)
-             (findf name-attr? attrs))
-           (define (name-attr? oc)
-             (eq? (attr-oc-type oc) 'nameo))
-           (define reify-nameos
-             (default-reify-attr 'reify-name 'nameo
-               (lambda (x* r) (remove-duplicates x*))))
-           (extend-attributes 'nameo)
-           #,@(if (attribute no-reify?)
-                  #'()
-                  #'((extend-reify-fns 'nameo reify-nameos)))))]))
+     (define/with-syntax (name-fail-incompatible ...)
+       (map (lambda (incompat)
+              (format-id #'name "~a-~a-fail" 
+                         (syntax-e #'name) 
+                         (syntax-e incompat)))
+            (syntax-e #'(inc-attrs ...))))
+     (define/with-syntax name-unique
+       (format-id #'name "~a-unique" (syntax-e #'name)))
+     #'(begin
+         (define-attribute-constraint (name x)
+           #:package (a [s c e])
+           #:reified
+           (define body
+             (cond
+              [(var? x) 
+               (add-constraint (name x))]
+              [(pred? x) succeed]
+              [else fail]))
+           (cond
+            [(empty-event? e)
+             (conj (cause-attrs x) ... body)]
+            [else body]))
+         (define-constraint-interaction
+           name-fail-incompatible
+           [(name ,x) (inc-attrs ,x)] => [fail])
+         ...
+         (define-constraint-interaction
+           name-unique
+           [(name ,x) (name ,x)] => [(name x)])
+         ;; (printf "~a: ~a\n" 'name x)
+
+         ;; Value [List-of Attribute] -> Boolean
+         (define (symbol-unifies-with? x attrs)
+           (define incompatible  (list inc-attrs ...))
+           (define incompatible? (curryr memq incompatible))
+           (cond
+            [(var? x)
+             (or (not attrs) 
+                 (andmap (compose not incompatible?) attrs))]
+            [else (pred? x)]))
+         (extend-attributes-uw? name symbol-unifies-with?))]))
 
 (define-attribute symbol
   #:satisfied-when symbol?
-  #:incompatible-attributes (numbero)
-  #:reify-name sym)
+  #:incompatible-attributes (number))
 
 (define-attribute number
   #:satisfied-when number?
-  #:incompatible-attributes (symbolo)
-  #:reify-name num)
-
-(define-attribute boolean
-  #:possible-values (#t #f)
-  #:incompatible-attributes (symbolo numbero))
-
-(define remove-duplicates
-  (lambda (l)
-    (for/fold ([s '()])
-              ([x l])
-      (if (member x s) s (cons x s)))))
-
-(define (rerun-type-cs x)
-  (constraint
-   #:package (a : s c)
-   (let ([ocs (filter (lambda (oc) (memq (attr-oc-type oc) (attributes)))
-                      (filter/rator attr-tag c))])
-     (run-relevant-constraints (map (compose car oc-rands) ocs) c))))
-
-;; etc
-
-(define-attribute even
-  #:satisfied-when 
-  (lambda (x) (and (integer? x) (even? x)))
-  #:incompatible-attributes (oddo))
-
-(define-attribute odd
-  #:satisfied-when
-  (lambda (x) (and (integer? x) (odd? x)))
-  #:incompatible-attributes (eveno))
-
-;; ckanren stuffs
-
-(extend-enforce-fns attr-tag rerun-type-cs)
-
+  #:incompatible-attributes (symbol))
 

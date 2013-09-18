@@ -23,7 +23,7 @@
 
 (define prefo-c
   (lambda (x l)
-    (lambdam@ (a : s c)
+    (lambda@ (a [s c q t e])
       (let ((x (walk x s)))
         (cond
          ((var? x)
@@ -33,7 +33,7 @@
 
 (define pick-prefs
   (lambda ()
-    (lambdam@ (a : s c)
+    (lambda@ (a [s c q t e])
       (bindm a
         (letrec
             ((loop

@@ -1,4 +1,4 @@
-#lang racket/base
+#lang racket
 
 (require "constraint-store.rkt" "substitution.rkt" "queue.rkt" 
          "debugging.rkt" "infs.rkt" "events.rkt")
@@ -11,7 +11,17 @@
 (provide (all-from-out "substitution.rkt"))
 (provide (all-from-out "queue.rkt"))
 (provide (all-from-out "debugging.rkt"))
-(provide empty-a make-a)
+(provide empty-a)
+
+(provide 
+ (contract-out
+  [make-a
+   (-> (flat-contract substitution?)
+       (flat-contract constraint-store?)
+       any/c
+       any/c
+       (flat-contract event?)
+       (flat-contract a?))]))
 
 ;; == PACKAGE ==================================================================
 

@@ -7,292 +7,290 @@
  "../neq.rkt"
  "../tester.rkt")
 
-(provide test-symbolo-numbero
-         test-symbolo-numbero-long)
+(provide test-symbol-number
+         test-symbol-number-long)
 
-(define (test-symbolo-numbero)
-  (parameterize ([reify-prefix-dot #f]
-                 [reify-with-colon #f])
-  (test-check "symbolo-numbero-1"
-              (run* (q) (symbolo q) (numbero q))
-              '())
+(define (test-symbol-number)
+  (test
+   (run* (q) (symbol q) (number q))
+   '())
 
-  (test-check "symbolo-numbero-2"
-              (run* (q) (numbero q) (symbolo q))
-              '())
+  (test
+   (run* (q) (number q) (symbol q))
+   '())
 
-  (test-check "symbolo-numbero-3"
-              (run* (q)
-                (fresh (x)
-                  (numbero x)
-                  (symbolo x)))
-              '())
+  (test
+   (run* (q)
+     (fresh (x)
+       (number x)
+       (symbol x)))
+   '())
 
-  (test-check "symbolo-numbero-4"
-              (run* (q)
-                (fresh (x)
-                  (symbolo x)
-                  (numbero x)))
-              '())
+  (test
+   (run* (q)
+     (fresh (x)
+       (symbol x)
+       (number x)))
+   '())
 
-  (test-check "symbolo-numbero-5"
-              (run* (q)
-                (numbero q)
-                (fresh (x)
-                  (symbolo x)
-                  (== x q)))
-              '())
+  (test
+   (run* (q)
+     (number q)
+     (fresh (x)
+       (symbol x)
+       (== x q)))
+   '())
 
-  (test-check "symbolo-numbero-6"
-              (run* (q)
-                (symbolo q)
-                (fresh (x)
-                  (numbero x)
-                  (== x q)))
-              '())
+  (test
+   (run* (q)
+     (symbol q)
+     (fresh (x)
+       (number x)
+       (== x q)))
+   '())
 
-  (test-check "symbolo-numbero-7"
-              (run* (q)
-                (fresh (x)
-                  (numbero x)
-                  (== x q))
-                 (symbolo q))
-              '())
+  (test
+   (run* (q)
+     (fresh (x)
+       (number x)
+       (== x q))
+     (symbol q))
+   '())
 
-  (test-check "symbolo-numbero-7"
-              (run* (q)
-                (fresh (x)
-                  (symbolo x)
-                  (== x q))
-                (numbero q))
-              '())
+  (test
+   (run* (q)
+     (fresh (x)
+       (symbol x)
+       (== x q))
+     (number q))
+   '())
 
-  (test-check "symbolo-numbero-8"
-              (run* (q)
-                (fresh (x)
-                  (== x q)
-                  (symbolo x))
-                (numbero q))
-              '())
+  (test
+   (run* (q)
+     (fresh (x)
+       (== x q)
+       (symbol x))
+     (number q))
+   '())
 
-  (test-check "symbolo-numbero-9"
-              (run* (q)
-                (fresh (x)
-                  (== x q)
-                  (numbero x))
-                (symbolo q))
-              '())
+  (test
+   (run* (q)
+     (fresh (x)
+       (== x q)
+       (number x))
+     (symbol q))
+   '())
 
-  (test-check "symbolo-numbero-10"
-              (run* (q)
-                (symbolo q)
-                (fresh (x)
-                  (numbero x)))
-              '((_.0 (sym _.0))))
+  (test
+   (run* (q)
+     (symbol q)
+     (fresh (x)
+       (number x)))
+   '((_.0 : (symbol _.0))))
 
-  (test-check "symbolo-numbero-11"
-              (run* (q)
-                (numbero q)
-                (fresh (x)
-                  (symbolo x)))
-              '((_.0 (num _.0))))
+  (test
+   (run* (q)
+     (number q)
+     (fresh (x)
+       (symbol x)))
+   '((_.0 : (number _.0))))
 
-  (test-check "symbolo-numbero-12"
-              (run* (q)    
-                (fresh (x y)
-                  (symbolo x)
-                  (== `(,x ,y) q)))
-              '(((_.0 _.1) (sym _.0))))
+  (test
+   (run* (q)    
+     (fresh (x y)
+       (symbol x)
+       (== `(,x ,y) q)))
+   '(((_.0 _.1) : (symbol _.0))))
 
-  (test-check "symbolo-numbero-13"
-              (run* (q)    
-                (fresh (x y)
-                  (numbero x)
-                  (== `(,x ,y) q)))
-              '(((_.0 _.1) (num _.0))))
+  (test
+   (run* (q)    
+     (fresh (x y)
+       (number x)
+       (== `(,x ,y) q)))
+   '(((_.0 _.1) : (number _.0))))
 
-  (test-check "symbolo-numbero-14"
-              (run* (q)    
-                (fresh (x y)
-                  (numbero x)
-                  (symbolo y)
-                  (== `(,x ,y) q)))
-              '(((_.0 _.1) (num _.0) (sym _.1))))
+  (test
+   (run* (q)    
+     (fresh (x y)
+       (number x)
+       (symbol y)
+       (== `(,x ,y) q)))
+   '(((_.0 _.1) : (number _.0) (symbol _.1))))
 
-  (test-check "symbolo-numbero-15"
-              (run* (q)    
-                (fresh (x y)
-                  (numbero x)
-                  (== `(,x ,y) q)
-                  (symbolo y)))
-              '(((_.0 _.1) (num _.0) (sym _.1))))
+  (test
+   (run* (q)    
+     (fresh (x y)
+       (number x)
+       (== `(,x ,y) q)
+       (symbol y)))
+   '(((_.0 _.1) : (number _.0) (symbol _.1))))
 
-  (test-check "symbolo-numbero-16"
-              (run* (q)    
-                (fresh (x y)
-                  (== `(,x ,y) q)
-                  (numbero x)
-                  (symbolo y)))
-              '(((_.0 _.1) (num _.0) (sym _.1))))
+  (test
+   (run* (q)    
+     (fresh (x y)
+       (== `(,x ,y) q)
+       (number x)
+       (symbol y)))
+   '(((_.0 _.1) : (number _.0) (symbol _.1))))
 
-  (test-check "symbolo-numbero-17"
-              (run* (q)
-                (fresh (x y)
-                  (== `(,x ,y) q)
-                  (numbero x)
-                  (symbolo y))
-                (fresh (w z)
-                  (== `(,w ,z) q)))
-              '(((_.0 _.1) (num _.0) (sym _.1))))
+  (test
+   (run* (q)
+     (fresh (x y)
+       (== `(,x ,y) q)
+       (number x)
+       (symbol y))
+     (fresh (w z)
+       (== `(,w ,z) q)))
+   '(((_.0 _.1) : (number _.0) (symbol _.1))))
 
-  (test-check "symbolo-numbero-18"
-              (run* (q)
-                (fresh (x y)
-                  (== `(,x ,y) q)
-                  (numbero x)
-                  (symbolo y))
-                (fresh (w z)
-                  (== `(,w ,z) q)
-                  (== w 5)))
-              '(((5 _.0) (sym _.0))))
+  (test
+   (run* (q)
+     (fresh (x y)
+       (== `(,x ,y) q)
+       (number x)
+       (symbol y))
+     (fresh (w z)
+       (== `(,w ,z) q)
+       (== w 5)))
+   '(((5 _.0) : (symbol _.0))))
 
-  (test-check "symbolo-numbero-19"
-              (run* (q)
-                (fresh (x y)
-                  (== `(,x ,y) q)
-                  (numbero x)
-                  (symbolo y))
-                (fresh (w z)
-                  (== 'a z)
-                  (== `(,w ,z) q)))
-              '(((_.0 a) (num _.0))))
+  (test
+   (run* (q)
+     (fresh (x y)
+       (== `(,x ,y) q)
+       (number x)
+       (symbol y))
+     (fresh (w z)
+       (== 'a z)
+       (== `(,w ,z) q)))
+   '(((_.0 a) : (number _.0))))
 
-  (test-check "symbolo-numbero-20"
-              (run* (q)
-                (fresh (x y)
-                  (== `(,x ,y) q)
-                  (numbero x)
-                  (symbolo y))
-                (fresh (w z)
-                  (== `(,w ,z) q)
-                  (== 'a z)))
-              '(((_.0 a) (num _.0))))
+  (test
+   (run* (q)
+     (fresh (x y)
+       (== `(,x ,y) q)
+       (number x)
+       (symbol y))
+     (fresh (w z)
+       (== `(,w ,z) q)
+       (== 'a z)))
+   '(((_.0 a) : (number _.0))))
 
-  (test-check "symbolo-numbero-21"
-              (run* (q)
-                (fresh (x y)
-                  (== `(,x ,y) q)
-                  (=/= `(5 a) q)))
-              '(((_.0 _.1) (=/= ((_.0 5) (_.1 a))))))
+  (test
+   (run* (q)
+     (fresh (x y)
+       (== `(,x ,y) q)
+       (=/= `(5 a) q)))
+   '(((_.0 _.1) : (=/= ((_.0 . 5) (_.1 . a))))))
 
-  (test-check "symbolo-numbero-22"
-              (run* (q)
-                (fresh (x y)
-                  (== `(,x ,y) q)
-                  (=/= `(5 a) q)
-                  (symbolo x)))
-              '(((_.0 _.1) (sym _.0))))
+  (test
+   (run* (q)
+     (fresh (x y)
+       (== `(,x ,y) q)
+       (=/= `(5 a) q)
+       (symbol x)))
+   '(((_.0 _.1) : (symbol _.0))))
 
-  (test-check "symbolo-numbero-23"
-              (run* (q)
-                (fresh (x y)
-                  (== `(,x ,y) q)
-                  (symbolo x)
-                  (=/= `(5 a) q)))
-              '(((_.0 _.1) (sym _.0))))
+  (test
+   (run* (q)
+     (fresh (x y)
+       (== `(,x ,y) q)
+       (symbol x)
+       (=/= `(5 a) q)))
+   '(((_.0 _.1) : (symbol _.0))))
 
-  (test-check "symbolo-numbero-24"
-              (run* (q)
-                (fresh (x y)
-                  (symbolo x)
-                  (== `(,x ,y) q)
-                  (=/= `(5 a) q)))
-              '(((_.0 _.1) (sym _.0))))
+  (test
+   (run* (q)
+     (fresh (x y)
+       (symbol x)
+       (== `(,x ,y) q)
+       (=/= `(5 a) q)))
+   '(((_.0 _.1) : (symbol _.0))))
 
-  (test-check "symbolo-numbero-25"
-              (run* (q)
-                (fresh (x y)
-                  (=/= `(5 a) q)
-                  (symbolo x)
-                  (== `(,x ,y) q)))
-              '(((_.0 _.1) (sym _.0))))
+  (test
+   (run* (q)
+     (fresh (x y)
+       (=/= `(5 a) q)
+       (symbol x)
+       (== `(,x ,y) q)))
+   '(((_.0 _.1) : (symbol _.0))))
 
-  (test-check "symbolo-numbero-26"
-              (run* (q)
-                (fresh (x y)
-                  (=/= `(5 a) q)
-                  (== `(,x ,y) q)
-                  (symbolo x)))
-              '(((_.0 _.1) (sym _.0))))
+  (test
+   (run* (q)
+     (fresh (x y)
+       (=/= `(5 a) q)
+       (== `(,x ,y) q)
+       (symbol x)))
+   '(((_.0 _.1) : (symbol _.0))))
 
-  (test-check "symbolo-numbero-27"
-              (run* (q)
-                (fresh (x y)
-                  (== `(,x ,y) q)
-                  (=/= `(5 a) q)
-                  (numbero y)))
-              '(((_.0 _.1) (num _.1))))
+  (test
+   (run* (q)
+     (fresh (x y)
+       (== `(,x ,y) q)
+       (=/= `(5 a) q)
+       (number y)))
+   '(((_.0 _.1) : (number _.1))))
 
-  (test-check "symbolo-numbero-28"
-              (run* (q)
-                (fresh (x y)
-                  (== `(,x ,y) q)
-                  (numbero y)
-                  (=/= `(5 a) q)))
-              '(((_.0 _.1) (num _.1))))
+  (test
+   (run* (q)
+     (fresh (x y)
+       (== `(,x ,y) q)
+       (number y)
+       (=/= `(5 a) q)))
+   '(((_.0 _.1) : (number _.1))))
 
-  (test-check "symbolo-numbero-29"
-              (run* (q)
-                (fresh (x y)
-                  (numbero y)
-                  (== `(,x ,y) q)
-                  (=/= `(5 a) q)))
-              '(((_.0 _.1) (num _.1))))
+  (test
+   (run* (q)
+     (fresh (x y)
+       (number y)
+       (== `(,x ,y) q)
+       (=/= `(5 a) q)))
+   '(((_.0 _.1) : (number _.1))))
 
-  (test-check "symbolo-numbero-30"
-              (run* (q)
-                (fresh (x y)
-                  (=/= `(5 a) q)
-                  (numbero y)
-                  (== `(,x ,y) q)))
-              '(((_.0 _.1) (num _.1))))
+  (test
+   (run* (q)
+     (fresh (x y)
+       (=/= `(5 a) q)
+       (number y)
+       (== `(,x ,y) q)))
+   '(((_.0 _.1) : (number _.1))))
 
-  (test-check "symbolo-numbero-31"
-              (run* (q)
-                (fresh (x y)
-                  (=/= `(5 a) q)
-                  (== `(,x ,y) q)
-                  (numbero y)))
-              '(((_.0 _.1) (num _.1))))
+  (test
+   (run* (q)
+     (fresh (x y)
+       (=/= `(5 a) q)
+       (== `(,x ,y) q)
+       (number y)))
+   '(((_.0 _.1) : (number _.1))))
 
-  (test-check "symbolo-numbero-32"
-              (run* (q)
-                (fresh (x y)
-                  (=/= `(,x ,y) q)
-                  (numbero x)
-                  (symbolo y)))
-              '(_.0))
+  (test
+   (run* (q)
+     (fresh (x y)
+       (=/= `(,x ,y) q)
+       (number x)
+       (symbol y)))
+   '(_.0))
 
-  (test-check "symbolo-numbero-33"
-              (run* (q)
-                (fresh (x y)
-                  (numbero x)
-                  (=/= `(,x ,y) q)
-                  (symbolo y)))
-              '(_.0))
+  (test
+   (run* (q)
+     (fresh (x y)
+       (number x)
+       (=/= `(,x ,y) q)
+       (symbol y)))
+   '(_.0))
 
-  (test-check "symbolo-numbero-34"
-              (run* (q)
-                (fresh (x y)
-                  (numbero x)
-                  (symbolo y)
-                  (=/= `(,x ,y) q)))
-              '(_.0))
-))
+  (test
+   (run* (q)
+     (fresh (x y)
+       (number x)
+       (symbol y)
+       (=/= `(,x ,y) q)))
+   '(_.0))
+  )
 
-(define (test-symbolo-numbero-long)
-  (test-symbolo-numbero))
+(define (test-symbol-number-long)
+  (test-symbol-number))
 
 (module+ main
-  (test-symbolo-numbero-long))
+  (test-symbol-number-long))
 
