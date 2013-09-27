@@ -9,61 +9,32 @@
 (define (templateo t x)
   (goal-construct (init-template t x)))
 
-(define empty-env '())
-
-(define (extend-env x v env) 
-  (unless (var? v) 
-    (error "extend-env: first argument is not a variable" x))
-  (cons `(,x . ,v) env))
-
-(define (lookup-env x env)
-  (cond
-   [(assq x env) => cdr]
-   [else #f]))
-
-(define (make-var x env)
-  (cond
-   [(not (var? x))
-    (values (var 'new-pair) env)]
-   [(lookup-env x env)
-    => (lambda (x^) (values x^ env))]
-   [else 
-    (define x^ (var 'new-var))
-    (values x^ (extend-env x x^ env))]))
-
 (define (init-template t x)
   (let ([new-env-var (var 'env)])
-    (composem
-     (template-env new-env-var empty-env)
-     (template t x new-env-var))))
+    (template t x new-env-var)))
 
 ;; if t is an mk-struct, copies that structure onto x.  if t is ground
 ;; or if there is already a (template x t) constraint, this constraint
 ;; turns into ==. otherwise, placed back in the store.
 (define (template t x env-var)
   (lambdam@ (a : s c)
-    (update-args 
-     #:with-args (s)
-     ([t walk*]
-      [x walk])
-     (cond
-      [(eq? t x) a]
-      [(occurs-check x t s) #f]
-      [(pair? t)
-       (define env (get-env env-var s c))
-       (define-values (first env^) 
-         (make-var (car t) env))
-       (define-values (rest env^^)
-         (make-var (cdr t) env^))
-       (bindm a
-         (composem
-          (update-env env-var env^^)
-          (==-c x `(,first . ,rest))
-          (template (car t) first env-var)
-          (template (cdr t) rest env-var)))]
-      [(not (var? t))
-       (bindm a (==-c t x))]
-      [else (bindm a (update-c (build-oc template t x env-var)))]))))
+    (let ([t (walk* t s)]
+          [x (walk x s)])
+      (cond
+       [(eq? t x) 
+        (bindm a (update-c (build-oc template t x env-var)))]
+       [(occurs-check x t s) #f]
+       [(pair? t)
+        (let ([first (var 'first)]
+              [rest  (var 'rest)])
+          (bindm a
+            (composem
+             (==-c x `(,first . ,rest))
+             (template (car t) first env-var)
+             (template (cdr t) rest env-var))))]
+       [(not (var? t))
+        (bindm a (==-c t x))]
+       [else (bindm a (update-c (build-oc template t x env-var)))]))))
 
 (define (get-env env-var s c)
   (let ([envs (filter/rator 'template-env c)])
@@ -76,42 +47,16 @@
         (error 'get-env "expected oc, got something else ~s" (list env-var c envs oc)))
       (walk* (cadr (oc-rands oc)) s))))
 
-(define (update-env env-var env^)
-  (lambdam@ (a : s c)
-    (unless (var? env-var)
-      (error 'update-env "env-var is not a var ~s" env-var))
-    ((update-c (build-oc update-env env-var env^)) a)))
-
-(define (unify-duplicates env)
-  (cond
-   [(null? env) identitym]
-   [(assq (caar env) (cdr env))
-    => (lambda (p) 
-         (composem 
-          (==-c (cdr p) (cdar env))
-          (unify-duplicates (cdr env))))]
-   [else (unify-duplicates (cdr env))]))
-
-(define (template-env env-var env)
-  (lambdam@ (a : s c)
-    (update-args 
-     #:with-args (s) ([env walk*])
-     (unless (var? env-var)
-       (error 'template-env "env-var is not a var ~s" env-var))
-     ((composem
-       (update-c (build-oc template-env env-var env))
-       (unify-duplicates env))
-      a))))
-
-(define-constraint-interaction
-  update-env-trigger
-  [(update-env ,env-var ,env^) (template-env ,env-var ,env)]
-  [#t ((template-env env-var env^))])
-
 (define-constraint-interaction
   template-to-unify
   [(template ,t ,x ,env1) (template ,x ,t ,env2)]
   [#t ((==-c t x))])
+
+(define-constraint-interaction
+  same-template
+  [(template ,x ,y ,env-var) (template ,x ,z ,env-var)]
+  [#t ((==-c y z)
+       (template x y env-var))])
 
 (define (specific-templateo t x)
   (conj (specifico t) (templateo t x)))
@@ -197,6 +142,7 @@
             (templateo q 5)
             (== `(,x ,y) q)))
         '())
+
   (test "5"
         (run* (q)
           (fresh (x y)
@@ -204,6 +150,7 @@
             (templateo q `(3 4 5 6 7))
             (== q `(,x . ,y))))
         '((_.0 . _.1)))
+
   (test "6"
         (run* (q)
           (fresh (x y)
@@ -232,8 +179,10 @@
   (test "9" (run* (q) (templateo `(,q) q)) '())
 
   (test "10"
-        (run* (q) (fresh (x y) (templateo `(,x ,x) y) (== q `(,x ,y))))
-        '((_.0 (_.1 _.1))))
+        (run* (q)
+          (fresh (x) 
+            (templateo `(,x ,x) q)))
+        '((_.0 _.0)))
 
   (test "11"
         (run* (q) (fresh (x y) (templateo `((,x) (,x)) y) (== q `(,x ,y))))
@@ -268,7 +217,7 @@
   
   (test "16.1"
         (run* (q)
-          (fresh (x g g^ t t^)
+          (fresh (g g^ t t^)
             (== `(,t) g^)
             (templateo `((,t) ,t) `(,g^ ,t^))
             (== `(,t ,t^) q)))
@@ -276,7 +225,7 @@
 
   (test "16.2"
         (run* (q)
-          (fresh (x g g^ t t^)
+          (fresh (g g^ t t^)
             (templateo `(,g ,t) `(,g^ ,t^))
             (== `(,t) g)
             (== g g^)
@@ -285,7 +234,7 @@
 
   (test "16.3"
         (run* (q)
-          (fresh (x g t t^)
+          (fresh (g t t^)
             (== `(,t) g)
             (templateo `(,g ,t) `(,g ,t^))
             (== `(,t ,t^) q)))
@@ -293,13 +242,31 @@
 
   (test "16.4"
         (run* (q)
-          (fresh (x g g^ t t^ t1 t2)
+          (fresh (g g^ t t^ t1 t2)
             (== g g^)
             (== `(-> ,t1 ,t2) t)
-            (== `((x ,t1)) g)
+            (== `((,t1)) g)
             (== `(,t ,t^) q)
             (templateo `(,g ,t) `(,g^ ,t^))))
         '(((-> _.0 _.1) (-> _.0 _.2))))
+
+  (test "16.5"
+    (run* (q)
+      (fresh (s t t^)
+        (templateo `(,s ,t) `(,s ,t^))
+        (== `(,t) s)
+        (== `(,t ,t^) q)))
+    '((_.0 _.0)))
+
+  (test "16.6"
+    (run* (q)
+      (fresh (x g g^ t t^ t1 t2)
+        (templateo `(,g ,t) `(,g^ ,t^))
+        (== g g^)
+        (== `(-> ,t1 ,t2) t)
+        (== `((x ,t1)) g)
+        (== `(,x ,t ,t1 ,t2 ,t^ ,g ,g^) q)))
+    '((_.0 (-> _.1 _.2) _.1 _.2 (-> _.1 _.3) ((x _.1)) ((x _.1))))) 
 
 )
 

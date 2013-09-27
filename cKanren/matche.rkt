@@ -1,55 +1,67 @@
 #lang racket
 
-;; Example:
-;; (print-gensym #f)
-;; (pretty-print (expand '(matche '(1 2 3) ((,a ,b ,c) 1) ((,x d ,y) 2) (5) (,w) ((a b c)))))
-;; (print-gensym #t)
+(require "ck.rkt" "tree-unify.rkt")
+(require (for-syntax racket racket/syntax syntax/parse))
+;; (provide matche defmatche)
+(provide (all-defined-out))
 
-(require "ck.rkt")
-(provide matche)
+(define-syntax (defmatche stx)
+  (syntax-parse stx
+    [(defmatche (name:id args:id ...) clause ...)
+     #'(define (name args ...)
+         (matche (args ...) clause ...))]))
 
 (define-syntax lambdae
   (syntax-rules ()
     ((_ (x ...) c c* ...)
-     (lambda (x ...) (matche (list x ...) (c c* ...))))))
+     (lambda (x ...) (matche (x ...) c c* ...)))))
 
-(define-syntax fresh* ;;; easy way to deal with duplicate vars (as if fresh used let*)
-  (syntax-rules ()
-    ((_ () g ...) (conj g ...))  ;;; just in case there were no vars in pattern.
-    ((_ (x) g ...) (fresh (x) g ...)) ;;; exactly one var
-    ((_ (y x z ...) g ...) (fresh (y) (fresh* (x z ...) g ...))))) ;;; more than one.
+(define-syntax (matche stx)
+  (syntax-parse stx
+    [(matche (v:id ...) (pat g ...) ...)
+     (define args (syntax-e #'(v ...)))
+     (define depth 1)
+     (with-syntax*
+      ([((pat (x ...) (c ...)) ...) 
+        (map (lambda (pat) (wpat pat args depth))
+             (syntax-e #'(pat ...)))]
+       [((x ...) ...) (map (lambda (ls) 
+                             (remove-duplicates (syntax-e ls) free-identifier=?))
+                           (syntax-e #'((x ...) ...)))])
+      #'(let ([ls (list v ...)])
+          (conde [(fresh (x ...) (== `pat ls) c ... g ...)] ...)))]))
 
-(define-syntax matche
-  (syntax-rules ()
-    
-    ((_ (f x ...) g* . cs)
-     (let ((v (f x ...))) ;;; evaluate first argument once.
-       (matche v g* . cs))) 
-    
-    ((_ v (pat g ...) ...) ;;; pass to driver list of uns and (empty) list of dones.
-     (mpat0 ((pat (fresh* () (== `pat v) g ...)) ...) ()))))
+(define-for-syntax (guard-pattern-var-is-arg x args depth)
+  (when (and (or (not depth) (not (zero? depth)))
+             (ormap ((curry free-identifier=?) x) args))
+    (error 'matche "argument ~s appears more than once at different depths" 
+           (syntax-e x))))
 
-(define-syntax mpat0  ;;; body is alwasys (fresh* (x ...) g ...)
-  (syntax-rules ()
-    
-    ((_ () (done ...)) (conde done ...))  ;;; all done (no more undone)
-    
-    ((_ ((pat body) un* ...) done*) (mpat pat () body (un* ...) done*)))) ;;; do one un.
+(define-for-syntax (wpat pat args depth)
+  (syntax-case pat (unquote _ ?)
+    [(unquote _)
+     (guard-pattern-var-is-arg #'x args depth)
+     (with-syntax ([_new (generate-temporary #'?_)])
+       #'((unquote _new) (_new) ()))]
+    [(unquote (? c x))
+     (guard-pattern-var-is-arg #'x args depth)
+     #'((unquote x) (x) ((c x)))]
+    [(unquote x)
+     (guard-pattern-var-is-arg #'x args depth)
+     #'((unquote x) (x) ())]
+    [(a ...)
+     (let ([depth (and depth (> depth 0) (sub1 depth))])
+       (with-syntax
+         ([((pat (x ...) (c ...)) ...)
+           (map (lambda (a) (wpat a args depth)) (syntax-e #'(a ...)))])
+         #'((pat ...) (x ... ...) (c ... ...))))]
+    [(a . d)
+     (let ([depth #f])
+       (with-syntax
+         ([((pat1 (x1 ...) (c1 ...)) (pat2 (x2 ...) (c2 ...)))
+           (map (lambda (a) (wpat a args depth)) (syntax-e #'(a d)))])
+         #'((pat1 . pat2) (x1 ... x2 ...) (c1 ... c2 ...))))]
+    [x #'(x () ())]))
 
-(define-syntax mpat ;;; virtually the same reasoning as earlier versions.
-  (syntax-rules (unquote fresh*)
-    
-    ((_ (unquote x) () (fresh* (y ...) g ...) un* (done ...))
-     (mpat0 un* (done ... ((fresh* (y ... x) g ...))))) ;;; empty stack. add var; one un done.
-    ;;; turn g to clause.
-    
-    ((_ (unquote x) (top stack ...) (fresh* (y ...) g ...) un* done*) 
-     (mpat top (stack ...) (fresh* (y ... x) g ...) un* done*)) ;;; pop; add var
-    
-    ((_ (a . d) (top ...) body un* done*) (mpat a (d top ...) body un* done*)) ;;; push d
-    
-    ((_ ignore () body un* (done ...)) (mpat0 un* (done ... (body)))) ;;; empty stack
-    ;;; turn g to clause.
-    
-    ((_ ignore (top stack ...) body un* done*) (mpat top (stack ...) body un* done*)))) ; pop
+
 
