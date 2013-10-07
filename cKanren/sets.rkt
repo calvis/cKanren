@@ -566,7 +566,7 @@
     (let ([U (normalize (walk* U s))]
           [V (normalize (walk* V s))]
           [W (normalize (walk* W s))])
-      (printf "lazy-union-set: ~s ~s ~s\n" U V W)
+      ;; (printf "lazy-union-set: ~s ~s ~s\n" U V W)
       (cond
        [(empty-set? W)
         (bindm a (composem (==-c U W) (==-c V W)))]
@@ -725,6 +725,9 @@
           [W (normalize (walk* (caddr (oc-rands oc)) s))])
       ((fresh (t N N1 N2)
          (== t (car (set-left W)))
+         (proper-seto N)
+         (proper-seto N1)
+         (proper-seto N2)
          (== N (set (cdr (set-left W)) (set-right W)))
          (!ino t N)
          (!ino t N1)
@@ -769,6 +772,7 @@
   (lambdam@ (a : s c)
     (let ([U (normalize (walk* U s))]
           [V (normalize (walk* V s))])
+      ;; (printf "disj-c: ~a ~a\n" U V)
       (cond
        [(same-set? U V)
         (bindm a
@@ -793,13 +797,16 @@
               [U^ (set (cdr (set-left U)) (set-right U))])
           (bindm a
             (composem
+             (!in-c t V)
              (!in-c t U^)
              (disj-c U^ V))))]
        [(set? V)
+        ;; (printf "here\n")
         (let ([t (car (set-left V))]
               [V^ (set (cdr (set-left V)) (set-right V))])
           (bindm a
             (composem
+             (!in-c t U)
              (!in-c t V^)
              (disj-c U V^))))]
        [else ((update-c-nocheck (build-oc disj-c U V)) a)]))))
@@ -808,23 +815,53 @@
   (lambdag@ (a : s c)
     (let ([U (normalize (walk* (car (oc-rands oc)) s))]
           [V (normalize (walk* (cadr (oc-rands oc)) s))])
-      (printf "enforce-disj: ~s ~s\n" U V)
-      (cond
-       [(and (set-var? U)
-             (set-var? V))
-        ((conde
-          [(== U V)
-           (== U (empty-set))
-           (== V (empty-set))]
-          [(fresh (u v U^ V^)
-             (== U (set `(,u) U^))
-             (== V (set `(,v) V^))
-             (=/= u v)
-             (!ino u V^)
-             (!ino v U^)
-             (disjo U^ V^))])
-         a)]
-       [else (goal-construct (oc-proc oc))]))))
+      ;; (printf "enforce-disj: ~s ~s\n" U V)
+      (bindm a
+             (cond
+              [(and (set-var? U)
+                    (set-var? V))
+               (conde
+                [(== U V)
+                 (== U (empty-set))
+                 (== V (empty-set))]
+                [(fresh (u v U^ V^)
+                   (== U (set `(,u) U^))
+                   (== V (set `(,v) V^))
+                   (=/= u v)
+                   (!ino u V^)
+                   (!ino u U^)
+                   (!ino v V^)
+                   (!ino v U^)
+                   (disjo U^ V^))])]
+              [(and (set? U) (set? V))
+               (let ([t1 (car (set-left U))]
+                     [s1 (set (cdr (set-left U)) (set-right U))]
+                     [t2 (car (set-left V))]
+                     [s2 (set (cdr (set-left V)) (set-right V))])
+                 (fresh ()
+                   (goal-construct (neq-? t1 t2))
+                   (!ino t1 s2)
+                   (!ino t2 s1)
+                   (disjo s1 s2)))]
+              [(empty-set? U)
+               succeed]
+              [(empty-set? V)
+               succeed]
+              [(set? U)
+               (let ([t (car (set-left U))]
+                     [U^ (set (cdr (set-left U)) (set-right U))])
+                 (fresh ()
+                   (!ino t V)
+                   (!ino t U^)
+                   (disjo U^ V)))]
+              [(set? V)
+               (let ([t (car (set-left V))]
+                     [V^ (set (cdr (set-left V)) (set-right V))])
+                 (fresh ()
+                  (!ino t U)
+                  (!ino t V^)
+                  (disjo U V^)))]
+              [else (goal-construct (oc-proc oc))])))))
 
 (define (!uniono u v w)
   (goal-construct
