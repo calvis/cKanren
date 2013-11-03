@@ -10,10 +10,8 @@
  "tests/mk-struct.rkt"
  "tests/mk.rkt"
  "tests/neq.rkt"
- "tests/nevertrue.rkt"
  "tests/numbero.rkt"
  "tests/no-closure.rkt"
- "tests/pref.rkt"
  "tests/quines.rkt"
  "tests/sets.rkt"
  "tests/symbolo-numbero.rkt"
@@ -30,14 +28,12 @@
   (test-interp)
   (test-mk-struct)
   (test-neq)
-  (test-nevertrue)
-  (test-numbero)
+  (test-number)
   (test-no-closure)
-  (test-pref)
   (test-quines)
   (test-sets)
-  (test-symbolo)
-  (test-symbolo-numbero)
+  (test-symbol)
+  (test-symbol-number)
   (test-comp)
 )
 
@@ -51,13 +47,11 @@
   (test-interp-long)
   (test-mk-struct-long)
   (test-neq-long)
-  (test-nevertrue-long)
-  (test-numbero-long)
+  (test-number-long)
   (test-no-closure-long)
-  (test-pref-long)
   (test-sets-long)
-  (test-symbolo-long)
-  (test-symbolo-numbero-long)
+  (test-symbol-long)
+  (test-symbol-number-long)
   (test-comp-long)
 
   (test-quines-long)

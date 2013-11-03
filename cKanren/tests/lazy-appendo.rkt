@@ -9,14 +9,16 @@
  (for-syntax "../ck.rkt"))
 
 ;; (search-strategy 'bfs)
-(begin-for-syntax
- (search-strategy 'dfs))
+;; (begin-for-syntax
+ ;; (search-strategy 'dfs)
+;;)
 
-(define-lazy-goal (syms* t out)
+(define ;;-lazy-goal 
+  (syms* t out)
   (conde
    [(== t '())
     (== out '())]
-   [(symbolo t)
+   [(symbol t)
     (== out `(,t))]
    [(fresh (a d a^ d^)
       (appendo a^ d^ out)
@@ -24,7 +26,8 @@
       (syms* d d^)
       (== t `(,a . ,d)))]))
   
-(define-lazy-goal (appendo ls1 ls2 out)
+(define ;;-lazy-goal 
+  (appendo ls1 ls2 out)
   (conde
    [(== ls1 '()) 
     (== ls2 out)]

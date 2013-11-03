@@ -165,11 +165,9 @@
         (== `(,t ,t^) q)))
     '((_.0 _.0)))
 
-  (test-highlight
+  (test
     (run* (x y m n g)
       (templateo `(,g (,x ,y)) `((a ,x) (,m ,n)))
-      (prtm "=====\n")
-      prt
       (== `(a ,x) g)) ;; first thing in z should be x
     ;; x   y    x   ?       x
     '((_.0 _.1 _.0 _.2 (a _.0))))

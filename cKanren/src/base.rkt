@@ -4,7 +4,7 @@
 
 ;; constraints
 (require "constraints.rkt") 
-(provide succeed fail transformer?)
+(provide succeed fail transformer? #%app-safe)
 
 ;; debugging
 (require "debugging.rkt") 

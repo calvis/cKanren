@@ -12,19 +12,19 @@
     (conj (domfd x0 n*) (domfd x n*) ...)))
 
 (define (domfd x n*)
-  (constraint
-   #:package (a [s c e])
-   (dom x (make-dom n*))))
+  (dom x (make-dom n*)))
 
 (define-constraint (dom v [d #:constant])
-  #:extend-subscriptions
-  (curry findf enforce-event?)
+  #:reaction
+  [(enforce (list v))
+   (force-ans v d)]
   #:package (a [s c e])
-  (printf "dom: ~a ~a\n" v d)
+  ;; (printf "dom: ~a ~a\n" v d)
   (cond
    [(and (value-dom? v)
          (memv-dom? v d))
     succeed]
+   #;
    [(findf enforce-event? e)
     => (match-lambda
          [(enforce-event enforce-vars)
@@ -45,12 +45,14 @@
   [(dom x (intersection-dom d d^))])
 
 (define (force-ans ocs)
+  succeed
+  #;
   (for/fold ([ct succeed]) ([an-oc ocs])
     (match-define (list v d) (oc-rands an-oc))
     (conj ((map-sum (curry update-s v)) d) ct)))
 
 (define (enforce-domfd enforce-vars)
-  (constraint
+  (transformer
    #:package (a [s c e])
    (define doms (filter/rator dom c))
    (define (relevant? oc)

@@ -69,7 +69,7 @@
        ((zero?-primo exp env val))
        ((*-primo exp env val))
        ((if-primo exp env val))
-       ((symbolo exp) (lookupo exp env val))
+       ((symbol exp) (lookupo exp env val))
        ((fresh (rator rand x body env^ a)
           (== `(,rator ,rand) exp)
           (eval-expo rator env `(closure ,x ,body ,env^))
@@ -77,7 +77,7 @@
           (eval-expo body `((,x . ,a) . ,env^) val)))
        ((fresh (x body)
           (== `(lambda (,x) ,body) exp)
-          (symbolo x)
+          (symbol x)
           (== `(closure ,x ,body ,env) val)
           (not-in-envo 'lambda env))))))
 
@@ -100,14 +100,11 @@
 
 
 (define (test-mk)
-  (parameterize ([reify-prefix-dot #f]
-                 [reify-with-colon #f])
+  (test-check "0"
+              (run* (q) succeed)
+              '(_.0))
 
-    (test-check "0"
-                (run* (q) succeed)
-                '(_.0))
-
-    (test-check "1"
+  (test-check "1"
               (run 1 (q) (== 5 q))
               '(5))
 
@@ -292,7 +289,7 @@
                  '()
                  `(intval ,(build-num 120))))
               `(f))
-))
+  )
 
 (define (test-mk-long)
   (test-mk))

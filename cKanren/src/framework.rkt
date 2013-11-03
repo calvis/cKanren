@@ -11,7 +11,7 @@
 (provide (except-out (all-defined-out) debug?))
 (provide (for-syntax (all-defined-out)))
 
-(define debug? #t)
+(define debug? #f)
 
 (define (sum lsct)
   (for/fold ([out succeed]) ([ct lsct])

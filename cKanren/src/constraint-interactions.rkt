@@ -56,7 +56,7 @@
      (define/with-syntax (sat-constraints ...)
        #'((conj
            rem-ocs
-           (prtm "============TRIGGERED=============\n")
+           ;; (prtm "============TRIGGERED=============\n")
            ;; pprt
            constraints
            ...

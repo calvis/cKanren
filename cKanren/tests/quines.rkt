@@ -11,12 +11,12 @@
 
 (provide test-quines test-quines-long)
 
-(begin-for-syntax
- (define strat 'dfs)
- (search-strategy strat))
+;; (begin-for-syntax
+;;  (define strat 'dfs)
+;;  (search-strategy strat))
 
-(define-lazy-goal (eval-expo exp env val)
-;; (define (eval-expo exp env val)
+;; (define-lazy-goal (eval-expo exp env val)
+(define (eval-expo exp env val)
   (conde
    ((fresh (v)
       (== `(quote ,v) exp)
@@ -28,7 +28,7 @@
       (not-in-envo 'list env)
       (absento 'closure a*)
       (proper-listo a* env val)))
-   ((symbolo exp) (lookupo exp env val))
+   ((symbol exp) (lookupo exp env val))
    ((fresh (rator rand x body env^ a)
       (== `(,rator ,rand) exp)
       (eval-expo rator env `(closure ,x ,body ,env^))
@@ -36,7 +36,7 @@
       (eval-expo body `((,x . ,a) . ,env^) val)))
    ((fresh (x body)
       (== `(lambda (,x) ,body) exp)
-      (symbolo x)
+      (symbol x)
       (not-in-envo 'lambda env)
       (== `(closure ,x ,body ,env) val)))))
 
@@ -49,8 +49,8 @@
          (not-in-envo x rest)))
       ((== '() env)))))
 
-(define-lazy-goal proper-listo
-;; (define proper-listo
+;; (define-lazy-goal proper-listo
+(define proper-listo
   (lambda (exp env val)
     (conde
      ((== '() exp)
@@ -70,60 +70,55 @@
         ((=/= y x) (lookupo x rest t))))))
 
 (define (test-quines)
-  (parameterize ([reify-with-colon #f]
-                 [reify-prefix-dot #f])
-    
-    (test "1 quine"
-          (time (run 1 (q) (eval-expo q '() q)))
-          '((((lambda (_.0) (list _.0 (list 'quote _.0)))
-              '(lambda (_.0) (list _.0 (list 'quote _.0))))
-             (=/= ((_.0 closure)) ((_.0 list)) ((_.0 quote)))
-             (sym _.0))))
-    
-    (test "2 quines"
-          (time (length (run 2 (q) (eval-expo q '() q))))
-          2)
+  (test "1 quine"
+        (time (run 1 (q) (eval-expo q '() q)))
+        '((((lambda (_.0) (list _.0 (list 'quote _.0)))
+            '(lambda (_.0) (list _.0 (list 'quote _.0))))
+           (=/= ((_.0 closure)) ((_.0 list)) ((_.0 quote)))
+           (sym _.0))))
+  
+  (test "2 quines"
+        (time (length (run 2 (q) (eval-expo q '() q))))
+        2)
 
-    (test "3 quines"
-          (time (length (run 3 (q) (eval-expo q '() q))))
-          3)))
+  (test "3 quines"
+        (time (length (run 3 (q) (eval-expo q '() q))))
+        3))
 
 (define (test-quines-long)
   (test-quines)
 
-  (parameterize ([reify-with-colon #f]
-                 [reify-prefix-dot #f])
-    (test-check "5 quines"
-                (time (length (run 5 (q) (eval-expo q '() q))))
-                5)
+  (test-check "5 quines"
+              (time (length (run 5 (q) (eval-expo q '() q))))
+              5)
 
-    (test-check "10 quines"
-                (time (length (run 10 (q) (eval-expo q '() q))))
-                10)
+  (test-check "10 quines"
+              (time (length (run 10 (q) (eval-expo q '() q))))
+              10)
 
-    (test-check "40 quines"
-                (time (length (run 40 (q) (eval-expo q '() q))))
-                40)
+  (test-check "40 quines"
+              (time (length (run 40 (q) (eval-expo q '() q))))
+              40)
 
-    (test-check "2 twines"
-                (time (length (run 2 (x) (fresh (p q)
-                                           (=/= p q)
-                                           (eval-expo p '() q)
-                                           (eval-expo q '() p)
-                                           (== `(,p ,q) x)))))
-                2)
+  (test-check "2 twines"
+              (time (length (run 2 (x) (fresh (p q)
+                                         (=/= p q)
+                                         (eval-expo p '() q)
+                                         (eval-expo q '() p)
+                                         (== `(,p ,q) x)))))
+              2)
 
-    (test-check "4 thrines"
-                (time (length (run 4 (x)
-                                (fresh (p q r)
-                                  (=/= p q)
-                                  (=/= q r)
-                                  (=/= r p)
-                                  (eval-expo p '() q)
-                                  (eval-expo q '() r)
-                                  (eval-expo r '() p)
-                                  (== `(,p ,q ,r) x)))))
-                4)))
+  (test-check "4 thrines"
+              (time (length (run 4 (x)
+                              (fresh (p q r)
+                                (=/= p q)
+                                (=/= q r)
+                                (=/= r p)
+                                (eval-expo p '() q)
+                                (eval-expo q '() r)
+                                (eval-expo r '() p)
+                                (== `(,p ,q ,r) x)))))
+              4))
 
 (module+ main
   (test-quines-long))

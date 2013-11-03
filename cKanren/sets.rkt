@@ -123,9 +123,9 @@
 
 ;; unifis a set u and a term v
 (define (unify-set u v e s c)
-  (unify e s (ext-c (build-oc safe-unify-set identity identity u v) c)))
+  (unify e s (ext-c (safe-unify-set u v) c)))
 
-(define (safe-unify-set u v)
+(define-constraint (safe-unify-set u v)
   (conj
    (seto u)
    (seto v)
@@ -159,42 +159,36 @@
    [else fail]))
 
 (define-set-constraint (lazy-unify-same X T)
-  #:extend-subscriptions 
-  (curry findf enforce-event?)
+  #:reaction
+  [(enforce (list X T))
+   (enforce-lazy-unify-same X T)]
   #:package (a [s c e])
   (cond
-   [(findf enforce-event? e)
-    (enforce-lazy-unify-same X T)]
-   [else
-    (cond
-     [(null? (set-left X))
-      (unify-walked (set-right X) T)]
-     [(and (set? T) (null? (set-left T)))
-      (unify-walked (set-right T) X)]
-     [else (add-constraint (lazy-unify-same X T))])]))
+   [(null? (set-left X))
+    (unify-walked (set-right X) T)]
+   [(and (set? T) (null? (set-left T)))
+    (unify-walked (set-right T) X)]
+   [else (add-constraint (lazy-unify-same X T))]))
 
 (define-set-constraint (lazy-unify-diff X T)
-  #:extend-subscriptions 
-  (curry findf enforce-event?)
+  #:reaction
+  [(enforce (list X T))
+   (enforce-lazy-unify-diff X T)]
   #:package (a [s c e])
   (cond
-   [(findf enforce-event? e)
-    (enforce-lazy-unify-diff X T)]
-   [else
-    (cond
-     [(null? (set-left X))
-      (== T (set-right X))]
-     [(null? (set-left T))
-      (== X (set-right T))]
-     ;; if there's only one thing in X or T, gtfo
-     [(or (and (empty-set? (set-right X))
-               (null? (cdr (set-left X))))
-          (and (empty-set? (set-right T))
-               (null? (cdr (set-left T)))))
-      (conj
-       (== (set-left  X) (set-left T))
-       (== (set-right X) (set-right T)))]
-     [else (add-constraint (lazy-unify-diff X T))])]))
+   [(null? (set-left X))
+    (== T (set-right X))]
+   [(null? (set-left T))
+    (== X (set-right T))]
+   ;; if there's only one thing in X or T, gtfo
+   [(or (and (empty-set? (set-right X))
+             (null? (cdr (set-left X))))
+        (and (empty-set? (set-right T))
+             (null? (cdr (set-left T)))))
+    (conj
+     (== (set-left  X) (set-left T))
+     (== (set-right X) (set-right T)))]
+   [else (add-constraint (lazy-unify-diff X T))]))
 
 ;; =============================================================================
 
@@ -248,12 +242,14 @@
                   (set t^s N)))]
            [(loop (cdr tjs))]))]))))
 
+#;
 (define (enforce-set-cs x)
   (conj
    (loop 'union-fresh enforce-one-union-fresh)
    (loop 'disjoint-fresh enforce-one-disjoint-fresh)
    (cycle)))
 
+#;
 (define (cycle)
   (conj
     (loop 'in-set            enforce-in)
@@ -264,7 +260,7 @@
     (loop 'lazy-union-var  enforce-lazy-union-var)
     (loop 'lazy-union-set  enforce-lazy-union-set)
     ;; (loop 'lazy-union-neq  enforce-lazy-union-neq)
-    (constraint
+    (transformer
      #:package (a [s c e])
      (cond
       [(null? (filter-memq/rator
@@ -283,7 +279,7 @@
       [else (cycle)]))))
 
 (define (loop sym fn)
-  (constraint
+  (transformer
    #:package (a [s c e])
    (let ([ocs (filter/rator sym c)])
      (conj
@@ -333,8 +329,9 @@
    [(and (set? S) (memq x (set-left S))) succeed]
    [else (add-constraint (in-set x S))]))
 
+#;
 (define (enforce-in oc)
-  (constraint
+  (transformer
    #:package (a [s c e])
    (let ([x (walk (car (oc-rands oc)) s)]
          [S (update-set (cadr (oc-rands oc)) s)])
@@ -431,8 +428,9 @@
    [else (add-constraint (lazy-neq-var U V))]))
 
 ;; U is a set var, and V might be a set or a set var
+#;
 (define (enforce-lazy-neq-var oc)
-  (constraint
+  (transformer
    #:package (a [s c e])
    (let ([U (update-set (car (oc-rands oc)) s)]
          [V (update-set (cadr (oc-rands oc)) s)])
@@ -453,6 +451,7 @@
       [(set-neq U V)]))))
 
 ;; both U and V are sets
+#;
 (define (enforce-lazy-neq-sets oc)
   (constraint
    #:package (a [s c e])
@@ -504,8 +503,9 @@
 
 ;; W is a set var
 (define-set-constraint (lazy-union-var U V W)
-  #:extend-subscriptions
-  (curry findf enforce-event?)
+  #:reaction
+  [(enforce (list U V W))
+   (enforce-lazy-union-var U V W)]
   #:package (a [s c e])
   (printf "lazy-union-var: ~a ~a ~a\n" U V W)
   (cond
@@ -517,8 +517,6 @@
     (== W V)]
    [(empty-set? V)
     (== W U)]
-   [(findf enforce-event? e)
-    (enforce-lazy-union-var U V W)]
    [else 
     (conj
      ;; Not tested yet
@@ -529,16 +527,15 @@
 
 ;; W is a set
 (define-set-constraint (lazy-union-set U V W)
-  #:extend-subscriptions 
-  (curry findf enforce-event?)
+  #:reaction
+  [(enforce (list U V W))
+   (enforce-lazy-union-set U V W)]
   #:package (a [s c e])
   (cond
    [(empty-set? W)
     (conj (== U W) (== V W))]
    [(same-set? U V)
     (== U W)]
-   [(findf enforce-event? e)
-    (enforce-lazy-union-set U V W)]
    [else (add-constraint (lazy-union-set U V W))]))
 
 ;; Untested
@@ -615,6 +612,7 @@
                 (uniono N1 N2 N))]))])))]
    [else (union-fresh U V W)]))
 
+#;
 (define (enforce-one-union-fresh oc)
   (constraint
    #:package (a [s c e])
@@ -737,8 +735,9 @@
   (cond
    [(or (set? U) (set? V))
     (disjoint U V)]
-   [else (update-c (build-oc disjoint-fresh U V))]))
+   [else (add-constraint (disjoint-fresh U V))]))
 
+#;
 (define (enforce-one-disjoint-fresh oc)
   (constraint
    #:package (a [s c e])

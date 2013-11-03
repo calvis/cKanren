@@ -5,6 +5,6 @@
 
 (provide (all-from-out "ck.rkt"))
 (provide (except-out (all-from-out racket/base) #%app))
-(provide (for-syntax (all-from-out racket/base) search-strategy))
+;; (provide (for-syntax (all-from-out racket/base) search-strategy))
 (provide (rename-out [#%app-safe #%app]))
 
