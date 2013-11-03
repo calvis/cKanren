@@ -1,3 +1,5 @@
+Copyright (C) 2013 Claire E. Alvis
+
 Copyright (C) 2011-2013 Daniel P. Friedman, Oleg Kiselyov,
 Claire E. Alvis, Jeremiah J. Willcock, Kyle M. Carter, William E. Byrd
 
@@ -24,45 +26,4 @@ THE SOFTWARE.
 cKanren
 =======
 
-This library implements miniKanren (http://minikanren.org) with an
-extensible framework for defining constraints.
-
-How to install
---------------
-
-cKanren can be installed as a collection within Racket (http://racket-lang.org)
-as follows:
-
-* `git clone git://github.com/calvis/cKanren.git`
-* `cd cKanren/cKanren`
-* `raco link .`
-* `raco setup cKanren`
-
-After setup finishes, you will be able to use miniKanren, `#lang
-cKanren`, and all constraint libraries that ship with cKanren.
-
-For users
----------
-
-If you are interested in writing miniKanren programs, you can
-`(require cKanren/miniKanren)` for standard miniKanren definitions.
-You can also require constraint libraries like `neq` as `(require
-cKanren/neq)`.  
-
-Stable constraint libraries
----------------------------
-
-The following libraries have been tested extensively.
-
-* Tree unification              `cKanren/tree-unify`
-* Disequality constraints       `cKanren/neq`
-* Finite-domain constraints     `cKanren/fd`
-* Nominal logic                 `cKanren/ak`
-* Absento, symbolo, and numbero `cKanren/absento`
-
-All other constraints libraries are experimental.
-
-For constraint writers
-----------------------
-
-Documentation of cKanren is available by running `raco docs cKanren`.
+The dev branch is pretty unstable and broken.  Please don't use it yet ;)
