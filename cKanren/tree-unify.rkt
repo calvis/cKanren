@@ -38,7 +38,7 @@
       (or (var? v) (eq? u v) (equal? u v)))
     (define (gen-unify u v p s c e)
       (cond
-       [(var? v) (unify p (ext-s v u s) c e)]
+       [(var? v) (unify p (ext-s v (walk* u s c e) s) c e)]
        [else (unify p s c e)]))]))
 
 (define (== u v)
@@ -76,7 +76,7 @@
 ;; unifies mk-structs that are the same type
 (define (mk-struct-unify u v p s c e)
   (cond
-   [(var? v) (unify p (ext-s v u s) c e)]
+   [(var? v) (unify p (ext-s v (walk* u s c e) s) c e)]
    [else
     (recur u 
      (lambda (ua ud)

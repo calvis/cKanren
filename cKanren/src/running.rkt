@@ -3,7 +3,8 @@
 (require (for-syntax syntax/parse racket/syntax "framework.rkt" racket/pretty)
          "framework.rkt" syntax/parse racket/syntax racket/pretty "helpers.rkt"
          "operators.rkt" "constraints.rkt" "events.rkt" "package.rkt"
-         racket/generator (except-in "infs.rkt" make-a) "constraint-interactions.rkt")
+         racket/generator (except-in "infs.rkt" make-a) "constraint-interactions.rkt"
+         "variables.rkt")
 
 (provide (all-defined-out))
 
@@ -14,7 +15,8 @@
        #'(spawn-constraint-interactions
           (constraint-interactions)))
      (define/with-syntax prog 
-       #'(fresh (x) g ... (enforce x) (reify x)))
+       #'(let ([x (var 'x)])
+           (conj g ... (enforce x) (reify x))))
      (define/with-syntax initial-a-inf
        #'(delay (bindm empty-a (conj initialize-interactions prog))))
      (syntax/loc #'stx

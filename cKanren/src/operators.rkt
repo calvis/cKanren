@@ -20,17 +20,6 @@
 (define succeed (lambda@ (a) a))
 (define fail    (lambda@ (a) mzerom))
 
-;; defines a macro to create new unconstrained variables
-(define-syntax fresh-aux
-  (syntax-rules ()
-    [(_ constructor (x ...) g g* ...)
-     (let ([x (constructor (gensym 'x))] ...)
-       (conj g g* ...))]))
-
-;; miniKanren's "fresh" defined in terms of fresh-aux over vars
-(define-syntax-rule (fresh (x ...) g g* ...)
-  (fresh-aux var (x ...) g g* ...))
-
 (define onceo (lambda (g) (condu (g))))
 
 ;; =============================================================================

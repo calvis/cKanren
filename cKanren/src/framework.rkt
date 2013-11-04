@@ -8,6 +8,8 @@
 (require (for-syntax racket syntax/parse racket/syntax racket/match racket/pretty racket/function))
 (require syntax/parse racket/syntax racket/pretty)
 
+(require (rename-in (only-in racket filter) [filter ls:filter]))
+
 (provide (except-out (all-defined-out) debug?))
 (provide (for-syntax (all-defined-out)))
 
@@ -16,6 +18,22 @@
 (define (sum lsct)
   (for/fold ([out succeed]) ([ct lsct])
     (conj ct out)))
+
+;; defines a macro to create new unconstrained variables
+(define-syntax fresh-aux
+  (syntax-rules ()
+    [(_ constructor (x ...) g g* ...)
+     (let ([x (constructor (gensym 'x))] ...)
+       (conj 
+        (send-event (enter-scope-event x)) ...
+        g 
+        g* 
+        ...
+        (send-event (leave-scope-event x)) ...))]))
+
+;; miniKanren's "fresh" defined in terms of fresh-aux over vars
+(define-syntax-rule (fresh (x ...) g g* ...)
+  (fresh-aux var (x ...) g g* ...))
 
 (begin-for-syntax
  
@@ -646,6 +664,31 @@
   [((remove-constraint-event/internal rator rands)) 
    (remove-from-c (oc rator rands))]
   [((empty-event)) succeed]
-  [(e) (error 'solidify-atomic-event "not impl yet: ~a\n" e)])
+  [(e) succeed])
+
+(define-trigger (enter-scope x)
+  [(enter-scope-event y)
+   (=> abort) (unless (or (not x) (eq? x y)) (abort)) y])
+
+(define-trigger (leave-scope x)
+  [(leave-scope-event y)
+   (=> abort) (unless (or (not x) (eq? x y)) (abort)) y])
+
+(define-trigger (any-association-event x)
+  [(add-association-event y z)
+   (=> abort)
+   (unless (or (eq? x y) (memq x (filter*/var? z)))
+     (abort))
+   (list (cons y z))]
+  [(add-substitution-prefix-event p)
+   (=> abort)
+   (define (assoc-contains-var? u/v)
+     (or (eq? x (car u/v)) (memq x (filter*/var? (cdr u/v)))))
+   (when debug? (printf "here: ~a ~a\n" x p))
+   (cond
+    [(ls:filter assoc-contains-var? p)
+     => (lambda (p) (when (null? p) (abort)) p)]
+    [else (abort)])])
+
 
 

@@ -81,12 +81,14 @@
 ;; [Event -> Boolean] Event -> [Maybe Event]
 (define (findf fn e)
   (unless (event? e)
-    (error 'findf "uhhh ~a\n" e))
+    (error 'findf "not an event: ~a" e))
   (or (and (fn e) e)
       (gen-findf fn e)))
 
 ;; [Event -> Boolean] Event -> [List-of Event]
 (define (filter fn e)
+  (unless (event? e)
+    (error 'filter "not an event: ~a" e))
   (cond 
    [(compound-event? e)
     (gen-filter fn e)]
@@ -461,3 +463,10 @@
             (add-association-event 'q 6))))))
 
 
+(struct enter-scope-event (x)
+        #:transparent
+        #:methods gen:event [])
+
+(struct leave-scope-event (x)
+        #:transparent
+        #:methods gen:event [])
