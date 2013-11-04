@@ -169,6 +169,20 @@
    (run* (q) (eigen (e1) (eigen (e2) (fresh (x y) (== x e1) (== x y) (== y e2)))))
    '())
 
+  (test
+   (run* (q)
+     (eigen (e e2)
+       (fresh (x)
+         (== `(,x . ,x) `(,e . ,e2)))))
+   '())
+
+  (test
+   (run* (q)
+     (eigen (e)
+       (fresh (x)
+         (== `(,e . ,q) `(,x . ,x)))))
+   '())
+
   ;; Tests below this point fail.
 
   #;
