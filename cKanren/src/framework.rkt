@@ -26,9 +26,7 @@
      (let ([x (constructor (gensym 'x))] ...)
        (conj 
         (send-event (enter-scope-event x)) ...
-        g 
-        g* 
-        ...
+        g g* ...
         (send-event (leave-scope-event x)) ...))]))
 
 ;; miniKanren's "fresh" defined in terms of fresh-aux over vars
