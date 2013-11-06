@@ -34,7 +34,7 @@
     (cond
      [(null-dom? d) fail]
      [(singleton-dom? d)
-      (update-s v (singleton-element-dom d))]
+      (add-association v (singleton-element-dom d))]
      [else (add-constraint (dom v d))])]
    [else fail]))
 
@@ -255,9 +255,9 @@
       (cond
        [(eq? u v) succeed]
        [else fail])]
-     [else (update-s v u)])]
+     [else (add-association v u)])]
    [(value-dom? v)
-    (update-s u v)]
+    (add-association u v)]
    [else (add-constraint (=fd u v))]))
 
 (define-constraint-interaction

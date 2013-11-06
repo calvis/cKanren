@@ -4,7 +4,7 @@
 ;; See: https://github.com/jasonhemann/miniKanren
 
 (require "ck.rkt" "src/helpers.rkt" "src/events.rkt" "src/framework.rkt"
-         "src/constraints.rkt" "src/constraint-store.rkt")
+         "src/constraints.rkt" "src/constraint-store.rkt" "src/macros.rkt")
 (require (for-syntax racket/syntax syntax/parse "src/framework.rkt"))
 
 (provide (all-defined-out))

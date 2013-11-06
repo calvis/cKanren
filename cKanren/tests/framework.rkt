@@ -10,6 +10,7 @@
  cKanren/src/operators
  cKanren/src/running
  cKanren/src/triggers
+ cKanren/src/macros
  racket/generator
  "../tester.rkt")
 

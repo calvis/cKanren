@@ -2,10 +2,18 @@
 
 (require (for-syntax syntax/parse racket/syntax "syntax-classes.rkt")
          "syntax-classes.rkt"
-         "constraints.rkt")
+         "constraints.rkt"
+         "events.rkt"
+         "mk-structs.rkt")
+
+(require (rename-in (only-in racket filter) [filter ls:filter]))
 
 (provide (struct-out trigger)
          define-trigger)
+
+(provide enter-scope
+         leave-scope
+         any-association-event)
 
 (struct trigger (subs interp))
 
@@ -35,4 +43,27 @@
                ...
                [_ #f]))))
      #'(define name (trigger subs interp))]))
+
+(define-trigger (enter-scope x)
+  [(enter-scope-event y)
+   (=> abort) (unless (or (not x) (eq? x y)) (abort)) y])
+
+(define-trigger (leave-scope x)
+  [(leave-scope-event y)
+   (=> abort) (unless (or (not x) (eq? x y)) (abort)) y])
+
+(define-trigger (any-association-event x)
+  [(add-association-event y z)
+   (=> abort)
+   (unless (or (eq? x y) (memq x (filter*/var? z)))
+     (abort))
+   (list (cons y z))]
+  [(add-substitution-prefix-event p)
+   (=> abort)
+   (define (assoc-contains-var? u/v)
+     (or (eq? x (car u/v)) (memq x (filter*/var? (cdr u/v)))))
+   (cond
+    [(ls:filter assoc-contains-var? p)
+     => (lambda (p) (when (null? p) (abort)) p)]
+    [else (abort)])])
 

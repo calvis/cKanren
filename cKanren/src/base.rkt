@@ -2,6 +2,14 @@
 
 ;; This file provides the minimum core of cKanren functionalities
 
+(require "macros.rkt")
+(provide define-constraint-type transformer)
+
+(provide define-constraint
+         constraint
+         add-constraint-event
+         remove-constraint-event)
+
 ;; constraints
 (require "constraints.rkt") 
 (provide succeed fail transformer? #%app-safe)
@@ -12,7 +20,7 @@
 ;; framework
 (require "framework.rkt") 
 (provide add-association add-constraint constraint update-package run run*
-         sort-by-lex<= lex<= define-constraint define-constraint-interaction)
+         sort-by-lex<= lex<= define-constraint-interaction)
 ;; (provide (for-syntax search-strategy))
 
 ;; lex

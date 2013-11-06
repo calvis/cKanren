@@ -2,7 +2,7 @@
 
 (require "src/base.rkt" "tree-unify.rkt"
          "attributes.rkt" "neq.rkt" "src/mk-structs.rkt"
-         "src/framework.rkt")
+         "src/framework.rkt" "src/triggers.rkt")
 (require "tester.rkt")
 
 ;; a "fresh" for EigenVars

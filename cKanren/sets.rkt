@@ -155,7 +155,7 @@
         (conj
          (proper-set (set (set-left X) N))
          (unify-well-formed-sets (set (set-left X) N) T)))]
-     [else (update-s T X)])]
+     [else (add-association T X)])]
    [else fail]))
 
 (define-set-constraint (lazy-unify-same X T)
@@ -317,7 +317,7 @@
        [else (loop (cdr l))]))]
    [(var? u)
     (let ([u^ (set-var (var-x u))])
-      (update-s u u^))]
+      (add-association u u^))]
    [else fail]))
 
 (define (ino t s)
