@@ -2,7 +2,10 @@
 
 (require "constraints.rkt" "package.rkt" "mk-structs.rkt" "variables.rkt" "errors.rkt" 
          "infs.rkt" "helpers.rkt" "operators.rkt" "events.rkt" "substitution.rkt" "lex.rkt")
-(require (for-syntax racket syntax/parse racket/syntax racket/match racket/function))
+(require (for-syntax racket syntax/parse racket/syntax racket/match racket/function
+                     "syntax-classes.rkt")
+         "syntax-classes.rkt"
+         "triggers.rkt")
 (require syntax/parse racket/syntax)
 
 (require (rename-in (only-in racket filter) [filter ls:filter]))
@@ -27,56 +30,6 @@
 ;; miniKanren's "fresh" defined in terms of fresh-aux over vars
 (define-syntax-rule (fresh (x ...) g g* ...)
   (fresh-aux var (x ...) g g* ...))
-
-(begin-for-syntax
- 
- ;; package keyword matching
- (define-splicing-syntax-class package-keyword
-   #:attributes (package)
-   (pattern (~seq #:package (a:id [s:id c:id e:id]))
-            #:with package #'(a [s c e]))
-   (pattern (~seq #:package a:id)
-            #:with (s c e) (generate-temporaries #'(?s ?c ?e))
-            #:with package #'(a [s c e]))
-   (pattern (~seq)
-            #:with (a s c e) (generate-temporaries #'(?a ?s ?c ?e))
-            #:with package #'(a [s c e])))
- 
- (define-splicing-syntax-class reaction-keyword
-   #:attributes (name [args 1] subs [response 1])
-   (pattern (~seq #:reaction 
-                  [(name args ...)
-                   response ...])
-            #:with subs
-            #'(trigger-subs name)))
-
- (define-syntax-class (argument default-fn)
-   #:attributes (arg fn)
-   (pattern [arg:id #:constant] 
-            #:with fn #'identity-update-fn)
-   (pattern [arg:id fn])
-   (pattern arg:id
-            #:with fn default-fn))
-
- ;; constructor keyword matching
- (define-splicing-syntax-class constructor-keyword
-   #:attributes (constructor)
-   (pattern (~seq #:constructor constructor:id))
-   (pattern (~seq) #:with constructor (generate-temporary #'?constfn)))
-
- (define-splicing-syntax-class persistent-keyword
-   #:attributes (persistent?)
-   (pattern (~seq (~and #:persistent persistent?:keyword)))
-   (pattern (~seq) #:with persistent? #'#f))
- 
- (define-splicing-syntax-class reification-keyword
-   #:attributes (reified)
-   (pattern (~seq #:reified)
-            #:with reified #'#t)
-   (pattern (~seq #:reification-function reified:expr))
-   (pattern (~seq) #:with reified #'#f))
-
-)
 
 ;; Event -> ConstraintTransformer
 ;; runs all the constraints on the event in the store, 
@@ -335,8 +288,6 @@
     (define add-event (add-substitution-prefix-event s-prefix))
     (bindm a (conj (send-event add-event) (sum c-prefix)))))
 
-(define (identity-update-fn x . rest) x)
-
 ;; given a name and a way to update the constraint arguments
 ;; default-update-fn, expands to two macros to define constraints of
 ;; that type: one "name-constraint" macro that simply returns a
@@ -355,8 +306,6 @@
          (create-define-constraint 
           definer name default-update-fn add-name remove-name)
          (void))]))
-
-(struct trigger (subs interp))
 
 (define-for-syntax (parse-responses stx bindings)
   (syntax-parse stx
@@ -404,7 +353,7 @@
                          reify-body)))]
                 [else #'#f]))
              (define should-sub-to-associations?
-               (null? (syntax-e #'(rkw.subs ...))))
+               (null? (syntax-e #'(rkw.name ...))))
              (define/with-syntax reaction-length
                (length (syntax-e #'(rkw.name ...))))
              (define/with-syntax (index ...)
@@ -418,7 +367,7 @@
                #`(lambda (e) 
                    (define all-matching-events 
                      (filter (lambda (e) 
-                               (or (rkw.subs e) ... 
+                               (or ((trigger-subs rkw.name) e) ... 
                                    #,@(cond
                                        [should-sub-to-associations?
                                         #'((association-event? e))]
@@ -505,40 +454,6 @@
                       rem))))
              ;; (pretty-print (syntax->datum #'pattern))
              #'pattern]))))]))
-
-;; TODO, weird scope of package (should be an error to try to use it
-;; in event-names)
-(define-syntax (define-trigger stx)
-  (syntax-parse stx
-    [(define-trigger (name args ...)
-       (~seq (~or (~once pkgkw:package-keyword))
-             ...)
-       [(event-name:id event-arg ...)
-        (~optional ((~literal =>) abort)
-                   #:defaults ([abort (generate-temporary #'?abort)]))
-        answer answer* ...]
-       ...)
-     (define/with-syntax (a [s c e]) #'pkgkw.package)
-     (define/with-syntax pattern
-       #'(define name
-           (trigger 
-            (lambda (e)
-              (let ([ans (match e
-                           [(struct event-name _) #t]
-                           ...
-                           [_ #f])])
-                ans))
-            (lambda (args ...)
-              (lambda@ (a [s c q t e]) 
-                (match-lambda
-                  [(event-name event-arg ...)
-                   (=> abort)
-                   (let ([result (let () answer answer* ...)])
-                     (list result))]
-                  ;; TODO WRONGGGG, TODO: WHY
-                  ...
-                  [_ #f]))))))
-     #'pattern]))
 
 (define-syntax (transformer stx)
   (syntax-parse stx

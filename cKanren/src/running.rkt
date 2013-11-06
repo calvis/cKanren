@@ -1,8 +1,8 @@
 #lang racket
 
-(require (for-syntax syntax/parse racket/syntax "framework.rkt" racket/pretty)
+(require (for-syntax syntax/parse racket/syntax "framework.rkt" racket/pretty "syntax-classes.rkt")
          "framework.rkt" syntax/parse racket/syntax racket/pretty "helpers.rkt"
-         "operators.rkt" "constraints.rkt" "events.rkt" "package.rkt"
+         "operators.rkt" "constraints.rkt" "events.rkt" "package.rkt" "syntax-classes.rkt"
          racket/generator "infs.rkt" "constraint-interactions.rkt" "variables.rkt")
 
 (provide (all-defined-out))

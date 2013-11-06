@@ -9,6 +9,7 @@
  cKanren/src/events
  cKanren/src/operators
  cKanren/src/running
+ cKanren/src/triggers
  racket/generator
  "../tester.rkt")
 
