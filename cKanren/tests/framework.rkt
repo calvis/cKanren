@@ -5,24 +5,78 @@
  cKanren/src/constraints
  cKanren/src/variables
  cKanren/src/package
- (except-in cKanren/src/infs make-a)
+ cKanren/src/infs
  cKanren/src/events
  cKanren/src/operators
  cKanren/src/running
  racket/generator
  "../tester.rkt")
 
-(test
- (let ([stream (let ([a-inf (bindm empty-a (conj succeed succeed))])
-                 (generator () (take/lazy a-inf)))])
-   (take 1 stream))
- (list empty-a))
+(require cKanren/src/substitution)
+
+(define u (var 'u))
+
+(let ()
+  (define test-event
+    (running-event
+     (add-association-event u 'a)
+     (build-chain-event
+      (add-substitution-prefix-event '())
+      (empty-event)
+      (composite-event
+       (list (add-substitution-prefix-event `((,u . b))))))))
+  (test (walk u '() #f test-event) 'a))
+
+(let ()
+  (define test-event
+    (running-event
+     (add-substitution-prefix-event `((,u . a)))
+     (build-chain-event
+      (add-substitution-prefix-event '())
+      (empty-event)
+      (composite-event
+       (list (add-substitution-prefix-event `((,u . b))))))))
+  (test (walk u '() #f test-event) 'a))
+
+(let ()
+  (define test-event
+    (running-event
+     (add-substitution-prefix-event `())
+     (build-chain-event
+      (add-substitution-prefix-event '())
+      (empty-event)
+      (composite-event
+       (list (add-substitution-prefix-event `((,u . b))))))))
+  (test (walk u '() #f test-event) 'b))
+
+(let ()
+  (define a-inf (bindm empty-a (conj succeed succeed)))
+  (test
+   (let ([stream (generator () (take/lazy a-inf))])
+     (take 1 stream))
+   (list empty-a)))
+
+(let ()
+  (define a-inf (bindm empty-a (conj succeed (enforce (var 'x)))))
+  (test
+   (let ([stream (generator () (take/lazy a-inf))])
+     (take 1 stream))
+   (list empty-a)))
+
+(let ()
+  (define a-inf (bindm empty-a (conj succeed (enforce (var 'x)) (reify (var 'x)))))
+  (test
+   (let ([stream (generator () (take/lazy a-inf))])
+     (take 1 stream))
+   (list '_.0)))
 
 (test
- (let ([stream (let ([a-inf (bindm empty-a (conj succeed (enforce (var 'x))))])
-                 (generator () (take/lazy a-inf)))])
-   (take 1 stream))
- (list empty-a))
+ (run 1 (q) succeed)
+ '(_.0))
+
+(test
+ (run 1 (q) fail)
+ '())
 
 (test
  (run 1 (q) (conde [fail] [fail]))
@@ -44,74 +98,76 @@
  (run* (q) (add-association q 5))
  '(5))
 
-(define-constraint (exc1 x)
+(define-constraint (reifiedc x)
   #:reified)
 
 (test
- (run 1 (q) (add-constraint (exc1 q)))
- '((_.0 : (exc1 _.0))))
+ (run 1 (q) (add-constraint (reifiedc q)))
+ '((_.0 : (reifiedc _.0))))
 
 (test
- (run* (q) (add-constraint (exc1 q)))
- '((_.0 : (exc1 _.0))))
-
-(define-constraint (exc2 x)
-  #:reified
-  (cond
-   [(not (var? x)) succeed]
-   [else (add-constraint (exc2 x))]))
-
-(test
- (run* (q) (add-association q 5) (exc2 q))
- '(5))
+ (run* (q) (add-constraint (reifiedc q)))
+ '((_.0 : (reifiedc _.0))))
 
 (define (check-store-empty rator)
   (lambda@ (a [s c q t e])
     (cond
-     [(null? (filter/rator rator (constraint-store-c c))) a]
+     [(null? (filter/rator rator c)) a]
      [else (error 'test "constraint store not empty: ~a\n" c)])))
 
-(test
- (run* (q) 
-   (exc2 q) 
-   (add-association q 5)
-   (check-store-empty exc2))
- '(5))
+(let ()
+  (define-constraint (exc x)
+    #:reified
+    (cond
+     [(not (var? x)) succeed]
+     [else (add-constraint (exc x))]))
 
-(define-trigger (extr1 rator)
-  [(add-constraint-event ra rn)
-   (=> abort)
-   (unless (eq? ra rator) (abort))])
+  (test
+   (run* (q) (add-association q 5) (exc q))
+   '(5))
 
-(define-constraint (exc3 x)
-  #:reaction
-  [(extr1 exc1)
-   (add-constraint (exc4 x))])
+  (test
+   (run* (q) 
+     (exc q) 
+     (add-association q 5)
+     (check-store-empty exc))
+   '(5)))
 
-(define-constraint (exc4 x) #:reified)
+(let ()
+  (define-trigger (extr rator)
+    [(add-constraint-event ra rn)
+     (=> abort)
+     (unless (eq? ra rator) (abort))])
 
-(test
- (run* (q)
-   (exc3 q)
-   (exc1 q)
-   (check-store-empty exc3))
- '((_.0 : (exc1 _.0) (exc4 _.0))))
+  (define-constraint (exc1 x)
+    #:reaction
+    [(extr reifiedc)
+     (add-constraint (exc2 x))])
 
-(define-trigger (true-immediately)
-  [(empty-event) #t])
+  (define-constraint (exc2 x) #:reified)
 
-(define-constraint (exc5 x)
-  #:reaction
-  [(true-immediately)
-   (add-constraint (exc4 x))])
+  (test
+   (run* (q)
+     (exc1 q)
+     (reifiedc q)
+     (check-store-empty exc1))
+   '((_.0 : (exc2 _.0) (reifiedc _.0))))
 
-;; checks reactions that fire when you first enter the body of the
-;; constraint (i.e. before the constraint is coming from the store)
-(test
- (run* (q) 
-   (exc5 q)
-   (check-store-empty exc5))
- '((_.0 : (exc4 _.0))))
+  (define-trigger (true-immediately)
+    [(empty-event) #t])
+
+  (define-constraint (exc3 x)
+    #:reaction
+    [(true-immediately)
+     (add-constraint (exc2 x))])
+
+  ;; checks reactions that fire when you first enter the body of the
+  ;; constraint (i.e. before the constraint is coming from the store)
+  (test
+   (run* (q) 
+     (exc3 q)
+     (check-store-empty exc3))
+   '((_.0 : (exc2 _.0)))))
 
 (define-trigger (rem-tr rator)
   [(remove-constraint-event/internal rator^ rands^)
@@ -123,19 +179,19 @@
    (=> abort)
    (unless (eq? rator rator^) (abort))])
 
-(define-constraint (exc6 x)
+(define-constraint (rem-self x)
   #:reaction
-  [(rem-tr exc6)
+  [(rem-tr rem-self)
    (error 'test "should not see itself removed")])
 
-(define-constraint (exc7 x)
+(define-constraint (add-self x)
   #:reaction
-  [(add-tr exc7)
+  [(add-tr add-self)
    (error 'test "should not see itself added")])
 
 (test
  (run* (q)
-   (let ([rator exc6]
+   (let ([rator rem-self]
          [rands (list q)])
      (conj (add-constraint (oc rator rands))
            (remove-constraint (oc rator rands)))))
@@ -143,7 +199,7 @@
 
 (test
  (run* (q)
-   (let ([rator exc7]
+   (let ([rator add-self]
          [rands (list q)])
      (conj (add-constraint (oc rator rands))
            (remove-constraint (oc rator rands)))))
@@ -151,11 +207,11 @@
 
 (define-constraint (exc8 x)
   #:reaction
-  [(add-tr exc6)
-   (add-constraint (exc1 x))]
+  [(add-tr rem-self)
+   (add-constraint (reifiedc x))]
   #:reaction
-  [(add-tr exc7)
-   (conj (add-constraint (exc1 x))
+  [(add-tr add-self)
+   (conj (add-constraint (reifiedc x))
          (exc8 x))])
 
 (test
@@ -163,45 +219,45 @@
    (exc8 q)
    (send-event 
     (composite-event
-     (list (add-constraint-event/internal exc7 (list q))
-           (add-constraint-event/internal exc6 (list q)))))
+     (list (add-constraint-event/internal add-self (list q))
+           (add-constraint-event/internal rem-self (list q)))))
    (check-store-empty exc8))
- '((_.0 : (exc1 _.0))))
+ '((_.0 : (reifiedc _.0))))
 
 (test
  (run* (q)
    (exc8 q)
    (send-event 
     (composite-event
-     (list (add-constraint-event/internal exc6 (list q))
-           (add-constraint-event/internal exc7 (list q)))))
+     (list (add-constraint-event/internal rem-self (list q))
+           (add-constraint-event/internal add-self (list q)))))
    (check-store-empty exc8))
- '((_.0 : (exc1 _.0))))
+ '((_.0 : (reifiedc _.0))))
 
 (define-constraint (exc9 x)
   #:reaction
-  [(add-tr exc6)
-   (conj (add-constraint (exc1 x))
+  [(add-tr rem-self)
+   (conj (add-constraint (reifiedc x))
          (add-constraint (exc9 x)))]
   #:reaction
-  [(add-tr exc7)
-   (conj (add-constraint (exc1 x))
+  [(add-tr add-self)
+   (conj (add-constraint (reifiedc x))
          (add-constraint (exc9 x)))])
 
 (test
  (run* (q)
    (exc9 q)
-   (send-event (add-constraint-event/internal exc6 (list q))))
- '((_.0 : (exc1 _.0))))
+   (send-event (add-constraint-event/internal rem-self (list q))))
+ '((_.0 : (reifiedc _.0))))
 
 (test
  (run* (q)
    (exc9 q)
    (send-event 
     (composite-event
-     (list (add-constraint-event/internal exc6 (list q))
-           (add-constraint-event/internal exc7 (list q))))))
- '((_.0 : (exc1 _.0 _.0))))
+     (list (add-constraint-event/internal rem-self (list q))
+           (add-constraint-event/internal add-self (list q))))))
+ '((_.0 : (reifiedc _.0 _.0))))
 
 ;; (chain exc12 exc11)
 ;; (chain exc13 ...)
@@ -289,7 +345,7 @@
     #:reaction
     [(add-tr exc17)
      (conj (add-constraint (exc18 q))
-           (add-constraint (exc1 q)))])
+           (add-constraint (reifiedc q)))])
 
   (test
    (run* (q)

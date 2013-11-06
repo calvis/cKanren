@@ -1,7 +1,7 @@
 #lang racket
 
 (require "ck.rkt" racket/generic "src/framework.rkt" "src/events.rkt" "src/mk-structs.rkt"
-         "attributes.rkt")
+         "attributes.rkt" "src/constraint-store.rkt")
 (provide == unify gen:unifiable gen-unify compatible? unify-two unify-walked unifiable?
          unify-change)
 

@@ -1,10 +1,9 @@
 #lang racket 
 
-(require (for-syntax syntax/parse racket/syntax "framework.rkt" racket/pretty
+(require (for-syntax syntax/parse racket/syntax "framework.rkt"
                      (only-in racket/list permutations))
-         "framework.rkt" syntax/parse racket/syntax racket/pretty "helpers.rkt"
-         "operators.rkt" "constraints.rkt" "events.rkt" "package.rkt"
-         racket/generator (except-in "infs.rkt" make-a))
+         "framework.rkt" syntax/parse racket/syntax "helpers.rkt"
+         "operators.rkt" "constraints.rkt" "events.rkt" "package.rkt")
 
 (provide (all-defined-out))
 
@@ -54,23 +53,13 @@
                ...
                (remove-constraint (oc (car last-oc) (cdr last-oc)))))
      (define/with-syntax (sat-constraints ...)
-       #'((conj
-           rem-ocs
-           ;; (prtm "============TRIGGERED=============\n")
-           ;; pprt
-           constraints
-           ...
-           ;; (prtm "============DONE=============\n")
-           )
-          ...))
+       #'((conj rem-ocs constraints ...) ...))
      ;; YOU NEED PERMUTATIONS BECAUSE: REFLEXICVIVITY.
      (define/with-syntax ((patterns ...) ...)
        (permutations (syntax-e #'(sat-patterns ...))))
      (define/with-syntax (temps ...)
        (generate-temporaries #'(sat-patterns ...)))
-     #'(lambda@ (a [?s ?c q t e])
-         (define s (substitution-s ?s))
-         (define c (constraint-store-c ?c))
+     #'(lambda@ (a [s c q t e])
          ;; (printf "GOT THE RIGHT NUMBER OF THINGIES\n")
          (match (list sat-ocs ... last-oc)
            [(list patterns ...)

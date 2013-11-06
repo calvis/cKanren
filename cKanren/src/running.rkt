@@ -3,8 +3,7 @@
 (require (for-syntax syntax/parse racket/syntax "framework.rkt" racket/pretty)
          "framework.rkt" syntax/parse racket/syntax racket/pretty "helpers.rkt"
          "operators.rkt" "constraints.rkt" "events.rkt" "package.rkt"
-         racket/generator (except-in "infs.rkt" make-a) "constraint-interactions.rkt"
-         "variables.rkt")
+         racket/generator "infs.rkt" "constraint-interactions.rkt" "variables.rkt")
 
 (provide (all-defined-out))
 

@@ -35,8 +35,7 @@
 (require "package.rkt") 
 (provide empty-a make-a)
 (provide occurs-check walk prefix-s ext-s ext-s*)
-(provide empty-c ext-c ext-c* memq-c remq-c remq*-c c->list
-         filter/rator filter-not/rator filter-memq/rator filter-not-memq/rator)
+(provide empty-c ext-c remq-c filter/rator filter-memq/rator)
 
 ;; running
 (require "running.rkt")

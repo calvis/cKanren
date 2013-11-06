@@ -1,37 +1,77 @@
 #lang racket
 
-(require "helpers.rkt" "variables.rkt" "events.rkt")
-
-(provide (all-defined-out))
+(require (only-in "variables.rkt" var?)
+         (only-in "events.rkt" relevant? findf walk/shortcut))
 
 ;; == SUBSTITUTIONS ============================================================
+;;
+;; A Substitution is a [List-of Association]
+;; An Association is a (cons Var Value) 
+;; A SubstitutionPrefix is Subsitution
 
-;; wraps a substitution
-(struct substitution (s)
-  #:methods gen:custom-write
-  [(define (write-proc . args) (apply write-substitution args))])
+(provide
+ ;; Value -> Boolean
+ ;; returns #t iff the value is a Subsitution
+ substitution?
 
-;; writes a substitution
-(define (write-substitution substitution port mode)
-  (define fn (lambda (s) ((parse-mode mode) s port)))
-  (define s (substitution-s substitution))
-  (fn "#s[")
-  (for ([p s])
-    (fn " (") (fn (car p)) (fn " . ") (fn (cdr p)) (fn ")"))
-  (unless (null? s) (fn " "))
-  (fn "]"))
+ ;; Substitution
+ ;; the empty subsitution
+ empty-s
+
+ ;; Var Value Subsitution -> Subsitution
+ ;; extends the given subsitution with a binding (cons Var Value)
+ ext-s
+
+ ;; SubsitutionPrefix Subsitution -> Subsitution
+ ;; appends the associations in the prefix onto the given subsitution
+ ext-s* 
+
+ ;; Subsitution -> Number
+ ;; returns the size of the substitution
+ size-s
+
+ ;; Substitution Substitution -> Substitution
+ ;; returns the prefix of the first substitution that is not contained
+ ;; in the second subsitution (it is an error to send two completely
+ ;; unrelated substitutions)
+ prefix-s
+
+ ;; Var Value Subsitution -> Value
+ ;; checks if the variable appears in the value (given the associations
+ ;; in the substitution)
+ occurs-check
+
+ ;; Var Substitution -> Value
+ ;; Var Substitution ConstraintStore Event -> Value
+ ;; returns the association for the variable in the substitution or in 
+ ;; the event (when given), or returns the variable unchanged if it has
+ ;; no association
+ walk
+
+ ;; Var Substitution -> Value
+ ;; returns the association for the variable in the substitution or
+ ;; returns the variable unchanged if it has no association
+ walk/internal
+ )
+
+(define substitution? list?)
 
 ;; the empty association list, abbreviated s
 (define empty-s '())
+(define empty-s? null?)
 
-;; extends a substitution with a binding of x to v
-(define (ext-s x v s)
-  (cons `(,x . ,v) s))
+(define (ext-s x v s) (cons `(,x . ,v) s))
+(define (ext-s* p s) (append p s))
 
-(define (ext-s* p s)
-  (append p s))
+(define (size-s s) (length s))
 
-;; checks if x appears in v
+(define (prefix-s s s^)
+  (define (loop s^) 
+    (cond
+     [(eq? s^ s) '()] 
+     [else (cons (car s^) (loop (cdr s^)))]))
+  (if (empty-s? s) s^ (loop s^)))
+
 (define (occurs-check x v^ s)
   (define v (walk/internal v^ s))
   (cond
@@ -40,23 +80,6 @@
     (or (occurs-check x (car v) s)
         (occurs-check x (cdr v) s))]
    [else #f]))
-
-;; returns the size of a substitution
-(define (size-s s) (length s))
-
-(define (walk/internal v s)
-  (cond
-   [(and (var? v) (assq v s))
-    => (lambda (a) (walk/internal (cdr a) s))]
-   [else v]))
-
-;; returns the part of s^ that is a prefix of s
-(define (prefix-s s s^)
-  (define (loop s^) 
-    (cond
-     [(eq? s^ s) '()] 
-     [else (cons (car s^) (loop (cdr s^)))]))
-  (if (null? s) s^ (loop s^)))
 
 (define walk
   (case-lambda
@@ -71,41 +94,8 @@
        [else #f])]
      [else (walk/internal u s)])]))
 
-(module+ test
-  (require (prefix-in ru: rackunit))
-
-  (ru:check-equal?
-   (let ([u (var 'u)])
-     (walk u '() #f
-           (running-event
-            (add-association-event u 'a)
-            (build-chain-event
-             (add-substitution-prefix-event '())
-             (empty-event)
-             (composite-event
-              (list (add-substitution-prefix-event `((,u . b)))))))))
-   'a)
-
-  (ru:check-equal?
-   (let ([u (var 'u)])
-     (walk u '() #f
-           (running-event
-            (add-substitution-prefix-event `((,u . a)))
-            (build-chain-event
-             (add-substitution-prefix-event '())
-             (empty-event)
-             (composite-event
-              (list (add-substitution-prefix-event `((,u . b)))))))))
-   'a)
-
-  (ru:check-equal?
-   (let ([u (var 'u)])
-     (walk u '() #f
-           (running-event
-            (add-substitution-prefix-event `())
-            (build-chain-event
-             (add-substitution-prefix-event '())
-             (empty-event)
-             (composite-event
-              (list (add-substitution-prefix-event `((,u . b)))))))))
-   'b))
+(define (walk/internal v s)
+  (cond
+   [(and (var? v) (assq v s))
+    => (lambda (a) (walk/internal (cdr a) s))]
+   [else v]))
