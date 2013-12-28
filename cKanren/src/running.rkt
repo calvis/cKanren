@@ -118,7 +118,7 @@
   (let ([st state])
     (let ([x (running-x st)]
           [a-inf (running-a-inf st)])
-      (enforced x (bindg a-inf (enforce x))))))
+      (enforced x (bindm a-inf (enforce x))))))
 
 (define-syntax-rule
   (reify/interactive state)
