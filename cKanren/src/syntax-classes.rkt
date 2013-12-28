@@ -20,10 +20,6 @@
             #:with (a s c e) (generate-temporaries #'(?a ?s ?c ?e))
             #:with package #'(a [s c e])))
 
- (define-splicing-syntax-class reaction-keyword
-   #:attributes (name [args 1] [response 1])
-   (pattern (~seq #:reaction [(name args ...) response ...])))
-
  (define-syntax-class (argument default-fn)
    #:attributes (arg fn)
    (pattern [arg:id #:constant] 
@@ -48,6 +44,14 @@
    (pattern (~seq #:reified)
             #:with reified #'#t)
    (pattern (~seq #:reification-function reified:expr))
+   (pattern (~seq #:reify reify-expr:expr)
+            #:with reified #'(lambda (v r) reify-expr))
    (pattern (~seq) #:with reified #'#f))
+
+ (define-splicing-syntax-class unique-keyword
+   #:attributes (unique)
+   (pattern (~seq #:unique)
+            #:with unique #'#t)
+   (pattern (~seq) #:with unique #'#f))
 
 )

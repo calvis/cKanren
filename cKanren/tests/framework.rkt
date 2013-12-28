@@ -356,3 +356,8 @@
      (exc17 q))
    '(_.0)))
 
+(let ()
+  (test (exit/ir (start/ir)) '(_.0)))
+
+(let ()
+  (test (exit/ir (extend/ir (start/ir) #:var q (add-association q 5))) '(5)))

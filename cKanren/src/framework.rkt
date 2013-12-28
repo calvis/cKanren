@@ -20,6 +20,7 @@
          add-association
          enforce
          reify
+         reifyc
          default-reify)
 
 (define (sum lsct)
@@ -236,8 +237,6 @@
 
 (define (reify x)
   (lambda@ (a [s c q t e])
-    (when (not (empty-event? e))
-      (error 'reify "internal error, event not empty ~a" e))
     (define v (walk* x s c e))
     (define r (reify-s v empty-s))
     (define v^ (reify-term v r))
@@ -261,6 +260,16 @@
 
 (define (reify-n cvar n)
   (string->symbol (format "~a.~a" (cvar->str cvar) (number->string n))))
+
+(define (reifyc x)
+  (lambda@ (a [s c q t e])
+    ;; get all of the variables mentioned in the constraint store and
+    ;; make a reified substitution for them
+    (define v (walk* (filter*/var? (hash->list c)) s c e))
+    (define r (reify-s v empty-s))
+    
+    ;; then sort and return a reified version of all constraints
+    (sort-store (run-reify-fns v r c))))
 
 (define (reify-constraints v r store)
   (define store^ (run-reify-fns v r store))

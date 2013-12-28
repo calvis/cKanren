@@ -470,3 +470,8 @@
 (struct leave-scope-event (x)
         #:transparent
         #:methods gen:event [])
+
+(define-syntax-rule (define-event name (args ...))
+  (struct name (args ...)
+          #:transparent
+          #:methods gen:event []))

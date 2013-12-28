@@ -127,8 +127,8 @@
 ;; The only correct application of a goal g is to a package a; i.e. (g a).
 (define-for-syntax (valid-app?-pred fn args) 
   (syntax-case args ()
-    [(a) #`(or (not (-ct? #,fn)) (a? a))]
-    [(a* ...) #`(not (-ct? #,fn))]))
+    [(a) #`(or (not (oc? #,fn)) (a? a))]
+    [(a* ...) #`(not (oc? #,fn))]))
 
 (define-syntax (#%app-safe x)
   (syntax-case x () 

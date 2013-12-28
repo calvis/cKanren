@@ -31,6 +31,12 @@
     [(_ g g* ...)
      (lambda@ (a) (delay (start a g g* ...)))]))
 
+(define-syntax disj
+  (syntax-rules ()
+    [(_ g) g]
+    [(_ g g* ...)
+     (conde [g] [g*] ...)]))
+
 (define-syntax-parameter conde
   (lambda (stx)
     (syntax-parse stx
@@ -127,3 +133,10 @@
 (define diaf
   (lambda@ (a) (error 'diaf "dying: ~s" a)))
 
+(define-syntax-rule (for/disj (for-clause ...) body)
+  (for/fold ([ct fail]) (for-clause ...)
+    (disj body ct)))
+
+(define-syntax-rule (for/conj (for-clause ...) body)
+  (for/fold ([ct succeed]) (for-clause ...)
+    (conj body ct)))

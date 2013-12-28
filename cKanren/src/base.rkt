@@ -17,6 +17,9 @@
 ;; debugging
 (require "debugging.rkt") 
 
+(require "events.rkt")
+(provide define-event send-event)
+
 ;; framework
 (require "framework.rkt") 
 (provide add-association add-constraint constraint update-package run run*
@@ -35,9 +38,10 @@
 
 ;; operators
 (require "operators.rkt") 
-(provide conj conde fresh fresh-aux)
+(provide conj disj conde fresh fresh-aux)
 (provide ifu condu ifa conda project onceo)
 (provide debug debug-conde prt prtm prtt)
+(provide for/disj for/conj)
 
 ;; package
 (require "package.rkt") 
@@ -47,7 +51,8 @@
 
 ;; running
 (require "running.rkt")
-(provide run run* run/lazy define-constraint-interaction)
+(provide run run* run/lazy define-constraint-interaction
+         start/ir extend/ir enforce/ir reify/ir reifyc/ir exit/ir exitc/ir)
 
 ;; variables
 (require "variables.rkt") 

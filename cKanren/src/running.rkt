@@ -1,9 +1,23 @@
 #lang racket
 
-(require (for-syntax syntax/parse racket/syntax "framework.rkt" racket/pretty "syntax-classes.rkt")
-         "framework.rkt" syntax/parse racket/syntax racket/pretty "helpers.rkt"
-         "operators.rkt" "constraints.rkt" "events.rkt" "package.rkt" "syntax-classes.rkt"
-         racket/generator "infs.rkt" "constraint-interactions.rkt" "variables.rkt")
+(require (for-syntax syntax/parse 
+                     racket/syntax
+                     "framework.rkt"
+                     "syntax-classes.rkt")
+         "framework.rkt" 
+         syntax/parse
+         racket/syntax
+         racket/pretty
+         "helpers.rkt"
+         "operators.rkt" 
+         "constraints.rkt"
+         "events.rkt"
+         "package.rkt"
+         "syntax-classes.rkt"
+         racket/generator 
+         "infs.rkt"
+         "macros.rkt"
+         "variables.rkt")
 
 (provide (all-defined-out))
 
@@ -11,8 +25,7 @@
   (syntax-parse stx
     [(run/lazy (x:id) g:expr ...)
      (define/with-syntax initialize-interactions
-       #'(spawn-constraint-interactions
-          (constraint-interactions)))
+       #'(spawn-constraint-interactions))
      (define/with-syntax prog 
        #'(let ([x (var 'x)])
            (conj g ... (enforce x) (reify x))))
@@ -39,31 +52,6 @@
   (syntax-parse stx
     [(_ (x ...) g ...) 
      (syntax/loc stx (run #f (x ...) g ...))]))
-
-(define-syntax (define-constraint-interaction stx)
-  (syntax-parse stx 
-    [(define-constraint-interaction 
-       rest ...
-       [constraint-exprs ...] (~literal =>) [constraints ...])
-     #'(define-constraint-interaction
-         rest ...
-         [constraint-exprs ...]
-         [#t [constraints ...]])]
-    [(define-constraint-interaction 
-       (~or (~seq ci-name:id) (~seq))
-       (constraint-exprs ...)
-       (~or (~once pkgkw:package-keyword))
-       ...
-       clauses ...)
-     (define/with-syntax name 
-       (or (attribute ci-name) (generate-temporary #'?name)))
-     (define/with-syntax (a [s c e]) #'pkgkw.package)
-     (define/with-syntax initfn
-       #`(create-interaction-fn
-          name (constraint-exprs ...) (clauses ...)
-          (a [s c e])))
-     #'(extend-constraint-interactions
-        'name initfn)]))
 
 (define-syntax (case/lazy stx)
   (syntax-parse stx
@@ -94,55 +82,90 @@
 (struct running (x a-inf)
         #:methods gen:custom-write 
         [(define (write-proc ra port mode) 
-           ((parse-mode mode) "#<running/interactive>" port))])
+           ((parse-mode mode) "#<running/ir>" port))])
 
 (struct enforced running ()
         #:methods gen:custom-write 
         [(define (write-proc ra port mode) 
-           ((parse-mode mode) "#<running/interactive>" port))])
+           ((parse-mode mode) "#<running/ir>" port))])
 
-(define-syntax (start/interactive stx)
+(define-syntax (start/ir stx)
   (syntax-parse stx
-    [(_ (~seq #:var x) g ...)
-     #'(running x (bindm empty-a (conj succeed g ...)))]))
+    [(_ g ...) 
+     (define/with-syntax initialize-interactions
+       #'(spawn-constraint-interactions))
+     (define/with-syntax initial-a-inf
+       #'(delay (bindm empty-a (conj initialize-interactions prog))))
+     #'(let ([x (var 'x)])
+         (running x (delay (bindm empty-a (conj initialize-interactions g ...)))))]))
+
+(define-syntax (extend/ir stx)
+  (syntax-parse stx
+    [(extend/ir state 
+                (~optional (~seq #:var x)
+                           #:defaults ([x (generate-temporary #'?x)]))
+                g ...)
+     #'(let ([st state])
+         (let ([x (running-x st)]
+               [a-inf (running-a-inf st)])
+           (running x (bindm a-inf (conj succeed g ...)))))]))
 
 (define-syntax-rule 
-  (resume/interactive state g ...)
-  (let ([st state])
-    (let ([x (running-x st)]
-          [a-inf (running-a-inf st)])
-      (running x (bindm a-inf (conj succeed g ...))))))
-
-(define-syntax-rule 
-  (enforce/interactive state)
+  (enforce/ir state)
   (let ([st state])
     (let ([x (running-x st)]
           [a-inf (running-a-inf st)])
       (enforced x (bindm a-inf (enforce x))))))
 
 (define-syntax-rule
-  (reify/interactive state)
+  (reify/ir state)
   (let ([st state])
     (unless (enforced? st)
-      (error 'reify/interactive "trying to reify an unenforced state ~s" st))
+      (error 'reify/ir "trying to reify an unenforced state ~s" st))
     (let ([x (running-x st)]
           [a-inf (running-a-inf st)])
       (bindm a-inf (reify x)))))
 
-(define-syntax-rule 
-  (exit/interactive n state)
-  (let ([stream
-         (generator 
-          ()
-          (take/lazy
-           (let ([st state])
-             (reify/interactive
-              (cond
-               [(enforced? st) state]
-               [else (enforce/interactive state)])))))])
-    (take n stream)))
-
 (define-syntax-rule
-  (exit*/interactive state)
-  (exit/interactive #f state))
+  (reifyc/ir state)
+  (let ([st state])
+    (unless (enforced? st)
+      (error 'reify/ir "trying to reify an unenforced state ~s" st))
+    (let ([x (running-x st)]
+          [a-inf (running-a-inf st)])
+      (bindm a-inf (reifyc x)))))
+
+(define-syntax (exit/ir stx)
+  (syntax-parse stx
+    [(exit/ir st) 
+     #'(exit/ir #f st)]
+    [(exit/ir n state)
+     #'(let ([stream
+              (generator 
+               ()
+               (take/lazy
+                (let ([st state])
+                  (reify/ir
+                   (cond
+                    [(enforced? st) st]
+                    [else (enforce/ir st)])))))])
+         (take n stream))]))
+
+(define-syntax-rule (exit*/ir state) (exit/ir #f state))
+
+(define-syntax (exitc/ir stx)
+  (syntax-parse stx
+    [(exitc/ir st)
+     #'(exitc/ir #f st)]
+    [(exitc/ir n state)
+     #'(let ([stream
+              (generator 
+               ()
+               (take/lazy
+                (let ([st state])
+                  (reifyc/ir
+                   (cond
+                    [(enforced? st) st]
+                    [else (enforce/ir st)])))))])
+         (take n stream))]))
 
