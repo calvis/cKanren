@@ -4,7 +4,7 @@
  racket/base 
  "../ck.rkt"
  "../tree-unify.rkt"
- "../sets.rkt"
+ "../unstable/sets.rkt"
  "../tester.rkt")
 
 (provide test-sets test-sets-long)

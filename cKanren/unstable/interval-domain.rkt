@@ -1,6 +1,6 @@
 #lang racket
 
-(require "ck.rkt")
+(require cKanren/ck)
 
 (provide range value-dom?
          

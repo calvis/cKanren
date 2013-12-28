@@ -1,6 +1,6 @@
 #lang racket
 
-(require "ck.rkt")
+(require cKanren/ck)
 (provide range value-dom?
          map-sum null-dom? singleton-dom? singleton-element-dom
          min-dom max-dom memv-dom? intersection-dom diff-dom

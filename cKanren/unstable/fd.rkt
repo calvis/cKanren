@@ -1,7 +1,10 @@
 #lang racket
 
-(require "interval-domain.rkt" "ck.rkt" "src/framework.rkt"
-         "src/events.rkt" "src/constraints.rkt")
+(require cKanren/unstable/interval-domain
+         cKanren/ck
+         cKanren/src/framework
+         cKanren/src/events
+         cKanren/src/constraints)
 
 (provide (all-defined-out))
 

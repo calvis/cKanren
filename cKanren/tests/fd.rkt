@@ -3,7 +3,7 @@
 (require 
  "../ck.rkt"
  "../tree-unify.rkt"
- "../fd.rkt"
+ "../unstable/fd.rkt"
  "../tester.rkt")
 
 (provide test-fd test-fd-long)

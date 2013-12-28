@@ -1,6 +1,6 @@
 #lang racket
 
-(require "../../ak.rkt")
+(require "../../unstable/ak.rkt")
 (provide nnf prepare A E)
 
 ;; NNF taken from Oleg Kiselyov's translation of leanTAP

@@ -1,8 +1,9 @@
 #lang racket
 
-(require (except-in "ck.rkt" walk walk* occurs-check)
-         "src/constraints.rkt" "src/framework.rkt"
-         (rename-in "src/events.rkt" [findf e:findf]))
+(require (except-in cKanren/ck walk walk* occurs-check)
+         cKanren/src/constraints
+         cKanren/src/framework
+         (rename-in cKanren/src/events [findf e:findf]))
 (provide
  nom ==-check fresh-nom hash (rename-out [make-tie tie]) unify-s get-sus nom?
  (prefix-out nominal- walk)

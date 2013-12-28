@@ -3,10 +3,10 @@
 ;; Based on code written by Nada Amin
 ;; See: https://github.com/namin/clpset-miniKanren
 
-(require "ck.rkt" "tree-unify.rkt"
-         (rename-in (only-in "neq.rkt" =/= subsumes?) [=/= =/=-other])
+(require cKanren/ck cKanren/tree-unify
+         (rename-in (only-in cKanren/neq =/= subsumes?) [=/= =/=-other])
          (only-in rackunit check-equal?)
-         "src/framework.rkt" "src/events.rkt")
+         cKanren/src/framework cKanren/src/events)
 (provide set seto set-var normalize empty-set make-set
          enforce-lazy-unify-same =/= lazy-unify-same
          enforce-lazy-union-set lazy-union-set uniono
@@ -18,13 +18,13 @@
 ;; a set-var, a variable that can only be bound to a set
 (define-var-type set-var "s"
   #:methods gen:unifiable
-  [(define (compatible? u v s c)
+  [(define (compatible? u v s c e)
      (or (var? v) (set? v)))
-   (define (gen-unify u v e s c)
+   (define (gen-unify u v p s c e)
      (cond
       [(var? v) 
-       (unify e (ext-s v u s) c)]
-      [else (unify-set v u e s c)]))])
+       (unify p (ext-s v u s) c e)]
+      [else (unify-set v u p s c e)]))])
 
 ;; a set structure, where left is a list, and right is another set.
 ;; for example {1 2} = (set '(1) (set '(2) (empty-set)))
@@ -38,10 +38,10 @@
    (define (reify-mk-struct s r) 
      (reify-set (normalize s) r))]
   #:methods gen:unifiable
-  [(define (compatible? set v s c)
+  [(define (compatible? set v s c e)
      (or (var? v) (set? v)))
-   (define (gen-unify set v e s c)
-     (unify-set set v e s c))]
+   (define (gen-unify set v p s c e)
+     (unify-set set v p s c e))]
   #:methods gen:custom-write
   [(define (write-proc set port mode)
      (cond

@@ -3,7 +3,7 @@
 ;;; And now the tests from the old alphamk.scm
 
 (require
- (rename-in "../ak.rkt" [nominal-== ==])
+ (rename-in "../unstable/ak.rkt" [nominal-== ==])
  "../tester.rkt"
  "nominal/nnf.rkt" 
  "nominal/alphaleantap.rkt"

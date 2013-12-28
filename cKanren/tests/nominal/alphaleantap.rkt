@@ -1,7 +1,7 @@
 #lang racket
 
 (require 
- (rename-in "../../ak.rkt" [nominal-== ==]) 
+ (rename-in "../../unstable/ak.rkt" [nominal-== ==]) 
  "nnf.rkt"
  (only-in "../../ck.rkt" conde fresh project run))
 (provide proveo do-prove-th A E)

@@ -2,4 +2,5 @@
 
 (define deps (list))
 
-(define scribblings '(("doc/manual.scrbl" ())))
+;; (define scribblings '(("doc/manual.scrbl" ())))
+

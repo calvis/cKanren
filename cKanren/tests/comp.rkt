@@ -2,9 +2,8 @@
 
 (require 
  "../ck.rkt"
- "../fd.rkt"
+ "../unstable/fd.rkt"
  "../neq.rkt"
- "../fd.rkt"
  "../tree-unify.rkt"
  "../tester.rkt")
 
