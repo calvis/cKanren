@@ -3,6 +3,7 @@
 (require
  "../miniKanren.rkt"
  "../absento.rkt"
+ "../attributes.rkt"
  "../neq.rkt" 
  "../tester.rkt")
 (provide test-mk test-mk-long)
@@ -68,7 +69,7 @@
        ((zero?-primo exp env val))
        ((*-primo exp env val))
        ((if-primo exp env val))
-       ((symbolo exp) (lookupo exp env val))
+       ((symbol exp) (lookupo exp env val))
        ((fresh (rator rand x body env^ a)
           (== `(,rator ,rand) exp)
           (eval-expo rator env `(closure ,x ,body ,env^))
@@ -76,7 +77,7 @@
           (eval-expo body `((,x . ,a) . ,env^) val)))
        ((fresh (x body)
           (== `(lambda (,x) ,body) exp)
-          (symbolo x)
+          (symbol x)
           (== `(closure ,x ,body ,env) val)
           (not-in-envo 'lambda env))))))
 
@@ -99,14 +100,11 @@
 
 
 (define (test-mk)
-  (parameterize ([reify-prefix-dot #f]
-                 [reify-with-colon #f])
+  (test-check "0"
+              (run* (q) succeed)
+              '(_.0))
 
-    (test-check "0"
-                (run* (q) succeed)
-                '(_.0))
-
-    (test-check "1"
+  (test-check "1"
               (run 1 (q) (== 5 q))
               '(5))
 
@@ -239,7 +237,6 @@
 
   (test-check "lots of programs to make a 6"
               (run 12 (q) (eval-expo q '() `(intval ,(build-num 6))))
-              #;
               '((intexp (0 1 1))
                 (sub1 (intexp (1 1 1)))
                 (* (intexp (1)) (intexp (0 1 1)))
@@ -248,10 +245,11 @@
                 (* (intexp (0 1)) (intexp (1 1)))
                 (if #f _.0 (intexp (0 1 1)))
                 (sub1 (* (intexp (1)) (intexp (1 1 1))))
-                (((lambda (_.0) (intexp (0 1 1))) #t) (=/= ((_.0 numo))) (sym _.0))
                 (sub1 (* (intexp (1 1 1)) (intexp (1))))
-                (sub1 (sub1 (intexp (0 0 0 1))))
-                (sub1 (if #t (intexp (1 1 1)) _.0)))
+                (* (intexp (1 1)) (intexp (0 1)))
+                (sub1 (if #t (intexp (1 1 1)) _.0))
+                (((lambda (_.0) (intexp (0 1 1))) #t) (=/= ((_.0 numo))) (sym _.0)))
+              #;
               '((intexp (0 1 1))
                 (sub1 (intexp (1 1 1)))
                 (* (intexp (1)) (intexp (0 1 1)))
@@ -291,7 +289,7 @@
                  '()
                  `(intval ,(build-num 120))))
               `(f))
-))
+  )
 
 (define (test-mk-long)
   (test-mk))

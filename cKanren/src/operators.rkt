@@ -3,10 +3,10 @@
 (require "helpers.rkt"
          "infs.rkt"
          "errors.rkt"
-         "goals.rkt"
          "variables.rkt"
          "mk-structs.rkt"
          "debugging.rkt"
+         "constraints.rkt"
          racket/stxparam)
 
 (require 
@@ -16,16 +16,9 @@
 
 (provide (all-defined-out))
 
-;; defines a macro to create new unconstrained variables
-(define-syntax fresh-aux
-  (syntax-rules ()
-    [(_ constructor (x ...) g g* ...)
-     (let ([x (constructor 'x)] ...)
-       (conj g g* ...))]))
-
-;; miniKanren's "fresh" defined in terms of fresh-aux over vars
-(define-syntax-rule (fresh (x ...) g g* ...)
-  (fresh-aux var (x ...) g g* ...))
+;; succeed and fail are the simplest succeeding and failing ct
+(define succeed (lambda@ (a) a))
+(define fail    (lambda@ (a) mzerom))
 
 (define onceo (lambda (g) (condu (g))))
 
@@ -36,7 +29,7 @@
   (syntax-rules ()
     [(_ g) g]
     [(_ g g* ...)
-     (lambdag@ (a) (delay (start a g g* ...)))]))
+     (lambda@ (a) (delay (start a g g* ...)))]))
 
 (define-syntax-parameter conde
   (lambda (stx)
@@ -47,18 +40,18 @@
           (with-syntax ([(branches ...) (attribute branch-name)])
             #'(debug-conde [#:name branches g g* ...] ...))]
          [else 
-          #'(lambdag@ (a) 
-              (delay (mplusg* (bindg* (app-goal g a) g* ...) ...)))])])))
+          #'(lambda@ (a) 
+              (delay (mplusm* (start a g g* ...) ...)))])])))
 
 (define-syntax (debug-conde stx)
   (syntax-parse stx
     [(_ ((~optional (~seq #:name branch-name)) g g* ...) ...+)
      (with-syntax ([(labels ...) (attribute branch-name)])
-       #'(lambdag@/private (a : s c q t) 
+       #'(lambda@ (a [s c q t e])
            (delay 
-            (mplusg* 
+            (mplusm* 
              (let ([a (make-a s c q (add-level t 'labels))])
-               (bindg* (app-goal g a) g* ...))
+               (start a g g* ...))
              ...))))]))
 
 (define-syntax (debug stx)
@@ -76,52 +69,61 @@
           expr ...))]))
 
 (define-syntax-rule (conda (g0 g ...) (g1 g^ ...) ...)
-  (lambdag@ (a)
+  (lambda@ (a)
     (delay (ifa ((app-goal g0 a) g ...) 
                 ((app-goal g1 a) g^ ...) ...))))
 
 (define-syntax ifa
   (syntax-rules ()
-    ((_) mzerog)
+    ((_) fail)
     ((_ (e g ...) b ...)
      (let loop ((a-inf e))
        (case-inf a-inf
          (() (ifa b ...))
          ((f) (delay (loop (f))))
-         ((a) (bindg* a-inf g ...))
-         ((a f) (bindg* a-inf g ...)))))))
+         ((a) (bindm* a-inf g ...))
+         ((a f) (bindm* a-inf g ...)))))))
 
 (define-syntax-rule (condu (g0 g ...) (g1 g^ ...) ...)
-  (lambdag@ (a)
+  (lambda@ (a)
     (delay
      (ifu ((start a g0) g ...)
           ((start a g1) g^ ...) ...))))
 
 (define-syntax ifu
   (syntax-rules ()
-    ((_) mzerog)
+    ((_) fail)
     ((_ (e g ...) b ...)
      (let loop ((a-inf e))
        (case-inf a-inf
          (() (ifu b ...))
          ((f) (delay (loop (f))))
-         ((a) (bindg* a-inf g ...))
-         ((a f) (bindg* a g ...)))))))
+         ((a) (bindm* a-inf g ...))
+         ((a f) (bindm* a g ...)))))))
 
 (define-syntax-rule (project (x ...) g g* ...) 
-  (lambdag@ (a : s)
-    (let ((x (walk* x s)) ...)
-      ((conj g g* ...) a))))
+  (lambda@ (a : s)
+    (let ((x (walk*-internal x s)) ...)
+      (bindm a (conj g g* ...)))))
 
 ;; for debugging, a goal that prints the substitution and a goal
 ;; that prints a message.  both succeed.
 
 (define prt  
-  (lambdag@ (a) (begin (printf "~a\n" a) a)))
+  (lambda@ (a) (begin (printf "~a\n" a) a)))
+
+(require racket/pretty)
+(define pprt
+  (lambda@ (a [s c q t e])
+    (begin (pretty-print a) a)))
+
 (define (prtm . m) 
-  (lambdag@ (a) (begin (apply printf m) a)))
+  (lambda@ (a) (begin (apply printf m) a)))
 
 (define (prtt . m) 
-  (lambdag@/private (a : s c q t) 
+  (lambda@ (a [s c q t e]) 
     (begin (display t) (display " ") (apply printf m) a)))
+
+(define diaf
+  (lambda@ (a) (error 'diaf "dying: ~s" a)))
 

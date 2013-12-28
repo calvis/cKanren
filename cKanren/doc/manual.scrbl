@@ -75,7 +75,7 @@ program and succeeds. }
 @defproc*[([(prtm [str string?]) goal?]
            [(prtm [format-str string?] [args any/c?] ...) goal?])]{
 
-Returns a goal that prints @racket[str] or the reuslt of
+Returns a goal that prints @racket[str] or the result of
 @racket[(printf format-str args ...)] and then succeeds. }
 
 @defform[(run num (q) goal ...+)]
@@ -168,17 +168,6 @@ equivalent to @racket[(fm a)], but so much prettier. }
 arbitrary number of constraints together, threading through the state
 from left to right. }
 
-@defproc[(goal-construct [fm constraint?]) goal?]{ Turns a constraint
-into a goal that succeeds only when the constraint succeeds, and fails
-otherwise. }
-
-@examples[
-#:eval ck-eval
-(run* (q) identitym)
-(run* (q) (goal-construct identitym))
-(run* (q) (goal-construct mzerom))
-]
-
 @defstruct[oc ([proc constraint?] [rator symbol?] [rands list?])]{
 
 The stored version of a constraint.  @racket[proc] is an instance of
@@ -240,24 +229,22 @@ described in a later section. }
 
 @examples[
 #:eval ck-eval
-(run* (q) (goal-construct (update-s q 5)))
+(run* (q) (update-s q 5))
 (run* (q)
   (conde
-   [(goal-construct (update-s q 'x))]
-   [(goal-construct (update-s q 'y))]))
+   [(update-s q 'x)]
+   [(update-s q 'y)]))
 (define (best-pony pony)
   (update-s pony 'pinkie-pie))
-(define (best-ponyo pony)
-  (goal-construct (best-pony pony)))
-(run* (q) (best-ponyo q))
-(run* (q) (best-ponyo q) (goal-construct (update-s q 'fluttershy)))
+(run* (q) (best-pony q))
+(run* (q) (best-pony q) (update-s q 'fluttershy))
 ] 
 
 The last example fails because @racket[q] cannot be
 @racket['pinkie-pie] and @racket['fluttershy] simultaneously.
 
-If you think @racket[(goal-construct (update-s _arg ...))] can get a
-little wordy, you're right!  cKanren ships with a much more expressive
+If you think @racket[(update-s _arg ...)] can get a little wordy, 
+you're right!  cKanren ships with a much more expressive
 way to update the substitution called @deftech{unification}, which
 will be described in an appendix of this guide at some point.
 
@@ -277,12 +264,11 @@ constraint store if it contains any unground @racket[var?]s. }
       (cond
        [(not (var? x)) #f]
        [else (bindm a (update-c (build-oc fail-if-ground x)))]))))
-(define (fail-if-groundo x)
-  (goal-construct (fail-if-ground x)))
-(run* (q) (fail-if-groundo q)) ] 
+(run* (q) (fail-if-ground q) prt) ] 
 
 What happens if @racket[q] is ground after a @racket[fail-if-ground]
-constraint is placed in the constraint store?
+constraint is placed in the constraint store?  How is our stored
+constraint notified that @racket[q] is changed?
 
 @defproc[(run-constraints [x* list?] [ocs list?]) constriant?]{
 
@@ -292,9 +278,9 @@ Runs any constraint in @racket[ocs] that mentions any variable in
 @examples[
 #:eval ck-eval
 (run* (q)
-  (fail-if-groundo q)
+  (fail-if-ground q)
   prt
-  (goal-construct (update-s q 5)))
+  (update-s q 5))
 ]
 
 Updating the substitution with a new binding will rerun the
@@ -336,13 +322,13 @@ display the path they took through the program.  }
  (run* (q)
    (conde
     [#:name first
-     (goal-construct (update-s q 5))
+     (update-s q 5)
      prt]
     [#:name second
-     (goal-construct (update-s q 6))])))
+     (update-s q 6)])))
 ]
 
-The path that is displayed indicates the answer with @racket[q] bound
-to @racket[5] traveled through the @racket[conde] clause named
+The package that is displayed indicates the answer with @racket[q] 
+bound to @racket[5] traveled through the @racket[conde] clause named
 @racket[first].
 

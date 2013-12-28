@@ -19,6 +19,7 @@
 
 (define ((extend-parameter param) tag fn)
   (let ((fns (param)))
-    (and (not (assq tag fns))
-         (param (cons `(,tag . ,fn) fns)))))
+    (when (assq tag fns)
+      (error 'extend-parameter "duplicate tag: ~s" tag))
+    (param (cons `(,tag . ,fn) fns))))
 

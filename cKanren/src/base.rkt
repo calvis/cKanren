@@ -2,33 +2,30 @@
 
 ;; This file provides the minimum core of cKanren functionalities
 
-;; attributed variables
-(require "attributes.rkt") 
-(provide (struct-out attr-oc) build-attr-oc get-attributes default-reify-attr)
+(require "macros.rkt")
+(provide define-constraint-type transformer)
 
-;; constraint interactions
-(require "constraint-interactions.rkt") 
-(provide define-constraint-interaction)
+(provide define-constraint
+         constraint
+         add-constraint-event
+         remove-constraint-event)
 
 ;; constraints
 (require "constraints.rkt") 
-(provide identitym composem lambdam@)
+(provide succeed fail transformer? #%app-safe)
 
 ;; debugging
 (require "debugging.rkt") 
 
 ;; framework
 (require "framework.rkt") 
-(provide update-s replace-s goal-construct reify-cvar update-c-nocheck
-         update-package sort-by-lex<= lex<= default-reify bindm update-c
-         extend-reify-fns run-relevant-constraints extend-enforce-fns
-         define-lazy-goal reify-with-colon run run* run/lazy #%app-safe
-         use-constraints trace-define)
-(provide (for-syntax search-strategy))
+(provide add-association add-constraint constraint update-package run run*
+         sort-by-lex<= lex<= define-constraint-interaction)
+;; (provide (for-syntax search-strategy))
 
-;; goals
-(require "goals.rkt") 
-(provide lambdag@)
+;; lex
+(require "lex.rkt")
+(provide sort-by-lex<= lex<=)
 
 ;; mk-structs
 (require "mk-structs.rkt") 
@@ -36,13 +33,9 @@
          reify-mk-struct override-occurs-check? reify-term any/var? 
          any-relevant/var? walk* same-default-type?)
 
-;; ocs
-(require "ocs.rkt") 
-(provide (struct-out oc) build-oc)
-
 ;; operators
 (require "operators.rkt") 
-(provide succeed fail conj conde fresh fresh-aux conj mzerog unitg)
+(provide conj conde fresh fresh-aux)
 (provide ifu condu ifa conda project onceo)
 (provide debug debug-conde prt prtm prtt)
 
@@ -50,8 +43,11 @@
 (require "package.rkt") 
 (provide empty-a make-a)
 (provide occurs-check walk prefix-s ext-s ext-s*)
-(provide empty-c ext-c ext-c* memq-c remq-c remq*-c replace-ocs c->list
-         filter/rator filter-not/rator filter-memq/rator filter-not-memq/rator)
+(provide empty-c ext-c remq-c filter/rator filter-memq/rator)
+
+;; running
+(require "running.rkt")
+(provide run run* run/lazy define-constraint-interaction)
 
 ;; variables
 (require "variables.rkt") 

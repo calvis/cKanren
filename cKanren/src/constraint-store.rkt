@@ -1,73 +1,81 @@
-#lang racket/base
+#lang racket
 
-(require "helpers.rkt" "ocs.rkt")
-
-(provide (all-defined-out))
+(require "constraints.rkt")
 
 ;; == CONSTRAINT STORE =========================================================
+;; 
+;; A ConstraintStore is a [Hasheq Rator [List-of Rands]]
 
-;; wrapper for a constraint store
-(struct constraint-store (c)
-  #:methods gen:custom-write
-  [(define (write-proc . args) (apply write-constraint-store args))])
+(provide
+ ;; Value -> Boolean
+ ;; returns #t iff the value is a ConstraintStore (superfluously)
+ constraint-store?
 
-;; writes a constraint store
-(define (write-constraint-store constraint-store port mode)
-  (define fn (lambda (s) ((parse-mode mode) s port)))
-  (define c (constraint-store-c constraint-store))
-  (fn "#c[")
-  (let ([f (lambda (key ocs) (for ([oc ocs]) (fn " ") (fn oc)))])
-    (hash-for-each c f))
-  (unless (null? c) (fn " "))
-  (fn "]"))
+ ;; ConstraintStore
+ ;; an empty ConstraintStore
+ empty-c
 
-;; an empty constraint store
+ ;; Oc ConstraintStore -> ConstraintStore
+ ;; adds oc to the constraint store 
+ ext-c
+
+ ;; Oc ConstraintStore -> ConstraintStore
+ ;; removes the oc from the constraint store
+ remq-c
+
+ ;; ConstraintStore ConstraintStore -> [List-of Ocs]
+ prefix-c
+ 
+ ;; Rator ConstraintStore -> [List-of Rands]
+ ;; returns all the rands that have rator as a key
+ filter/rator
+
+ ;; [List-of Rator] ConstraintStore -> [List-of Rands]
+ ;; returns all the rands that have a rator in the given list
+ filter-memq/rator
+
+ ;; [Rator -> Boolean] ConstraintStore -> [List-of Oc]
+ ;; it filters something?????
+ filter-something/rator)
+
+(define constraint-store? hash?)
+
 (define empty-c (hasheq))
 
-;; extends the constraint store c with oc
-(define (ext-c oc c) 
-  (hash-update c (oc-rator oc) (lambda (ocs) (cons oc ocs)) '()))
+(define (ext-c new-oc c) 
+  (match-define (oc rator rands) new-oc)
+  (hash-update c rator (curry cons rands) '()))
 
-(define (ext-c* ocs c)
-  (for/fold ([c c]) ([oc ocs]) (ext-c oc c)))
+(define (remq-c new-oc c) 
+  (match-define (oc rator rands) new-oc)
+  (hash-update c rator (curry remove rands) '()))
 
-;; checks if oc is in c
-(define (memq-c oc c)
-  (let ([ocs (filter/rator (oc-rator oc) c)])
-    (memq oc ocs)))
+(define (prefix-c c c^)
+  (for/fold 
+   ([prefix '()])
+   ([(rator rands*^) c^])
+   (define rands* (hash-ref c rator '()))
+   (define (prefix-loop rands*^ prefix)
+     (cond
+      [(eq? rands* rands*^) prefix]
+      [else 
+       (define new-prefix (cons (oc rator (car rands*^)) prefix))
+       (prefix-loop (cdr rands*^) new-prefix)]))
+   (prefix-loop rands*^ prefix)))
 
-;; removes oc from c
-(define (remq-c oc c) 
-  (hash-update c (oc-rator oc) (lambda (ocs) (remq oc ocs)) '()))
-
-;; removes all ocs in oc* from c
-(define (remq*-c oc* c)
-  (for/fold ([c c]) ([oc oc*]) (remq-c oc c)))
-
-;; filters the constraint store
-(define (filter/rator key c)
-  (unless (hash? c)
-    (error 'filter/rator "not given a c ~s\n" c))
-  (hash-ref c key '()))
-
-(define (filter-not/rator sym c)
-  (unless (hash? c)
-    (error 'filter-not/rator "not given a c ~s\n" c))
-  (apply append (for/list ([key (remq sym (hash-keys c))]) (hash-ref c key '()))))
+(define (filter/rator rator c)
+  (hash-ref c rator '()))
 
 (define (filter-memq/rator symls c)
-  (unless (hash? c)
-    (error 'filter-memq/rator "not given a c ~s\n" c))
   (apply append (for/list ([key symls]) (hash-ref c key '()))))
 
-(define (filter-not-memq/rator symls c)
-  (unless (hash? c)
-    (error 'filter-not-memq/rator "not given a c ~s\n" c))
-  (apply append (for/list ([key (hash-keys c)])
-                          (cond
-                           [(memq key symls) '()]
-                           [else (hash-ref c key '())]))))
+;; TODO: wow such name so good
+(define (filter-something/rator pred? c)
+  (apply append 
+         (for/list ([(rator rands*) c])
+           (cond
+            [(pred? rator) 
+             (map (curry oc rator) rands*)]
+            [else '()]))))
 
-(define (c->list c)
-  (apply append (hash-values c)))
 

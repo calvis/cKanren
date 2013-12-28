@@ -46,10 +46,10 @@
     #:methods gen:unifiable
     [(define (compatible? my x s c)
        (or (var? x) (my-struct? x)))
-     (define (gen-unify my x e s c)
+     (define (gen-unify my x p s c e)
        (cond
-        [(var? x) (unify e (ext-s x my s) c)]
-        [else (unify-two (my-struct-a my) x e s c)]))])
+        [(var? x) (unify p (ext-s x my s) c e)]
+        [else (unify-two (my-struct-a my) x p s c e)]))])
   
   (struct my-other-struct my-struct (b)
     #:methods gen:mk-struct
@@ -61,15 +61,15 @@
     #:methods gen:unifiable
     [(define (compatible? my x s c)
        (or (var? x) (my-other-struct? x)))
-     (define (gen-unify my x e s c)
+     (define (gen-unify my x p s c e)
        (cond
-        [(var? x) (unify e (ext-s x my s) c)]
+        [(var? x) (unify p (ext-s x my s) c e)]
         [else 
          (let ([my-a (my-struct-a my)]
                [x-a  (my-struct-a x)]
                [my-b (my-other-struct-b my)]
                [x-b  (my-other-struct-b x)])
-           (unify-two my-a x-a `((,my-b . ,x-b) . ,e) s c))]))])
+           (unify-two my-a x-a `((,my-b . ,x-b) . ,p) s c e))]))])
   
   (test-check "4" (run* (q) (== q (my-struct 'x))) `((my-struct x)))
   (test-check "5" (run* (q) (== q (my-other-struct 'x 'y))) `((my-struct x)))

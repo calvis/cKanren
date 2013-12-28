@@ -2,249 +2,199 @@
 
 (require
  "../ck.rkt"
- "../absento.rkt"
+ "../attributes.rkt"
  "../tree-unify.rkt"
  "../neq.rkt"
  "../tester.rkt")
 
-(provide test-numbero test-numbero-long)
+(provide test-number test-number-long)
 
-(define (test-numbero)
-  (parameterize ([reify-prefix-dot #f]
-                 [reify-with-colon #f])
-      (test-check "numbero-1"
-              (run* (q) (numbero q))
-              '((_.0 (num _.0))))
+(define (test-number)
+  (test
+   (run* (q) (number q))
+   '((_.0 : (number _.0))))
+  
+  (test
+   (run* (q) (number q) (== 5 q))
+   '(5))
+  
+  (test
+   (run* (q) (== 5 q) (number q))
+   '(5))
 
-  (test-check "numbero-2"
-              (run* (q) (numbero q) (== 5 q))
-              '(5))
+  (test
+   (run* (q) (== 'x q) (number q))
+   '())
+  
+  (test
+   (run* (q) (number q) (== 'x q))
+   '())
+  
+  (test
+   (run* (q) (number q) (== `(1 . 2) q))
+   '())
+  
+  (test
+   (run* (q) (== `(1 . 2) q) (number q))
+   '())
+  
+  (test
+   (run* (q) (fresh (x) (number x)))
+   '(_.0))
+  
+  (test
+   (run* (q) (fresh (x) (number x)))
+   '(_.0))
+  
+  (test
+   (run* (q) (fresh (x) (number x) (== x q)))
+   '((_.0 : (number _.0))))
+  
+  (test
+   (run* (q) (fresh (x) (number q) (== x q) (number x)))
+   '((_.0 : (number _.0))))
+  
+  (test
+   (run* (q) (fresh (x) (number q) (number x) (== x q)))
+   '((_.0 : (number _.0))))
+  
+  (test
+   (run* (q) (fresh (x) (== x q) (number q) (number x)))
+   '((_.0 : (number _.0))))
+  
+  (test
+   (run* (q) (fresh (x) (number q) (== 5 x)))
+   '((_.0 : (number _.0))))
+  
+  (test
+   (run* (q) (fresh (x) (number q) (== 5 x) (== x q)))
+   '(5))
+  
+  (test
+   (run* (q) (fresh (x) (== q x) (number q) (== 'y x)))
+   '())
+  
+  (test
+   (run* (q) (number q) (=/= 'y q))
+   '((_.0 : (number _.0))))
+  
+  (test
+   (run* (q) (=/= 'y q) (number q))
+   '((_.0 : (number _.0))))
+  
+  (test
+   (run* (q) (number q) (=/= `(1 . 2) q))
+   '((_.0 : (number _.0))))
+  
+  (test
+   (run* (q) (number q) (=/= 5 q))
+   '((_.0 : (=/= ((_.0 . 5))) (number _.0))))
+  
+  (test
+   (run* (x y)
+     (number x)
+     (number y))
+   '(((_.0 _.1) : (number _.0 _.1))))
+  
+  (test
+   (run* (x y)
+     (number x)
+     (number x))
+   '(((_.0 _.1) : (number _.0))))
+  
+  (test
+   (run* (q)
+     (fresh (w x y z)
+       (=/= `(,w . ,x) `(,y . ,z))
+       (number w)
+       (number z)))
+   '(_.0))
 
-  (test-check "numbero-3"
-              (run* (q) (== 5 q) (numbero q))
-              '(5))
+  (test
+   (run* (w x y z)
+     (=/= `(,w . ,x) `(,y . ,z))
+     (number w)
+     (number z))
+   '(((_.0 _.1 _.2 _.3)
+      :
+      (=/= ((_.0 . _.2) (_.1 . _.3)))
+      (number _.0 _.3))))
+  
+  (test
+   (run* (w x y z)
+     (=/= `(,w . ,x) `(,y . ,z))
+     (number w)
+     (number y))
+   '(((_.0 _.1 _.2 _.3)
+      :
+      (=/= ((_.0 . _.2) (_.1 . _.3)))
+      (number _.0 _.2))))
+  
+  (test
+   (run* (w x y z)
+     (=/= `(,w . ,x) `(,y . ,z))
+     (number w)
+     (number y)
+     (== w y))
+   '(((_.0 _.1 _.0 _.2)
+      :
+      (=/= ((_.1 . _.2)))
+      (number _.0))))
+  
+  (test
+   (run* (w x) (=/= `(,w . ,x) `(a . b)))
+   '(((_.0 _.1) : (=/= ((_.0 . a) (_.1 . b))))))
 
-  (test-check "numbero-4"
-              (run* (q) (== 'x q) (numbero q))
-              '())
+  (test
+   (run* (w x)
+     (=/= `(,w . ,x) `(a . b))
+     (number w))
+   '(((_.0 _.1) : (number _.0))))
 
-  (test-check "numbero-5"
-              (run* (q) (numbero q) (== 'x q))
-              '())
+  (test
+   (run* (w x)
+     (number w)
+     (=/= `(,w . ,x) `(a . b)))
+   '(((_.0 _.1) : (number _.0))))
 
-  (test-check "numbero-6"
-              (run* (q) (numbero q) (== `(1 . 2) q))
-              '())
+  (test
+   (run* (w x)
+     (number w)
+     (=/= `(a . b) `(,w . ,x)))
+   '(((_.0 _.1) : (number _.0))))
 
-  (test-check "numbero-7"
-              (run* (q) (== `(1 . 2) q) (numbero q))
-              '())
+  (test
+   (run* (w x)
+     (number w)
+     (=/= `(a . ,x) `(,w . b)))
+   '(((_.0 _.1) : (number _.0))))
 
-  (test-check "numbero-8"
-              (run* (q) (fresh (x) (numbero x)))
-              '(_.0))
+  (test
+   (run* (w x)
+     (number w)
+     (=/= `(5 . ,x) `(,w . b)))
+   '(((_.0 _.1) : (=/= ((_.0 . 5) (_.1 . b))) (number _.0))))
+  
+  (test
+   (run* (x y z a b)
+     (number x)
+     (number y)
+     (number z)
+     (number a)
+     (number b)
+     (== `(,y ,z ,x ,b) `(,z ,x ,y ,a)))
+   '(((_.0 _.0 _.0 _.1 _.1) : (number _.0 _.1))))
+  
+  (test
+   (run* (x y z a b)
+     (== `(,y ,z ,x ,b) `(,z ,x ,y ,a))
+     (number x)
+     (number a))
+   '(((_.0 _.0 _.0 _.1 _.1) : (number _.0 _.1))))
+  )
 
-  (test-check "numbero-9"
-              (run* (q) (fresh (x) (numbero x)))
-              '(_.0))
-
-  (test-check "numbero-10"
-              (run* (q) (fresh (x) (numbero x) (== x q)))
-              '((_.0 (num _.0))))
-
-  (test-check "numbero-11"
-              (run* (q) (fresh (x) (numbero q) (== x q) (numbero x)))
-              '((_.0 (num _.0))))
-
-  (test-check "numbero-12"
-              (run* (q) (fresh (x) (numbero q) (numbero x) (== x q)))
-              '((_.0 (num _.0))))
-
-  (test-check "numbero-13"
-              (run* (q) (fresh (x) (== x q) (numbero q) (numbero x)))
-              '((_.0 (num _.0))))
-
-  (test-check "numbero-14-a"
-              (run* (q) (fresh (x) (numbero q) (== 5 x)))
-              '((_.0 (num _.0))))
-
-  (test-check "numbero-14-b"
-              (run* (q) (fresh (x) (numbero q) (== 5 x) (== x q)))
-              '(5))
-
-  (test-check "numbero-15"
-              (run* (q) (fresh (x) (== q x) (numbero q) (== 'y x)))
-              '())
-
-  (test-check "numbero-16-a"
-              (run* (q) (numbero q) (=/= 'y q))
-              '((_.0 (num _.0))))
-
-  (test-check "numbero-16-b"
-              (run* (q) (=/= 'y q) (numbero q))
-              '((_.0 (num _.0))))
-
-  (test-check "numbero-17"
-              (run* (q) (numbero q) (=/= `(1 . 2) q))
-              '((_.0 (num _.0))))
-
-  (test-check "numbero-18"
-              (run* (q) (numbero q) (=/= 5 q))
-              '((_.0 (=/= ((_.0 5))) (num _.0))))
-
-  (test-check "numbero-19"
-              (run* (q)
-                (fresh (x y)
-                  (numbero x)
-                  (numbero y)
-                  (== `(,x ,y) q)))
-              '(((_.0 _.1) (num _.0 _.1))))
-
-  (test-check "numbero-20"
-              (run* (q)
-                (fresh (x y)
-                  (== `(,x ,y) q)
-                  (numbero x)
-                  (numbero y)))
-              '(((_.0 _.1) (num _.0 _.1))))
-
-  (test-check "numbero-21"
-              (run* (q)
-                (fresh (x y)
-                  (== `(,x ,y) q)
-                  (numbero x)
-                  (numbero x)))
-              '(((_.0 _.1) (num _.0))))
-
-  (test-check "numbero-22"
-              (run* (q)
-                (fresh (x y)
-                  (numbero x)
-                  (numbero x)
-                  (== `(,x ,y) q)))
-              '(((_.0 _.1) (num _.0))))
-
-  (test-check "numbero-23"
-              (run* (q)
-                (fresh (x y)
-                  (numbero x)
-                  (== `(,x ,y) q)
-                  (numbero x)))
-              '(((_.0 _.1) (num _.0))))
-
-  (test-check "numbero-24-a"
-              (run* (q)
-                (fresh (w x y z)
-                  (=/= `(,w . ,x) `(,y . ,z))
-                  (numbero w)
-                  (numbero z)))
-              '(_.0))
-
-  (test-check "numbero-24-b"
-              (run* (q)
-                (fresh (w x y z)
-                  (=/= `(,w . ,x) `(,y . ,z))
-                  (numbero w)
-                  (numbero z)
-                  (== `(,w ,x ,y ,z) q)))
-              '(((_.0 _.1 _.2 _.3)
-                 (=/= ((_.0 _.2) (_.1 _.3)))
-                 (num _.0 _.3))))
-
-  (test-check "numbero-24-c"
-              (run* (q)
-                (fresh (w x y z)
-                  (=/= `(,w . ,x) `(,y . ,z))
-                  (numbero w)
-                  (numbero y)
-                  (== `(,w ,x ,y ,z) q)))
-              '(((_.0 _.1 _.2 _.3)
-                 (=/= ((_.0 _.2) (_.1 _.3)))
-                 (num _.0 _.2))))
-
-  (test-check "numbero-24-d"
-              (run* (q)
-                (fresh (w x y z)
-                  (=/= `(,w . ,x) `(,y . ,z))
-                  (numbero w)
-                  (numbero y)
-                  (== w y)
-                  (== `(,w ,x ,y ,z) q)))
-              '(((_.0 _.1 _.0 _.2)
-                 (=/= ((_.1 _.2)))
-                 (num _.0))))
-
-  (test-check "numbero-25"
-              (run* (q)
-                (fresh (w x)
-                  (=/= `(,w . ,x) `(a . b))
-                  (== `(,w ,x) q)))
-              '(((_.0 _.1) (=/= ((_.0 a) (_.1 b))))))
-
-  (test-check "numbero-26"
-              (run* (q)
-                (fresh (w x)
-                  (=/= `(,w . ,x) `(a . b))
-                  (numbero w)
-                  (== `(,w ,x) q)))
-              '(((_.0 _.1) (num _.0))))
-
-  (test-check "numbero-27"
-              (run* (q)
-                (fresh (w x)
-                  (numbero w)
-                  (=/= `(,w . ,x) `(a . b))
-                  (== `(,w ,x) q)))
-              '(((_.0 _.1) (num _.0))))
-
-  (test-check "numbero-28"
-              (run* (q)
-                (fresh (w x)
-                  (numbero w)
-                  (=/= `(a . b) `(,w . ,x))
-                  (== `(,w ,x) q)))
-              '(((_.0 _.1) (num _.0))))
-
-  (test-check "numbero-29"
-              (run* (q)
-                (fresh (w x)
-                  (numbero w)
-                  (=/= `(a . ,x) `(,w . b))
-                  (== `(,w ,x) q)))
-              '(((_.0 _.1) (num _.0))))
-
-  (test-check "numbero-30"
-              (run* (q)
-                (fresh (w x)
-                  (numbero w)
-                  (=/= `(5 . ,x) `(,w . b))
-                  (== `(,w ,x) q)))
-              '(((_.0 _.1) (=/= ((_.0 5) (_.1 b))) (num _.0))))
-
-  (test-check "numbero-31"
-              (run* (q)
-                (fresh (x y z a b)
-                  (numbero x)
-                  (numbero y)
-                  (numbero z)
-                  (numbero a)
-                  (numbero b)
-                  (== `(,y ,z ,x ,b) `(,z ,x ,y ,a))
-                  (== q `(,x ,y ,z ,a ,b))))
-              '(((_.0 _.0 _.0 _.1 _.1) (num _.0 _.1))))
-
-  (test-check "numbero-32"
-              (run* (q)
-                (fresh (x y z a b)
-                  (== q `(,x ,y ,z ,a ,b))
-                  (== `(,y ,z ,x ,b) `(,z ,x ,y ,a))
-                  (numbero x)
-                  (numbero a)))
-              '(((_.0 _.0 _.0 _.1 _.1) (num _.0 _.1))))
-  ))
-
-(define (test-numbero-long)
-  (test-numbero))
+(define (test-number-long)
+  (test-number))
 
 (module+ main
-  (test-numbero-long))
+  (test-number-long))

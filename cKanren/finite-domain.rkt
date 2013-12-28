@@ -29,7 +29,7 @@
           (lambda (ls)
             (cond
               ((null? ls)
-               (lambdag@ (a) mzerog))
+               fail)
               (else
                (conde
                 ((f (car ls)))
