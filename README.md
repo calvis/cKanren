@@ -62,7 +62,3 @@ The following libraries have been tested extensively.
 
 All other constraints libraries are experimental.
 
-For constraint writers
-----------------------
-
-Documentation of cKanren is available by running `raco docs cKanren`.
