@@ -1,7 +1,6 @@
 #lang setup/infotab
 
+(define version "0.0")
+
 (define collection 'multi)
-<<<<<<< HEAD
-(define deps (list))
-=======
->>>>>>> dev
+(define deps '("base"))
