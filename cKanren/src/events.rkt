@@ -26,9 +26,10 @@
   ;; together into a single event.  cannot fail.
   (gen-pessimistic-merge event e)
 
-  ;; [Event -> Boolean] Event -> [Maybe Event]
+  ;; [Event -> Boolean] Event [Maybe Event] -> [Maybe Event]
   ;; finds an event inside the argument event that satisfies fn, if it exists
-  (gen-findf fn event)
+  ;; will look inside chain events off of ce if building a chain for ce
+  (gen-findf fn event ce)
 
   ;; [Event -> Boolean] Event -> [List-of Event]
   ;; returns a list of all sub-events of event that satisfy fn
@@ -47,14 +48,12 @@
      #f)
    (define (gen-pessimistic-merge e e^)
      (make-composite-event (list e e^)))
-   (define (gen-findf fn e) 
+   (define (gen-findf fn e ce)
      (and (fn e) e))
    (define (gen-filter fn e)
      (if (fn e) (list e) (list)))
-   (define (gen-solidify solid e)
-     e)
-   (define (gen-remove-chains e)
-     e)])
+   (define (gen-solidify solid e) e)
+   (define (gen-remove-chains e) e)])
 
 (define-generics compound-event)
 
@@ -79,11 +78,10 @@
    [else (gen-pessimistic-merge e e^)]))
 
 ;; [Event -> Boolean] Event -> [Maybe Event]
-(define (findf fn e)
+(define (findf fn e [ce #f])
   (unless (event? e)
     (error 'findf "not an event: ~a" e))
-  (or (and (fn e) e)
-      (gen-findf fn e)))
+  (or (and (fn e) e) (gen-findf fn e ce)))
 
 ;; [Event -> Boolean] Event -> [List-of Event]
 (define (filter fn e)
@@ -138,7 +136,7 @@
         #:methods gen:event
         [(define (gen-optimistic-merge e e^) #f)
          (define (gen-pessimistic-merge e e^) e^)
-         (define (gen-findf fn e) #f)])
+         (define (gen-findf fn e ce) #f)])
 
 (define empty-e (empty-event))
 
@@ -192,9 +190,9 @@
            (cond
             [(empty-event? e^) e]
             [else (make-composite-event (cons e^ es))]))
-         (define (gen-findf fn e)
+         (define (gen-findf fn e ce)
            (match-define (composite-event es) e)
-           (ormap (curry findf fn) es))
+           (ormap (lambda (e) (findf fn e ce)) es))
          (define (gen-filter fn e)
            (match-define (composite-event es) e)
            (append-map (curry filter fn) es))
@@ -267,12 +265,13 @@
          (define (gen-pessimistic-merge e e^)
            (match-define (running-event r w) e)
            (running-event r (pessimistic-merge w e^)))
-         (define (gen-findf fn e)
+         (define (gen-findf fn e ce)
            (match-define (running-event r w) e)
-           (or (findf fn r)
+           (or (findf fn r ce)
                (match w
                  [(build-chain-event tr old new)
-                  (findf fn new)]
+                  (or (findf fn new ce)
+                      (findf fn old tr))]
                  [else #f])))
          (define (gen-filter fn e)
            (match-define (running-event r w) e)
@@ -318,6 +317,34 @@
          (list
           (add-substitution-prefix-event `((,u . a)))
           (remove-constraint-event/internal rator1 rands1))))))
+     (add-substitution-prefix-event `((,u . a)))))
+
+  (let ([u (var 'u)]
+        [ce (add-substitution-prefix-event '())])
+    (ru:check-equal?
+     (findf
+      (curryr relevant? u)
+      (build-chain-event
+       ce
+       (chain-event 
+        ce
+        (add-substitution-prefix-event `((,u . a))))
+       (empty-event)))
+     (add-substitution-prefix-event `((,u . a)))))
+
+  (let ([u (var 'u)]
+        [ce (add-substitution-prefix-event '())])
+    (ru:check-equal?
+     (findf
+      (curryr relevant? u)
+      (running-event
+       (empty-event)
+       (build-chain-event
+        ce
+        (chain-event 
+         ce
+         (add-substitution-prefix-event `((,u . a))))
+        (empty-event))))
      (add-substitution-prefix-event `((,u . a))))))
 
 (define (relevant? x)
@@ -375,9 +402,9 @@
             [else #f]))
          ;; we can only be here if we have willingly gone into the
          ;; waiting event of a running event. so continue on.
-         (define (gen-findf fn e)
+         (define (gen-findf fn e ce)
            (match-define (build-chain-event trigger old new) e)
-           (findf fn new))
+           (or (findf fn new) (findf fn old trigger)))
          (define (gen-pessimistic-merge e e^)
            (match-define (build-chain-event trigger old new) e)
            (build-chain-event trigger old (pessimistic-merge new e^)))])
@@ -402,8 +429,9 @@
 (struct chain-event (head tail)
         #:transparent
         #:methods gen:event 
-        [(define (gen-findf fn e)
-           #f)
+        [(define (gen-findf fn e ce)
+           (match-define (chain-event head tail) e)
+           (and ce (eq? ce head) (findf fn tail ce)))
          (define (gen-solidify solid e)
            (match-define (chain-event head tail) e)
            (cond

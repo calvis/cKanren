@@ -119,10 +119,11 @@
                (syntax-parse #'reifykw.reified
                  [#t #'(default-reify 'fn-name args.arg ...)]
                  [#f #f]
-                 [x #'(reifykw.reified ans r)]))
+                 [(#t expr) #'(values 'fn-name expr)]
+                 [(#f expr) #'(expr ans r)]))
              (define/with-syntax reifyfn
                (cond
-                [(syntax-e #'reify-body) 
+                [(syntax-e #'reifykw.reified) 
                  #'(lambda (args.arg ...)
                      (lambda (ans r)
                        (let ([args.arg (args.fn args.arg r)] ...)

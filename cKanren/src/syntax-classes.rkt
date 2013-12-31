@@ -43,9 +43,10 @@
    #:attributes (reified)
    (pattern (~seq #:reified)
             #:with reified #'#t)
-   (pattern (~seq #:reification-function reified:expr))
+   (pattern (~seq #:reification-function _reify-expr:expr)
+            #:with reified #'(#f _reify-expr))
    (pattern (~seq #:reify reify-expr:expr)
-            #:with reified #'(lambda (v r) reify-expr))
+            #:with reified #'(#t reify-expr))
    (pattern (~seq) #:with reified #'#f))
 
  (define-splicing-syntax-class unique-keyword

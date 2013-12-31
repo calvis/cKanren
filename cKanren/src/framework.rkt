@@ -199,9 +199,14 @@
   ((apply r rands) a))
 
 (define (add-association x v)
-  (let ([x (if (var? x) x v)]
-        [v (if (var? x) v x)])
-    (send-event (add-association-event x v))))
+  (lambda@ (a [s c q t e])
+    (let ([x (walk x s c e)] [v (walk v s c e)])
+      (let ([x (if (var? x) x v)]
+            [v (if (var? x) v x)])
+        (cond
+         [(eq? x v) a]
+         [(not (var? x)) #f]
+         [else (bindm a (send-event (add-association-event x v)))])))))
 
 (define (add-constraint an-oc)
   (match-define (oc rator rands) an-oc)
@@ -269,7 +274,7 @@
     (define r (reify-s v empty-s))
     
     ;; then sort and return a reified version of all constraints
-    (sort-store (run-reify-fns v r c))))
+    (sort-store (run-reify-fns v r c #f))))
 
 (define (reify-constraints v r store)
   (define store^ (run-reify-fns v r store))
@@ -281,20 +286,23 @@
 ;; sorts the constraint store by lex<=
 (define (sort-store ocs) (sort ocs lex<= #:key car))
 
-(define (run-reify-fns v r store)
+(define (run-reify-fns v r store [with-vars-check? #t])
   (hash->list
    (for*/fold
     ([h (hasheq)])
     ([(rator rands*) store]
      #:when (-constraint-reifyfn rator)
      [rands rands*])
-    (define-values (sym ans)
-      ((apply (-constraint-reifyfn rator) rands) v r))
     (cond
-     [(any/var? ans) h]
-     [else
-      (define updatefn (curry insert-in-lex-order ans))
-      (hash-update h sym updatefn '())]))))
+     [(or (not with-vars-check?) (any/var? rands))
+      (define-values (sym ans)
+        ((apply (-constraint-reifyfn rator) rands) v r))
+      (cond
+       [(any/var? ans) h]
+       [else
+        (define updatefn (curry insert-in-lex-order ans))
+        (hash-update h sym updatefn '())])]
+     [else h]))))
 
 ;; given a new substitution and constraint store, adds the prefixes of
 ;; each to the existing substitution and constraint store. the

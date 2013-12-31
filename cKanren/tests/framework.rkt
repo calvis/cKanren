@@ -361,3 +361,8 @@
 
 (let ()
   (test (exit/ir (extend/ir (start/ir) #:var q (add-association q 5))) '(5)))
+
+(let ()
+  (define-constraint (ex x)
+    #:reify 5)
+  (test (run* (q) (ex q)) '((_.0 : (ex 5)))))
