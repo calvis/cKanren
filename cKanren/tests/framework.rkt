@@ -11,44 +11,40 @@
  cKanren/src/running
  cKanren/src/triggers
  cKanren/src/macros
+ cKanren/src/substitution
  racket/generator
  "../tester.rkt")
-
-(require cKanren/src/substitution)
 
 (define u (var 'u))
 
 (let ()
   (define test-event
-    (running-event
+    (build-chain-event
      (add-association-event u 'a)
-     (build-chain-event
-      (add-substitution-prefix-event '())
-      (empty-event)
-      (composite-event
-       (list (add-substitution-prefix-event `((,u . b))))))))
+     (empty-event)
+     (add-substitution-prefix-event '())
+     (composite-event
+      (list (add-substitution-prefix-event `((,u . b)))))))
   (test (walk u '() #f test-event) 'a))
 
 (let ()
   (define test-event
-    (running-event
+    (build-chain-event
      (add-substitution-prefix-event `((,u . a)))
-     (build-chain-event
-      (add-substitution-prefix-event '())
-      (empty-event)
-      (composite-event
-       (list (add-substitution-prefix-event `((,u . b))))))))
+     (empty-event)
+     (add-substitution-prefix-event '())
+     (composite-event
+      (list (add-substitution-prefix-event `((,u . b)))))))
   (test (walk u '() #f test-event) 'a))
 
 (let ()
   (define test-event
-    (running-event
+    (build-chain-event
      (add-substitution-prefix-event `())
-     (build-chain-event
-      (add-substitution-prefix-event '())
-      (empty-event)
-      (composite-event
-       (list (add-substitution-prefix-event `((,u . b))))))))
+     (empty-event)
+     (add-substitution-prefix-event '())
+     (composite-event
+      (list (add-substitution-prefix-event `((,u . b)))))))
   (test (walk u '() #f test-event) 'b))
 
 (let ()
@@ -380,7 +376,7 @@
   (define-constraint (fooi an-oc) 
     #:reaction
     [(removed-constraint (if an-oc (list an-oc) (list)))
-     (add-constraint (fooi #f))]
+     (fooi #f)]
     #:reaction
     [(added-constraint
       (lambda (an-oc^) 
@@ -434,7 +430,6 @@
           (check-store-not-empty fooi))
         '(_.0))
 
-  (printf "===================================================\n")
   (test (run* (q) 
           (send-event
            (composite-event

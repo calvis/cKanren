@@ -196,21 +196,19 @@
 (define (chain tr)
   (lambda@ (a [s c q t e])
     (match-define (running-event r w) e)
-    (define new-e 
-      (running-event r (build-chain-event tr w (empty-event))))
+    (define new-e (build-chain-event r w tr (empty-event)))
     (make-a s c q t new-e)))
 
 (define (unchain rs? ct)
   (lambda@ (a [s c q t e])
-    (match-define (running-event r w) e)
-    (match w
-      [(build-chain-event tr old new)
-       (define new-e (running-event r (apply-chain w)))
+    (match e 
+      [(build-chain-event r w tr new)
+       (define new-e (apply-chain e))
        (define new-a (make-a s c q t new-e))
        (cond
         [(findf rs? new) new-a]
         [else (bindm new-a ct)])]
-      [else a])))
+      [(running-event r w) a])))
 
 (define (apply-response r rands a)
   ((apply r rands) a))

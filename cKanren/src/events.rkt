@@ -99,8 +99,6 @@
   (cond
    [(running-event? e) #f]
    [(running-event? e^) #t]
-   [(build-chain-event? e) #f]
-   [(build-chain-event? e^) #t]
    [(composite-event? e) #f]
    [(composite-event? e^) #t]
    [else #t]))
@@ -145,10 +143,6 @@
   (ru:check-true
    (<e (composite-event (list (empty-event) (empty-event)))
        (running-event (empty-event) (empty-event))))
-  #;
-  (ru:check-true
-   (<e (remove-constraint-event rators1 rands1)
-       (composite-event (list (empty-event) (empty-event)))))
   ;; TODO: MORE EXAMPLES
   (ru:check-equal? 
    (pessimistic-merge (empty-event) (empty-event))
@@ -244,149 +238,24 @@
         #:methods gen:event
         [(define (gen-optimistic-merge e e^)
            (match-define (running-event r w) e)
-           (match w
-             [(build-chain-event tr old new)
-              (=> abort)
-              (cond
-               [(optimistic-merge tr e^)
-                (running-event
-                 (optimistic-merge r e^)
-                 (compose-events old new))]
-               [else (abort)])]
-             [_
-              (cond
-               [(optimistic-merge r e^)
-                => (curryr running-event w)]
-               [(optimistic-merge w e^)
-                => (curry running-event r)]
-               [else #f])]))
+           (cond
+             [(optimistic-merge r e^)
+              => (curryr running-event w)]
+             [(optimistic-merge w e^)
+              => (curry running-event r)]
+             [else #f]))
          (define (gen-pessimistic-merge e e^)
            (match-define (running-event r w) e)
            (running-event r (pessimistic-merge w e^)))
          (define (gen-findf fn e ce)
            (match-define (running-event r w) e)
-           (or (findf fn r ce)
-               (match w
-                 [(build-chain-event tr old new)
-                  (or (findf fn new ce)
-                      (findf fn old tr))]
-                 [else #f])))
+           (findf fn r ce))
          (define (gen-filter fn e)
            (match-define (running-event r w) e)
            (filter fn r))
          (define (gen-solidify solid e)
            (error 'gen-solidify "internal error: ~a" e))]
         #:methods gen:compound-event [])
-
-(module+ test
-  (ru:check-equal?
-   (findf 
-    association-event?
-    (running-event
-     (add-substitution-prefix-event '())
-     (empty-event)))
-   (add-substitution-prefix-event '()))
-  
-  (let ([u (var 'u)])
-    (ru:check-equal?
-     (findf
-      (curry relevant? u)
-      (running-event
-       (add-substitution-prefix-event `((,u . a)))
-       (build-chain-event
-        (add-substitution-prefix-event '())
-        (empty-event)
-        (composite-event
-         (list
-          (add-substitution-prefix-event `((,u . b)))
-          (remove-constraint-event/internal rator1 rands1))))))
-     (add-substitution-prefix-event `((,u . a)))))
-
-  (let ([u (var 'u)])
-    (ru:check-equal?
-     (findf
-      (curry relevant? u)
-      (running-event
-       (add-substitution-prefix-event '())
-       (build-chain-event
-        (add-substitution-prefix-event '())
-        (empty-event)
-        (composite-event
-         (list
-          (add-substitution-prefix-event `((,u . a)))
-          (remove-constraint-event/internal rator1 rands1))))))
-     (add-substitution-prefix-event `((,u . a)))))
-
-  (let ([u (var 'u)]
-        [ce (add-substitution-prefix-event '())])
-    (ru:check-equal?
-     (findf
-      (curry relevant? u)
-      (build-chain-event
-       ce
-       (chain-event 
-        ce
-        (add-substitution-prefix-event `((,u . a))))
-       (empty-event)))
-     (add-substitution-prefix-event `((,u . a)))))
-
-  (let ([u (var 'u)]
-        [ce (add-substitution-prefix-event '())])
-    (ru:check-equal?
-     (findf
-      (curry relevant? u)
-      (running-event
-       (empty-event)
-       (build-chain-event
-        ce
-        (chain-event 
-         ce
-         (add-substitution-prefix-event `((,u . a))))
-        (empty-event))))
-     (add-substitution-prefix-event `((,u . a)))))
-
-  (let ([u (var 'u)]
-        [ce (add-substitution-prefix-event '((g t)))])
-    (ru:check-equal?
-     (findf
-      (curry relevant? u)
-      (running-event 
-       ce
-       (build-chain-event 
-        ce
-        (chain-event ce 
-                     (composite-event 
-                      (list 
-                       (add-substitution-prefix-event `((r)))
-                       (constraint-event (lambda (x) x) `(t f g))
-                       (add-substitution-prefix-event `((,u f . r)))
-                       (constraint-event (lambda (x) x) `(g ,u g)))))
-        (constraint-event (lambda (x) x) `(g ,u)))))
-     (add-substitution-prefix-event `((,u f . r)))))
-
-  (let ([u (var 'u)]
-        [ce (add-substitution-prefix-event '((g t)))])
-    (ru:check-equal?
-     (findf
-      (curry relevant? u)
-      (running-event 
-       ce
-       (build-chain-event 
-        ce
-        (chain-event ce 
-                     (composite-event 
-                      (list 
-                       (leave-scope-event 'r)
-                       (leave-scope-event 'f)
-                       (add-substitution-prefix-event `((r)))
-                       (constraint-event (lambda (x) x) `(t f g))
-                       (add-substitution-prefix-event `((,u f . r)))
-                       (enter-scope-event 'r)
-                       (enter-scope-event 'f)
-                       (constraint-event (lambda (x) x) `(g f g)))))
-        (constraint-event (lambda (x) x) `(g ,u)))))
-     (add-substitution-prefix-event `((,u f . r))))))
-
 
 (define (relevant? x e)
   (and (association-event? e)
@@ -431,39 +300,166 @@
          (struct remove-name remove-constraint-event/internal ()
                  #:transparent))]))
 
-(struct build-chain-event (trigger old new)
+(struct build-chain-event running-event (trigger new)
         #:transparent
         #:methods gen:event 
         [(define (gen-optimistic-merge e e^)
-           (match-define (build-chain-event trigger old new) e)
+           (match-define (build-chain-event r w tr new) e)
            (cond
+            [(optimistic-merge tr e^)
+             (running-event (optimistic-merge r e^)
+                            (compose-events w new))]
             [(optimistic-merge new e^)
-             => (curry build-chain-event trigger old)]
+             => (curry build-chain-event r w tr)]
             [else #f]))
          ;; we can only be here if we have willingly gone into the
          ;; waiting event of a running event. so continue on.
          (define (gen-findf fn e ce)
-           (match-define (build-chain-event trigger old new) e)
-           (or (findf fn new) (findf fn old trigger)))
+           (match-define (build-chain-event r w tr new) e)
+           (or (findf fn r) (findf fn new) (findf fn w tr)))
          (define (gen-pessimistic-merge e e^)
-           (match-define (build-chain-event trigger old new) e)
-           (build-chain-event trigger old (pessimistic-merge new e^)))])
+           (match-define (build-chain-event r w tr new) e)
+           (build-chain-event r w tr (pessimistic-merge new e^)))
+         (define (gen-filter fn e)
+           (match-define (running-event r w) e)
+           (filter fn r))])
+
+(module+ test
+  (ru:check-equal?
+   (compose-events
+    (add-constraint-event/internal rator1 rands1)
+    (build-chain-event
+     (add-constraint-event/internal rator2 rands2)
+     (empty-event)
+     (add-constraint-event/internal rator2 rands2)
+     (composite-event
+      (list
+       (add-constraint-event/internal rator1 rands2)
+       (remove-constraint-event/internal rator1 rands1)))))
+   (build-chain-event
+    (add-constraint-event/internal rator2 rands2)
+    (empty-event)
+    (add-constraint-event/internal rator2 rands2)
+    (add-constraint-event/internal rator1 rands2)))
+
+  (ru:check-equal?
+   (findf 
+    association-event?
+    (running-event
+     (add-substitution-prefix-event '())
+     (empty-event)))
+   (add-substitution-prefix-event '()))
+  
+  (let ([u (var 'u)])
+    (ru:check-equal?
+     (findf
+      (curry relevant? u)
+      (build-chain-event
+       (add-substitution-prefix-event `((,u . 1)))
+       (add-substitution-prefix-event `())
+       (add-substitution-prefix-event `((,u . 2)))
+       (composite-event
+        (list
+         (add-substitution-prefix-event `((,u . 3)))
+         (remove-constraint-event/internal rator1 rands1)))))
+     (add-substitution-prefix-event `((,u . 1)))))
+
+  (let ([u (var 'u)])
+    (ru:check-equal?
+     (findf
+      (curry relevant? u)
+      (build-chain-event
+       (add-substitution-prefix-event '())
+       (add-substitution-prefix-event '())
+       (empty-event)
+       (composite-event
+        (list
+         (add-substitution-prefix-event `((,u . a)))
+         (remove-constraint-event/internal rator1 rands1)))))
+     (add-substitution-prefix-event `((,u . a)))))
+
+  (let ([u (var 'u)]
+        [ce (add-substitution-prefix-event '())])
+    (ru:check-equal?
+     (findf
+      (curry relevant? u)
+      (build-chain-event
+       ce
+       (chain-event 
+        ce
+        (add-substitution-prefix-event `((,u . a))))
+       ce
+       (empty-event)))
+     (add-substitution-prefix-event `((,u . a)))))
+
+  (let ([u (var 'u)]
+        [ce (add-substitution-prefix-event '())])
+    (ru:check-equal?
+     (findf
+      (curry relevant? u)
+      (build-chain-event
+       (empty-event)
+       (chain-event 
+        ce
+        (add-substitution-prefix-event `((,u . a))))
+       ce
+       (empty-event)))
+     (add-substitution-prefix-event `((,u . a)))))
+
+  (let ([u (var 'u)]
+        [ce (add-substitution-prefix-event '((g t)))])
+    (ru:check-equal?
+     (findf
+      (curry relevant? u)
+      (build-chain-event 
+       ce
+       (chain-event ce 
+                    (composite-event 
+                     (list 
+                      (add-substitution-prefix-event `((r)))
+                      (constraint-event (lambda (x) x) `(t f g))
+                      (add-substitution-prefix-event `((,u f . r)))
+                      (constraint-event (lambda (x) x) `(g ,u g)))))
+       ce
+       (constraint-event (lambda (x) x) `(g ,u))))
+     (add-substitution-prefix-event `((,u f . r)))))
+
+  (let ([u (var 'u)]
+        [ce (add-substitution-prefix-event '((g t)))])
+    (ru:check-equal?
+     (findf
+      (curry relevant? u)
+      (build-chain-event 
+       ce
+       (chain-event ce 
+                    (composite-event 
+                     (list 
+                      (leave-scope-event 'r)
+                      (leave-scope-event 'f)
+                      (add-substitution-prefix-event `((r)))
+                      (constraint-event (lambda (x) x) `(t f g))
+                      (add-substitution-prefix-event `((,u f . r)))
+                      (enter-scope-event 'r)
+                      (enter-scope-event 'f)
+                      (constraint-event (lambda (x) x) `(g f g)))))
+       ce
+       (constraint-event (lambda (x) x) `(g ,u))))
+     (add-substitution-prefix-event `((,u f . r))))))
+
 
 (module+ test
   (ru:check-equal?
    (compose-events
     (build-chain-event
      (add-association-event 'q 5)
-     (running-event
-      (add-association-event 'q 5)
-      (empty-event))
+     (add-association-event 'q 5)
+     (add-association-event 'q 5)
      (empty-event))
     (constraint-event rator1 rands1))
    (build-chain-event
     (add-association-event 'q 5)
-    (running-event
-     (add-association-event 'q 5)
-     (empty-event))
+    (add-association-event 'q 5)
+    (add-association-event 'q 5)
     (constraint-event rator1 rands1))))
 
 (struct chain-event (head tail)
@@ -484,8 +480,8 @@
 ;; Event -> Event
 ;; replace trigger with (chain-event trigger stored)
 (define (apply-chain e)
-  (match-define (build-chain-event trigger old new) e)
-  (compose-events old (chain-event trigger new)))
+  (match-define (build-chain-event r w tr new) e)
+  (running-event r (compose-events w (chain-event tr new))))
 
 (module+ test
   (let ([trigger (add-association-event 'q 5)])
@@ -494,16 +490,19 @@
       (build-chain-event
        trigger
        (empty-event)
+       trigger
        (composite-event
         (list
          (constraint-event rator1 rands2)
          (constraint-event rator1 rands1)))))
-     (chain-event
+     (running-event
       trigger
-      (composite-event
-       (list
-        (constraint-event rator1 rands2)
-        (constraint-event rator1 rands1)))))))
+      (chain-event
+       trigger
+       (composite-event
+        (list
+         (constraint-event rator1 rands2)
+         (constraint-event rator1 rands1))))))))
 
 ;; [List-of Event] Event -> Event
 (define (solidify solid e)
@@ -542,3 +541,4 @@
   (struct name (args ...)
           #:transparent
           #:methods gen:event []))
+
