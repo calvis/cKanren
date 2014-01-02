@@ -1,6 +1,6 @@
 #lang racket
 
-(require (only-in "variables.rkt" var?)
+(require (only-in "variables.rkt" cvar? var?)
          (only-in "events.rkt" relevant? findf walk/shortcut))
 
 ;; == SUBSTITUTIONS ============================================================
@@ -87,15 +87,15 @@
     (walk/internal u s)]
    [(u s c e)
     (cond
-     [(not (var? u)) u]
+     [(not (cvar? u)) u]
      [(cond
-       [(findf (curryr relevant? u) e)
+       [(findf (curry relevant? u) e)
         => (curry walk/shortcut u)]
        [else #f])]
      [else (walk/internal u s)])]))
 
 (define (walk/internal v s)
   (cond
-   [(and (var? v) (assq v s))
+   [(and (cvar? v) (assq v s))
     => (lambda (a) (walk/internal (cdr a) s))]
    [else v]))

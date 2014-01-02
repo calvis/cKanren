@@ -117,8 +117,6 @@
    [else
     (or (optimistic-merge e e^)
         (pessimistic-merge e e^))]))
-(require racket/trace)
-;; (trace compose-events)
 
 (module+ test
   (ru:check-equal?
@@ -292,7 +290,7 @@
   (let ([u (var 'u)])
     (ru:check-equal?
      (findf
-      (curryr relevant? u)
+      (curry relevant? u)
       (running-event
        (add-substitution-prefix-event `((,u . a)))
        (build-chain-event
@@ -307,7 +305,7 @@
   (let ([u (var 'u)])
     (ru:check-equal?
      (findf
-      (curryr relevant? u)
+      (curry relevant? u)
       (running-event
        (add-substitution-prefix-event '())
        (build-chain-event
@@ -323,7 +321,7 @@
         [ce (add-substitution-prefix-event '())])
     (ru:check-equal?
      (findf
-      (curryr relevant? u)
+      (curry relevant? u)
       (build-chain-event
        ce
        (chain-event 
@@ -336,7 +334,7 @@
         [ce (add-substitution-prefix-event '())])
     (ru:check-equal?
      (findf
-      (curryr relevant? u)
+      (curry relevant? u)
       (running-event
        (empty-event)
        (build-chain-event
@@ -345,12 +343,54 @@
          ce
          (add-substitution-prefix-event `((,u . a))))
         (empty-event))))
-     (add-substitution-prefix-event `((,u . a))))))
+     (add-substitution-prefix-event `((,u . a)))))
 
-(define (relevant? x)
-  (lambda (e)
-    (and (association-event? e)
-         (contains-relevant-var? e (list x)))))
+  (let ([u (var 'u)]
+        [ce (add-substitution-prefix-event '((g t)))])
+    (ru:check-equal?
+     (findf
+      (curry relevant? u)
+      (running-event 
+       ce
+       (build-chain-event 
+        ce
+        (chain-event ce 
+                     (composite-event 
+                      (list 
+                       (add-substitution-prefix-event `((r)))
+                       (constraint-event (lambda (x) x) `(t f g))
+                       (add-substitution-prefix-event `((,u f . r)))
+                       (constraint-event (lambda (x) x) `(g ,u g)))))
+        (constraint-event (lambda (x) x) `(g ,u)))))
+     (add-substitution-prefix-event `((,u f . r)))))
+
+  (let ([u (var 'u)]
+        [ce (add-substitution-prefix-event '((g t)))])
+    (ru:check-equal?
+     (findf
+      (curry relevant? u)
+      (running-event 
+       ce
+       (build-chain-event 
+        ce
+        (chain-event ce 
+                     (composite-event 
+                      (list 
+                       (leave-scope-event 'r)
+                       (leave-scope-event 'f)
+                       (add-substitution-prefix-event `((r)))
+                       (constraint-event (lambda (x) x) `(t f g))
+                       (add-substitution-prefix-event `((,u f . r)))
+                       (enter-scope-event 'r)
+                       (enter-scope-event 'f)
+                       (constraint-event (lambda (x) x) `(g f g)))))
+        (constraint-event (lambda (x) x) `(g ,u)))))
+     (add-substitution-prefix-event `((,u f . r))))))
+
+
+(define (relevant? x e)
+  (and (association-event? e)
+       (contains-relevant-var? e (list x))))
 
 (struct constraint-event (rator rands)
         #:transparent
@@ -468,7 +508,6 @@
 ;; [List-of Event] Event -> Event
 (define (solidify solid e)
   (gen-solidify solid e))
-;; (trace solidify)
 
 (module+ test
   (let ([tr (add-association-event 'q 5)])

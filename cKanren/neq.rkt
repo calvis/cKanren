@@ -58,8 +58,7 @@
        [else (add-constraint (!=/prefix new-p))])]
      [#f succeed])]
   #:reification-function
-  (lambda (v r)
-    (values '=/= (sort-p p))))
+  (lambda (v r) (reified-constraint '=/= (sort-p p) r)))
 
 ;; how to read this: 
 ;; neq-subsume defines an interaction between !=/prefix constraints

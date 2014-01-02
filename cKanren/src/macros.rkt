@@ -22,6 +22,9 @@
 (provide define-constraint-interaction
          spawn-constraint-interactions)
 
+(provide removed-constraint
+         added-constraint)
+
 ;; given a name and a way to update the constraint arguments
 ;; default-update-fn, expands to two macros to define constraints of
 ;; that type: one "name-constraint" macro that simply returns a
@@ -117,9 +120,9 @@
                     (syntax->list #'((rkw.response ...) ...))))
              (define/with-syntax reify-body
                (syntax-parse #'reifykw.reified
-                 [#t #'(default-reify 'fn-name args.arg ...)]
+                 [#t #'((default-reify 'fn-name args.arg ...) ans r)]
                  [#f #f]
-                 [(#t expr) #'(values 'fn-name expr)]
+                 [(#t expr) #'(reified-constraint 'fn-name expr r)]
                  [(#f expr) #'(expr ans r)]))
              (define/with-syntax reifyfn
                (cond
@@ -129,63 +132,67 @@
                        (let ([args.arg (args.fn args.arg r)] ...)
                          reify-body)))]
                 [else #'#f]))
-             (define should-sub-to-associations?
-               (null? (syntax-e #'(rkw.name ...))))
+             (define/with-syntax sub-to-associations?
+               (cond
+                [(null? (syntax-e #'(rkw.name ...)))
+                 #'(association-event? e)]
+                [else #'#f]))
              (define/with-syntax reaction-length
                (length (syntax-e #'(rkw.name ...))))
              (define/with-syntax (index ...)
                (range 0 (syntax-e #'reaction-length)))
+             (define/with-syntax (interp ...) 
+               (generate-temporaries #'(rkw.name ...)))
+             (define/with-syntax (subs ...) 
+               (generate-temporaries #'(rkw.name ...)))
              (define/with-syntax reaction
                ;; Event -> Response
                ;; A Response is a 
-               ;;   Rands ... -> Package -> [Vector (cons Event ConstraintTransformer)]
+               ;;   Rands ... -> Package -> [List-of (cons Event ConstraintTransformer)]
                ;; at this point, we are given an event that we vaguely
                ;; care about
-               #`(lambda (e) 
-                   (define all-matching-events 
-                     (filter (lambda (e) 
-                               (or ((trigger-subs rkw.name) e) ... 
-                                   #,@(cond
-                                       [should-sub-to-associations?
-                                        #'((association-event? e))]
-                                       [else #'()])))
-                             e))
-                   ;; responses is either false or a function that
-                   ;; takes the constraint arguments and then a
-                   ;; package
-                   (lambda (args.arg ...)
-                     (lambda@ (a [s c q t e])
-                       (define rets
-                         (for/fold 
-                           ([rets (make-vector (add1 reaction-length) (list))])
-                           ([an-e all-matching-events])
-                           (cond
-                            [((bindm a ((trigger-interp rkw.name) rkw.args ...)) an-e)
-                             => 
-                             (lambda (ans)
-                               (define ret (cons an-e (response ans)))
-                               (vector-set! rets index
-                                            (cons ret (vector-ref rets index)))
-                               rets)]
-                            ...
-                            [(and (association-event? an-e)
-                                  (contains-relevant-var?
-                                   an-e
-                                   (filter*/var? (list args.arg ...))))
-                             (define ret
-                               (cons an-e 
-                                     (let ([args.arg (args.fn args.arg s c an-e)] ...)
-                                       (add-constraint (fn-name args.arg ...)) 
-                                       body ...)))
-                             (vector-set! rets reaction-length 
-                                          (cons ret (vector-ref rets reaction-length)))
-                             rets]
-                            [else rets])))
-                       ;; rets
-                       (define rets^
-                         (for/fold ([all '()]) ([ls rets])
-                           (append all ls)))
-                       (and (not (null? rets^)) rets^)))))
+               #`(let ([subs   (trigger-subs rkw.name)] ...
+                       [interp (trigger-interp rkw.name)] ...)
+                   (lambda (e^) 
+                     (define all-matching-events 
+                       (filter (lambda (e) (or (subs e) ... sub-to-associations?)) e^))
+                     ;; responses is either false or a function that
+                     ;; takes the constraint arguments and then a
+                     ;; package
+                     (lambda (args.arg ...)
+                       (lambda@ (a [s c q t e])
+                         (define rets
+                           (for/fold 
+                             ([rets (make-vector (add1 reaction-length) (list))])
+                             ([an-e all-matching-events])
+                             (cond
+                              [(((interp rkw.args ...) a) an-e)
+                               => 
+                               (lambda (ans)
+                                 (define ret (cons an-e (response ans)))
+                                 (vector-set! rets index
+                                              (cons ret (vector-ref rets index)))
+                                 rets)]
+                              ...
+                              [(and (association-event? an-e)
+                                    (contains-relevant-var?
+                                     an-e
+                                     (filter*/var? (list args.arg ...))))
+                               (define ret
+                                 (cons an-e 
+                                       ;; todo: why is this walking in just an-e
+                                       (let ([args.arg (args.fn args.arg s c an-e)] ...)
+                                         (add-constraint (fn-name args.arg ...)) 
+                                         body ...)))
+                               (vector-set! rets reaction-length 
+                                            (cons ret (vector-ref rets reaction-length)))
+                               rets]
+                              [else rets])))
+                         ;; rets
+                         (define rets^
+                           (for/fold ([all '()]) ([ls rets])
+                             (append all ls)))
+                         (and (not (null? rets^)) rets^))))))
              (define/with-syntax unique-expr
                (syntax-parse #'uniquekw.unique
                  [#t #'((define-constraint-interaction 
@@ -206,6 +213,7 @@
                             (let ([args.arg (args.fn args.arg s c e)] ...)
                               (add-constraint (fn-name args.arg ...)) 
                               body ...))
+                          ;; TODO WTF IS GOING ON DOWN THERE
                           (cond
                            [(cond
                              [(reaction e)
@@ -250,11 +258,7 @@
 (define-trigger (removed-constraint ocs)
   [(remove-constraint-event/internal rator rands)
    (=> abort)
-   (cond
-    [(member rands (map cdr ocs))
-     ;; (printf "found a removed: ~a\n" rands)
-     #t]
-    [else (abort)])])
+   (or (member rands (map cdr ocs)) (abort))])
 
 (define-trigger (added-constraint missing)
   [(add-constraint-event/internal rator rands)
@@ -263,11 +267,7 @@
    ;; constraint-interaction user interface with unquotes.
    ;; TODO: get rid of the unquotes.
    (let ([ans (missing (cons rator rands))])
-     (cond
-      [ans
-       ;; (printf "found a missing: ~a\n" ans)
-       ans]
-      [else (abort)]))])
+     (or ans (abort)))])
 
 (define-syntax (create-initial-missing stx)
   (syntax-parse stx
@@ -290,7 +290,6 @@
      (define/with-syntax (temps ...)
        (generate-temporaries #'(sat-patterns ...)))
      #'(lambda@ (a [s c q t e])
-         ;; (printf "GOT THE RIGHT NUMBER OF THINGIES\n")
          (match (list sat-ocs ... last-oc)
            [(list patterns ...)
             (=> abort)
@@ -325,7 +324,6 @@
      ;; TODO: matching MORE THAN ONE.
      (define/with-syntax result
        #'(lambda (new-oc)
-           ;; (printf "~a: checking ~s\n" 'name new-oc)
            (cond
             ;; if you IMMEDIATELY try to add a constraint that is ptr
             ;; equivalent to one you already have, give up
@@ -340,7 +338,6 @@
                 ;; we have all the things we want, OR, we don't, and we
                 ;; have to simply add a new constraint with a new missing?
                 ;; to the store
-                ;; (printf "FOUND A MATCH\n")
                 (let ([fn (create-initial-missing 
                            [[a s c e] name [pred? constraints ...] ...]
                            (sat-ocs ... new-oc)
@@ -351,7 +348,6 @@
                    [(procedure? fn) (cons new-oc fn)]
                    [else (error 'wut "wututtututt")]))]
                [_
-                ;; (printf "didn't find a match\n")
                 ((create-initial-missing
                   [[a s c e] name [pred? constraints ...] ...]
                   (sat-ocs ...) (sat-patterns ...)
@@ -396,7 +392,6 @@
           #:package (a [s c e])
           #:reaction
           [(removed-constraint ocs)
-           ;; (printf "removed needed constraint\n")
            succeed]
           #:reaction
           [(added-constraint missing)
@@ -405,7 +400,6 @@
            ;; within the original event e, and do a conj of that whole
            ;; thing
            (lambda (result)
-             ;; (printf "found missing: ~a\n" result)
              (define fn
                (cond
                 [(transformer? result) 

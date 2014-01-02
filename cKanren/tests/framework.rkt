@@ -115,7 +115,14 @@
   (lambda@ (a [s c q t e])
     (cond
      [(null? (filter/rator rator c)) a]
-     [else (error 'test "constraint store not empty: ~a\n" c)])))
+     [else (error 'test "constraint store not empty when it shouldn't be: ~a\n" c)])))
+
+(define (check-store-not-empty rator)
+  (lambda@ (a [s c q t e])
+    (cond
+     [(null? (filter/rator rator c)) 
+      (error 'test "constraint store empty when it shouldn't be: ~a\n" c)]
+     [else a])))
 
 (let ()
   (define-constraint (exc x)
@@ -366,3 +373,74 @@
   (define-constraint (ex x)
     #:reify 5)
   (test (run* (q) (ex q)) '((_.0 : (ex 5)))))
+
+(let ()
+  (define-constraint (foo x y) #:reified)
+
+  (define-constraint (fooi an-oc) 
+    #:reaction
+    [(removed-constraint (if an-oc (list an-oc) (list)))
+     (add-constraint (fooi #f))]
+    #:reaction
+    [(added-constraint
+      (lambda (an-oc^) 
+        (cond
+         [an-oc
+          (and (eq? (car an-oc^) foo)
+               (not (= (cadr an-oc) (cadr an-oc^)))
+               an-oc^)]
+         [else (and (eq? (car an-oc^) foo) an-oc^)])))
+     =>
+     (lambda (an-oc^)
+       (cond
+        [an-oc
+         (conj
+          (remove-constraint (oc (car an-oc) (cdr an-oc)))
+          (remove-constraint (oc (car an-oc^) (cdr an-oc^)))
+          (add-constraint (foo (+ (cadr an-oc) (cadr an-oc^)) (caddr an-oc))))]
+        [else (fooi an-oc^)]))]
+    #:reify 
+    (if an-oc (cons 'foo (cdr an-oc)) #f))
+
+  (test (run* (q) (foo 5 q)) '((_.0 : (foo (5 _.0)))))
+  (test (run* (q) (fooi #f) (foo 5 q)) 
+        '((_.0 : (foo (5 _.0)) (fooi (foo 5 _.0)))))
+  (test (run* (q) (fooi #f) (foo 5 q) (foo 6 q)) 
+        '((_.0 : (foo (11 _.0)))))
+
+  (test (run* (q) 
+          (fooi #f)
+          (send-event
+           (composite-event
+            (list (add-constraint-event/internal foo (list 5 q))
+                  (add-constraint-event/internal foo (list 6 q))))))
+        '((_.0 : (foo (11 _.0)))))
+  
+  (test (run* (q) 
+          (send-event
+           (composite-event
+            (list 
+             (add-constraint-event/internal fooi (list #f))
+             (add-constraint-event/internal foo (list 5 q))
+             (add-constraint-event/internal foo (list 6 q))))))
+        '((_.0 : (foo (11 _.0)))))
+  
+  (test (run* (q) 
+          (send-event
+           (composite-event
+            (list 
+             (add-constraint-event/internal fooi (list (cons foo (list 5 q))))
+             (remove-constraint-event/internal foo (list 5 q)))))
+          (check-store-not-empty fooi))
+        '(_.0))
+
+  (printf "===================================================\n")
+  (test (run* (q) 
+          (send-event
+           (composite-event
+            (list 
+             (add-constraint-event/internal fooi (list (cons foo (list 5 q))))
+             (remove-constraint-event/internal foo (list 5 q))
+             (add-constraint-event/internal foo (list 6 q))))))
+        '((_.0 : (foo (6 _.0)) (fooi (foo 6 _.0)))))
+  )

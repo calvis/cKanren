@@ -1,12 +1,29 @@
 #lang racket
 
-(require "constraints.rkt" "package.rkt" "mk-structs.rkt" "variables.rkt" "errors.rkt" 
-         "infs.rkt" "helpers.rkt" "operators.rkt" "events.rkt" "substitution.rkt" "lex.rkt")
-(require (for-syntax racket syntax/parse racket/syntax racket/match racket/function
-                     "syntax-classes.rkt")
+(require "constraints.rkt" 
+         "package.rkt"
+         "mk-structs.rkt"
+         "variables.rkt"
+         "errors.rkt" 
+         "infs.rkt"
+         "helpers.rkt"
+         "operators.rkt"
+         "events.rkt"
+         "substitution.rkt"
+         "lex.rkt"
          "syntax-classes.rkt"
          "triggers.rkt")
-(require syntax/parse racket/syntax)
+
+(require syntax/parse 
+         racket/syntax)
+
+(require (for-syntax 
+          racket
+          syntax/parse
+          racket/syntax
+          racket/match
+          racket/function
+          "syntax-classes.rkt"))
 
 (require (rename-in (only-in racket filter) [filter ls:filter]))
 
@@ -21,7 +38,10 @@
          enforce
          reify
          reifyc
-         default-reify)
+         reify-s
+         extend-rs
+         default-reify
+         reified-constraint)
 
 (define (sum lsct)
   (for/fold ([out succeed]) ([ct lsct])
@@ -33,9 +53,10 @@
     [(_ constructor (x ...) g g* ...)
      (let ([x (constructor (gensym 'x))] ...)
        (conj 
-        (send-event (enter-scope-event x)) ...
+        ;; (send-event (enter-scope-event x)) ...
         g g* ...
-        (send-event (leave-scope-event x)) ...))]))
+        ;; (send-event (leave-scope-event x)) ...
+        ))]))
 
 ;; miniKanren's "fresh" defined in terms of fresh-aux over vars
 (define-syntax-rule (fresh (x ...) g g* ...)
@@ -77,30 +98,25 @@
   (define (loop pre post)
     (match post
       [(list) succeed]
+      [(cons (add-constraint-event/internal rator rands) rest)
+       (conj (send-to-other-events rator rands (append pre rest))
+             (loop (cons (car post) pre) rest))]
       [(cons e rest)
-       (conj (send-to-other-events e (append pre rest))
-             (loop (cons e pre) rest))]))
+       (loop (cons e pre) rest)]))
   (loop (list) es))
 
-;; Event [List-of Event] -> ConstraintTransformer
-(define (send-to-other-events e es)
-  (define addcs 
-    (filter add-constraint-event/internal? 
-            (composite-event es))) ;; TODO: hack
-  (define maybe-response
-    (match-lambda
-      [(add-constraint-event/internal rator rands)
-       (define reaction (-constraint-reaction rator))
-       (cond
-        ;; is our kind of constraint generally interested in anything
-        ;; inside of the event we have?
-        [(reaction e)
-         => ;; Response -> ConstraintTransformer
-         (lambda (response)
-           (run-response response rator (list rands)))]
-        ;; if not, just use the accumulator
-        [else succeed])]))
-  (sum (map maybe-response addcs)))
+;; Rator Rands [List-of Event] -> ConstraintTransformer
+(define (send-to-other-events rator rands es)
+  (define reaction (-constraint-reaction rator))
+  (cond
+   ;; is our kind of constraint generally interested in anything
+   ;; inside of the event we have?
+   [(reaction (composite-event es))
+    => ;; Response -> ConstraintTransformer
+    (lambda (response)
+      (run-response response rator (list rands)))]
+   ;; if not, just use the accumulator
+   [else succeed]))
 
 ;; ConstraintTransformer
 (define solidify-event
@@ -139,14 +155,15 @@
     (bindm a ct)))
 
 ;; Response Rator [List-of Rands] -> ConstraintTransformer
-(define (run-response r rator rands*)
+(define (run-response r rator rands* [removing-self-input #f])
   (for/fold ([ct succeed]) ([rands rands*])
     (lambda@ (a [s c q t e]) ;; we need the e?
       (define removing-self?
-        (match-lambda
-          [(remove-constraint-event/internal rator^ rands^)
-           (eq? rands rands^)]
-          [else #f]))
+        (or removing-self-input
+            (match-lambda
+              [(remove-constraint-event/internal rator^ rands^)
+               (eq? rands rands^)]
+              [else #f])))
       (define answer
         (cond
          ;; are we witnessing ourself be removed
@@ -216,10 +233,10 @@
   (case-lambda
    [(u v)
     (lambda@ (a [s c q t e])
-      (make-a (ext-s u v s) c q t e))]
+      (make-a (ext-s (walk u s) (walk v s) s) c q t e))]
    [(p) 
     (lambda@ (a [s c q t e])
-      (make-a (ext-s* p s) c q t e))]))
+      (make-a (ext-s* (walk* p s) s) c q t e))]))
 
 (define (update-c new-oc)
   (lambda@ (a [s c q t e])
@@ -255,16 +272,16 @@
 (define (reify-s v^ s)
   (define v (walk v^ s))
   (cond
-   [(var? v) 
-    `((,v . ,(reify-n v (size-s s))) . ,s)]
+   [(cvar? v)
+    (extend-rs v s)]
    [(mk-struct? v) 
     (define (k a d)
       (reify-s d (reify-s a s)))
     (recur v k)]
    [else s]))
 
-(define (reify-n cvar n)
-  (string->symbol (format "~a.~a" (cvar->str cvar) (number->string n))))
+(define (extend-rs v s)
+  `((,v . ,(reify-n v (size-s s))) . ,s))
 
 (define (reifyc x)
   (lambda@ (a [s c q t e])
@@ -286,33 +303,52 @@
 ;; sorts the constraint store by lex<=
 (define (sort-store ocs) (sort ocs lex<= #:key car))
 
+(struct reified-constraint (sym ans r)
+        #:transparent)
+
 (define (run-reify-fns v r store [with-vars-check? #t])
-  (hash->list
-   (for*/fold
-    ([h (hasheq)])
-    ([(rator rands*) store]
-     #:when (-constraint-reifyfn rator)
-     [rands rands*])
-    (cond
-     [(or (not with-vars-check?) (any/var? rands))
-      (define-values (sym ans)
-        ((apply (-constraint-reifyfn rator) rands) v r))
+  (define-values (hash-store r^)
+    (for*/fold
+     ([h (hash)] [r r])
+     ([(rator rands*) store]
+      #:when (-constraint-reifyfn rator)
+      [rands (sort rands* lex<=)])
+     (cond
+      [(or (not with-vars-check?) (any/var? rands))
+       (match ((apply (-constraint-reifyfn rator) rands) v r)
+         [(reified-constraint sym ans r)
+          (cond
+           [(not sym) (values h r)]
+           [(any/var? ans) (values h r)]
+           [else
+            (define updatefn (curry insert-in-lex-order ans))
+            (values (hash-update h sym updatefn '()) r)])]
+         [_ (values h r)])]
+      [else (values h r)])))
+
+   (hash->list 
+    (for/fold
+      ([h (hash)])
+      ([(rator rands*) hash-store])
       (cond
-       [(any/var? ans) h]
-       [else
-        (define updatefn (curry insert-in-lex-order ans))
-        (hash-update h sym updatefn '())])]
-     [else h]))))
+       [(pair? rator)
+        (define updatefn (curry insert-in-lex-order rands*))
+        (hash-update h (car rator) updatefn '())]
+       [else (hash-set h rator rands*)]))))
 
 ;; given a new substitution and constraint store, adds the prefixes of
 ;; each to the existing substitution and constraint store. the
 ;; constraints in c-prefix still need to run
 (define (update-package s^ c^)
   (lambda@ (a [s c q t e])
-    (define s-prefix (prefix-s s s^))
+    (define s-prefix 
+      (map (match-lambda [(cons x v) (if (var? x) (cons x v) (cons v x))]) 
+           (prefix-s s s^)))
     (define c-prefix (prefix-c c c^))
     (define add-event (add-substitution-prefix-event s-prefix))
-    (bindm a (conj (send-event add-event) (sum c-prefix)))))
+    (cond
+     [(null? s-prefix) a]
+     [else (bindm a (conj (send-event add-event) (sum c-prefix)))])))
 
 ;; Event -> ConstraintTransformer
 (define/match (solidify-atomic-event e)
@@ -326,12 +362,13 @@
   [(e) succeed])
 
 (define (default-reify sym . args)
-  (define reified-rands
-    (cond
-     [(null? args) args]
-     [(null? (cdr args)) (car args)]
-     [else args]))
-  (values sym reified-rands))
+  (lambda (v r)
+    (define reified-rands
+      (cond
+       [(null? args) args]
+       [(null? (cdr args)) (car args)]
+       [else args]))
+    (reified-constraint sym reified-rands r)))
 
 
 

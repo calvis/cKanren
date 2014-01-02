@@ -56,4 +56,4 @@
 
 ;; variables
 (require "variables.rkt") 
-(provide (struct-out var) define-var-type) 
+(provide var var? var-x define-var-type define-cvar-type) 
