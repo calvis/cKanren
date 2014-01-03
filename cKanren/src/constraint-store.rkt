@@ -48,7 +48,7 @@
 
 (define (remq-c new-oc c) 
   (match-define (oc rator rands) new-oc)
-  (hash-update c rator (curry remove rands) '()))
+  (hash-update c rator (curry remq rands) '()))
 
 (define (prefix-c c c^)
   (for/fold 

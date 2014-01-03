@@ -183,10 +183,11 @@
                          ;; if the event we are trying to subscribe to still exists in the
                          ;; current event, then we run the responses from our rands
                          [(findf (curry eq? tr) e)
-                          (conj (chain tr)
-                                (remove-constraint (oc rator rands))
-                                real-response
-                                (unchain removing-self? answer))]
+                          (conj 
+                           (chain tr)
+                           (remove-constraint (oc rator rands))
+                           real-response
+                           (unchain removing-self? answer))]
                          [else answer]))
                       ct)]
                [else (error 'run-response "~a" else)])]
@@ -281,7 +282,7 @@
 (define (extend-rs v s)
   `((,v . ,(reify-n v (size-s s))) . ,s))
 
-(define (reifyc x)
+(define (reifyc)
   (lambda@ (a [s c q t e])
     ;; get all of the variables mentioned in the constraint store and
     ;; make a reified substitution for them
@@ -354,7 +355,7 @@
   [((add-substitution-prefix-event p)) (update-s p)]
   [((add-constraint-event/internal rator rands))
    (update-c (oc rator rands))]
-  [((remove-constraint-event/internal rator rands)) 
+  [((remove-constraint-event/internal rator rands))
    (remove-from-c (oc rator rands))]
   [((empty-event)) succeed]
   [(e) succeed])

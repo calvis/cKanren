@@ -21,8 +21,30 @@
 
 (provide (all-defined-out))
 
+(define-syntax (run/internal stx)
+  (syntax-parse stx
+    [(run/internal n:expr g:expr ...+)
+     (define/with-syntax initialize-interactions
+       #'(spawn-constraint-interactions))
+     (define/with-syntax prog #'(conj g ...))
+     (define/with-syntax initial-a-inf
+       #'(delay (bindm empty-a (conj initialize-interactions prog))))
+     (syntax/loc #'stx
+       (take n (generator () (take/lazy initial-a-inf))))]))
+
 (define-syntax (run/lazy stx)
   (syntax-parse stx
+    [(run/lazy () g:expr ...)
+     (define/with-syntax initialize-interactions
+       #'(spawn-constraint-interactions))
+     (define/with-syntax prog 
+       #'(let ([x (var 'x)])
+           (conj g ... (enforce x) (reifyc))))
+     (define/with-syntax initial-a-inf
+       #'(delay (bindm empty-a (conj initialize-interactions prog))))
+     (syntax/loc #'stx
+       (let ([a-inf initial-a-inf])
+         (generator () (take/lazy a-inf))))]
     [(run/lazy (x:id) g:expr ...)
      (define/with-syntax initialize-interactions
        #'(spawn-constraint-interactions))
@@ -39,6 +61,10 @@
 ;; returns n answers to the goals g0 g1 ... where x is fresh
 (define-syntax (run stx)
   (syntax-parse stx
+    [(_ n:expr () g0:expr g1:expr ...)
+     (syntax/loc stx
+       (let ([stream (run/lazy () g0 g1 ...)])
+         (take n stream)))]
     [(_ n:expr (x:id) g0:expr g1:expr ...)
      (syntax/loc stx
        (let ([stream (run/lazy (x) g0 g1 ...)])
@@ -133,7 +159,7 @@
       (error 'reify/ir "trying to reify an unenforced state ~s" st))
     (let ([x (running-x st)]
           [a-inf (running-a-inf st)])
-      (bindm a-inf (reifyc x)))))
+      (bindm a-inf (reifyc)))))
 
 (define-syntax (exit/ir stx)
   (syntax-parse stx

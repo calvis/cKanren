@@ -258,7 +258,7 @@
 (define-trigger (removed-constraint ocs)
   [(remove-constraint-event/internal rator rands)
    (=> abort)
-   (or (member rands (map cdr ocs)) (abort))])
+   (or (memq rands (map cdr ocs)) (abort))])
 
 (define-trigger (added-constraint missing)
   [(add-constraint-event/internal rator rands)
@@ -388,7 +388,7 @@
      ;; this constraint will be run if a constraint is missing is
      ;; added, or if a constraint that we already count on is removed.
      #'(let ()
-         (define-constraint (name ocs missing)
+         (define-constraint (name [ocs #:constant] [missing #:constant])
           #:package (a [s c e])
           #:reaction
           [(removed-constraint ocs)

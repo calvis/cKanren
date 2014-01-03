@@ -40,59 +40,6 @@
   => 
   [(copy x y sym) (== y z)])
 
-;;  #a{ ((#_(first1604) . 5)
-;;       (#_(rest1605))
-;;       (#_(first1598) . #_(first1604))
-;;       (#_(rest1603) 5)
-;;       (5 . #_(first1602))
-;;       (#_(rest1599) 5)
-;;       (5 . #_(first1598))
-;;       (#_(rest1601))
-;;       (#_(first1594) . #_(first1600))
-;;       (#_(rest1595) 5)
-;;       (5 . #_(first1594))
-;;       (#_(rest1597))
-;;       (#_(first1590) . 5)
-;;       (#_(first1596) . 5)
-;;       (#_(rest1591) 5)
-;;       (#_(z1587) . #_(first1590))
-;;       (#_(rest1593))
-;;       (#_(y1586) . 5)
-;;       (#_(first1592) . 5)
-;;       (#_(x1584) #_(a1585) 5)
-;;       (#_(q) #_(x1584) #_(a1585) #_(y1586) #_(z1587))) 
-;;      #hasheq
-;;      ((symbol-number-fail . ((() #<procedure>)))
-;;       (symbol-unique . ((() #<procedure>)))
-;;       (number-symbol-fail . ((() #<procedure>)))
-;;       (number-unique . ((() #<procedure>)))
-;;       (neq-subsume . ((() #<procedure>)))
-;;       (absento-subsume . ((() #<procedure>)))
-;;       (neq-absento-subsume . ((() #<procedure>)))
-;;       (copy-same-copy . ((() #<procedure:...n/src/macros.rkt:331:9>)))
-;;       (merge-copylb . ((((copylb #_(a1585) 5)) #<procedure:fn>) (((copylb #_(a1585) #_(first1602))) #<procedure:fn>) (() #<procedure:...n/src/macros.rkt:331:9>)))
-;;       (copylb . ((#_(a1585) 5) (#_(a1585) #_(first1602))))
-;;       (copy . ((#_(a1585) #_(first1600) #_(gensym1589))))) 
-;;      #(struct:empty-event) }
-;; 
-;; SENDING: 
-;; #(struct:composite-event
-;;   (#(struct:add-constraint-event copy-same-copy (((copy #_(a1585) 5 #_(gensym1588))) #<procedure:fn>))
-;;    #(struct:remove-constraint-event copy (#_(a1585) #_(first1598) #_(gensym1588)))
-;;    #(struct:add-constraint-event copy (#_(a1585) 5 #_(gensym1588)))))
-;; 
-;; running response for copy-same-copy (((copy #_(a1585) 5 #_(gensym1588))) #<procedure:fn>)
-;; 
-;; SOLIDIFYING: 
-;; (#(struct:remove-constraint-event copy (#_(a1585) #_(first1598) #_(gensym1588))))
-;; 
-;;  #(struct:running-event 
-;;    #(struct:remove-constraint-event copy (#_(a1585) #_(first1598) #_(gensym1588)))
-;;    #(struct:composite-event 
-;;      (#(struct:add-constraint-event copy (#_(a1585) 5 #_(gensym1588)))
-;;       #(struct:remove-constraint-event copy (#_(a1585) #_(first1598) #_(gensym1588)))
-;;       #(struct:add-constraint-event copy-same-copy (((copy #_(a1585) 5 #_(gensym1588))) #<procedure:fn>)))))
-
 (define-constraint (copylb t u)
   #:reification-function
   (lambda (v r)
@@ -280,10 +227,10 @@
    (run* (t t^)
      (fresh (g g^ t1 t2)
        (== g g^)
-       (== `(-> ,t1 ,t2) t)
+       (== `(,t1 ,t2) t)
        (== `((,t1)) g)
        (copyo `(,g ,t) `(,g^ ,t^))))
-   '((((-> _.0 _.1) (-> _.0 _.2)) : (copy (_.1 _.2)))))
+   '((((_.0 _.1) (_.0 _.2)) : (copy (_.1 _.2)))))
 
   (test
    (run* (t t^)
@@ -295,17 +242,34 @@
   (test
    (run* (x y m n g)
      (copyo `(,g (,x ,y)) `((a ,x) (,m ,n)))
-     (== `(a ,x) g)) ;; first thing in z should be x
-   ;; x   y    x   ?       x
-   '(((_.0 _.1 _.2 _.3 (a _.0)) : (copy (_.1 _.3)))))
+     (== `(a ,x) g)) 
+   ;;    x   y   m   n    g                y   n
+   '(((_.0 _.1 _.0 _.2 (a _.0)) : (copy (_.1 _.2)))))
 
   (test 
-   (run* (x t t1 t2 t^ g g^)
-     (copyo `(,g ,t) `(,g^ ,t^))
-     (== g g^)
-     (== `(-> ,t1 ,t2) t)
-     (== `((x ,t1)) g))
-   '(((_.0 (-> _.1 _.2) _.1 _.2 (-> _.1 _.3) ((x _.1)) ((x _.1))) : (copy (_.2 _.3)))))
+   (run* (t t^)
+     (fresh (t1 t2)
+       (copyo `((,t1) (,t1 ,t2)) `((,t1) ,t^))))
+   '((_.0 (_.1 _.2))))
+
+  (printf "=============================================================\n")
+  (test 
+   (run* (t t^)
+     (fresh (t1 t2)
+       (copyo `((,t1) ,t) `((,t1) ,t^))
+       (prtm "=============================================================\n")
+       (== `(,t1 ,t2) t)
+       (prtm "=============================================================\n")))
+   '((((_.0 _.1) (_.0 _.2)) : (copy (_.1 _.2)))))
+
+  (test 
+   (run* (t t^)
+     (fresh (g g^ t1 t2)
+       (copyo `(,g ,t) `(,g^ ,t^))
+       (== g g^)
+       (== `(,t1 ,t2) t)
+       (== `((,t1)) g)))
+   '((((_.0 _.1) (_.0 _.2)) : (copy (_.1 _.2)))))
 
   (test
    (run* (x y) 
@@ -717,6 +681,7 @@
           (copyo x `(,y ,z)))
         '((((_.0 5) _.0 5 5) : (copy (_.0 5)))))
 
+  #;
   (test (run* (x a y z)
           (copyo x `(,z ,y))
           (copyo x `(,y ,z))
@@ -730,6 +695,7 @@
           (== `(,a 5) x))
         '((((_.0 5) _.0 5 5) : (copy (_.0 5)))))
 
+  #;
   (test (run* (x a y z)
           (copyo x `(,y ,z))
           (== `(,a 5) x)
@@ -765,6 +731,7 @@
           (copyo x `(,y ,z)))
         '((((_.0 5) _.0 _.1 5) : (copy (_.0 _.1)))))
 
+  #;
   (test (run* (x a y z)
           (copyo x `(,y ,z))
           (== `(,a 5) x))
@@ -775,6 +742,7 @@
           (copyo b `(,y ,z)))
         '((((_.0 5) _.0 _.1 5) : (copy (_.0 _.1)))))
 
+  #;
   (test (run* (b a y z)
           (copyo b `(,y ,z))
           (== `(,a 5) b))

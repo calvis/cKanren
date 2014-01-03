@@ -16,6 +16,211 @@
  "../tester.rkt")
 
 (define u (var 'u))
+(define rator1 (lambda (x) x))
+(define rands1 (list 5))
+(define rands1-equal (list 5))
+(define rator2 (lambda (x) x))
+(define rands2 (list 6))
+
+(test
+ (compose-events
+  (constraint-event rator1 rands1)
+  (running-event (add-association-event 'q 5) (empty-event)))
+ (running-event
+  (add-association-event 'q 5)
+  (constraint-event rator1 rands1)))
+
+(test
+ (<e (empty-event)
+     (running-event (empty-event) (empty-event)))
+ #t)
+
+(test
+ (<e (composite-event (list (empty-event) (empty-event)))
+     (running-event (empty-event) (empty-event)))
+ #t)
+
+(test 
+ (pessimistic-merge (empty-event) (empty-event))
+ (empty-event))
+
+(test 
+ (compose-events
+  (add-constraint-event/internal rator1 rands1-equal)
+  (build-chain-event 
+   (empty-event)
+   (empty-event)
+   (empty-event)
+   (remove-constraint-event/internal rator1 rands1)))
+ (build-chain-event (empty-event) (empty-event) (empty-event) (empty-event)))
+
+(test
+ (compose-events
+  (add-constraint-event/internal rator1 rands1)
+  (build-chain-event
+   (add-constraint-event/internal rator2 rands2)
+   (empty-event)
+   (add-constraint-event/internal rator2 rands2)
+   (composite-event
+    (list
+     (add-constraint-event/internal rator1 rands2)
+     (remove-constraint-event/internal rator1 rands1)))))
+ (build-chain-event
+  (add-constraint-event/internal rator2 rands2)
+  (empty-event)
+  (add-constraint-event/internal rator2 rands2)
+  (add-constraint-event/internal rator1 rands2)))
+
+(test
+ (findf 
+  association-event?
+  (running-event
+   (add-substitution-prefix-event '())
+   (empty-event)))
+ (add-substitution-prefix-event '()))
+
+(test
+ (findf
+  (curry relevant? u)
+  (build-chain-event
+   (add-substitution-prefix-event `((,u . 1)))
+   (add-substitution-prefix-event `())
+   (add-substitution-prefix-event `((,u . 2)))
+   (composite-event
+    (list
+     (add-substitution-prefix-event `((,u . 3)))
+     (remove-constraint-event/internal rator1 rands1)))))
+ (add-substitution-prefix-event `((,u . 1))))
+
+(test
+ (findf
+  (curry relevant? u)
+  (build-chain-event
+   (add-substitution-prefix-event '())
+   (add-substitution-prefix-event '())
+   (empty-event)
+   (composite-event
+    (list
+     (add-substitution-prefix-event `((,u . a)))
+     (remove-constraint-event/internal rator1 rands1)))))
+ (add-substitution-prefix-event `((,u . a))))
+
+(let ([ce (add-substitution-prefix-event '())])
+  (test
+   (findf
+    (curry relevant? u)
+    (build-chain-event
+     ce
+     (chain-event 
+      ce
+      (add-substitution-prefix-event `((,u . a))))
+     ce
+     (empty-event)))
+   (add-substitution-prefix-event `((,u . a)))))
+
+(let ([ce (add-substitution-prefix-event '())])
+  (test
+   (findf
+    (curry relevant? u)
+    (build-chain-event
+     (empty-event)
+     (chain-event 
+      ce
+      (add-substitution-prefix-event `((,u . a))))
+     ce
+     (empty-event)))
+   (add-substitution-prefix-event `((,u . a)))))
+
+(let ([ce (add-substitution-prefix-event '((g t)))])
+  (test
+   (findf
+    (curry relevant? u)
+    (build-chain-event 
+     ce
+     (chain-event ce 
+                  (composite-event 
+                   (list 
+                    (add-substitution-prefix-event `((r)))
+                    (constraint-event (lambda (x) x) `(t f g))
+                    (add-substitution-prefix-event `((,u f . r)))
+                    (constraint-event (lambda (x) x) `(g ,u g)))))
+     ce
+     (constraint-event (lambda (x) x) `(g ,u))))
+   (add-substitution-prefix-event `((,u f . r)))))
+
+(let ([ce (add-substitution-prefix-event '((g t)))])
+  (test
+   (findf
+    (curry relevant? u)
+    (build-chain-event 
+     ce
+     (chain-event ce 
+                  (composite-event 
+                   (list 
+                    (leave-scope-event 'r)
+                    (leave-scope-event 'f)
+                    (add-substitution-prefix-event `((r)))
+                    (constraint-event (lambda (x) x) `(t f g))
+                    (add-substitution-prefix-event `((,u f . r)))
+                    (enter-scope-event 'r)
+                    (enter-scope-event 'f)
+                    (constraint-event (lambda (x) x) `(g f g)))))
+     ce
+     (constraint-event (lambda (x) x) `(g ,u))))
+   (add-substitution-prefix-event `((,u f . r)))))
+
+(test
+ (compose-events
+  (build-chain-event
+   (add-association-event 'q 5)
+   (add-association-event 'q 5)
+   (add-association-event 'q 5)
+   (empty-event))
+  (constraint-event rator1 rands1))
+ (build-chain-event
+  (add-association-event 'q 5)
+  (add-association-event 'q 5)
+  (add-association-event 'q 5)
+  (constraint-event rator1 rands1)))
+
+(let ([trigger (add-association-event 'q 5)])
+  (test
+   (apply-chain
+    (build-chain-event
+     trigger
+     (empty-event)
+     trigger
+     (composite-event
+      (list
+       (constraint-event rator1 rands2)
+       (constraint-event rator1 rands1)))))
+   (running-event
+    trigger
+    (chain-event
+     trigger
+     (composite-event
+      (list
+       (constraint-event rator1 rands2)
+       (constraint-event rator1 rands1)))))))
+
+(let ([tr (add-association-event 'q 5)])
+  (test
+   (solidify
+    (list tr)
+    (chain-event tr (add-association-event 'q 6)))
+   (add-association-event 'q 6)))
+
+(let ([trigger1 (add-association-event 'q 5)]
+      [trigger2 (add-constraint-event/internal rator1 rands1)])
+  (test
+   (solidify
+    (list trigger1 trigger2)
+    (composite-event
+     (list (chain-event trigger1 (add-association-event 'q 6))
+           (chain-event trigger2 (chain-event trigger1 (add-association-event 'q 7))))))
+   (composite-event
+    (list (add-association-event 'q 7)
+          (add-association-event 'q 6)))))
 
 (let ()
   (define test-event
@@ -255,6 +460,8 @@
    (send-event (add-constraint-event/internal rem-self (list q))))
  '((_.0 : (reifiedc _.0))))
 
+;; can constraints respond to multiple things within the same events
+;; if they have multiple reactions
 (test
  (run* (q)
    (exc9 q)
@@ -263,9 +470,6 @@
      (list (add-constraint-event/internal rem-self (list q))
            (add-constraint-event/internal add-self (list q))))))
  '((_.0 : (reifiedc _.0 _.0))))
-
-;; (chain exc12 exc11)
-;; (chain exc13 ...)
 
 (let ()
   (define-constraint (exc10 x y)
@@ -371,9 +575,10 @@
   (test (run* (q) (ex q)) '((_.0 : (ex 5)))))
 
 (let ()
-  (define-constraint (foo x y) #:reified)
+  (define rands (list 5))
+  (define-constraint (foo x) #:reified)
 
-  (define-constraint (fooi an-oc) 
+  (define-constraint (fooi [an-oc #:constant]) 
     #:reaction
     [(removed-constraint (if an-oc (list an-oc) (list)))
      (fooi #f)]
@@ -393,49 +598,81 @@
          (conj
           (remove-constraint (oc (car an-oc) (cdr an-oc)))
           (remove-constraint (oc (car an-oc^) (cdr an-oc^)))
-          (add-constraint (foo (+ (cadr an-oc) (cadr an-oc^)) (caddr an-oc))))]
-        [else (fooi an-oc^)]))]
+          (add-constraint (foo (+ (cadr an-oc) (cadr an-oc^)))))]
+        [else 
+         (fooi an-oc^)]))]
     #:reify 
     (if an-oc (cons 'foo (cdr an-oc)) #f))
 
-  (test (run* (q) (foo 5 q)) '((_.0 : (foo (5 _.0)))))
-  (test (run* (q) (fooi #f) (foo 5 q)) 
-        '((_.0 : (foo (5 _.0)) (fooi (foo 5 _.0)))))
-  (test (run* (q) (fooi #f) (foo 5 q) (foo 6 q)) 
-        '((_.0 : (foo (11 _.0)))))
+  ;; (test (run* () (foo 5)) '([(foo 5)]))
+  ;; (test (run* () (fooi #f) (foo 5)) '([(foo 5) (fooi (foo 5))]))
 
-  (test (run* (q) 
+  (let ()
+    (define a (car (run/internal 1 (fooi (cons foo rands)))))
+    (define c (a-c a))
+    (define fooi-rands (car (hash-ref c fooi)))
+    (test (eq? (cdar fooi-rands) rands) #t))
+
+  (let ()
+    (define a (car (run/internal 1 (fooi #f) 
+                     (send-event (add-constraint-event/internal foo rands)))))
+    (define c (a-c a))
+    (define fooi-rands (car (hash-ref c fooi)))
+    (test (eq? (cdar fooi-rands) rands) #t))
+
+  (test (run* () (fooi #f) (foo 5) (foo 6)) '([(foo 11)]))
+  
+  (test (run* () 
           (fooi #f)
           (send-event
            (composite-event
-            (list (add-constraint-event/internal foo (list 5 q))
-                  (add-constraint-event/internal foo (list 6 q))))))
-        '((_.0 : (foo (11 _.0)))))
+            (list (add-constraint-event/internal foo (list 5))
+                  (add-constraint-event/internal foo (list 6))))))
+        '([(foo 11)]))
   
-  (test (run* (q) 
+  (test (run* () 
           (send-event
            (composite-event
             (list 
              (add-constraint-event/internal fooi (list #f))
-             (add-constraint-event/internal foo (list 5 q))
-             (add-constraint-event/internal foo (list 6 q))))))
-        '((_.0 : (foo (11 _.0)))))
+             (add-constraint-event/internal foo (list 5))
+             (add-constraint-event/internal foo (list 6))))))
+        '(((foo 11))))
   
-  (test (run* (q) 
-          (send-event
-           (composite-event
-            (list 
-             (add-constraint-event/internal fooi (list (cons foo (list 5 q))))
-             (remove-constraint-event/internal foo (list 5 q)))))
-          (check-store-not-empty fooi))
-        '(_.0))
+  (let ([rands (list 5)])
+    (test (run* () 
+            (send-event
+             (composite-event
+              (list 
+               (add-constraint-event/internal fooi (list (cons foo rands)))
+               (remove-constraint-event/internal foo rands)))))
+          '(((fooi #f)))))
 
-  (test (run* (q) 
-          (send-event
-           (composite-event
-            (list 
-             (add-constraint-event/internal fooi (list (cons foo (list 5 q))))
-             (remove-constraint-event/internal foo (list 5 q))
-             (add-constraint-event/internal foo (list 6 q))))))
-        '((_.0 : (foo (6 _.0)) (fooi (foo 6 _.0)))))
-  )
+  (let ([rands (list 5)])
+    (test (run* () 
+            (send-event
+             (composite-event
+              (list 
+               (add-constraint-event/internal fooi (list (cons foo rands)))
+               (remove-constraint-event/internal foo rands)
+               (add-constraint-event/internal foo (list 6))))))
+          '([(foo 6) (fooi (foo 6))]))))
+
+(let ()
+  (define-constraint (foo x) #:reified)
+  (define-constraint-interaction
+    [(foo ,x) (foo, y)] 
+    [(not (= x y)) [(foo (+ x y))]])
+
+  (test (run* () (foo 5) (foo 5)) '(((foo 5 5))))
+  (test (run* () (foo 5) (foo 6)) '(((foo 11))))
+
+  ;; do constraint-interactions disappear on
+  ;; remove-constraint-event/internal's when they shouldn't
+  (let ([rands (list 5)])
+    (test (run* () 
+            (send-event (add-constraint-event/internal foo rands))
+            (send-event (add-constraint-event/internal foo (list 5)))
+            (send-event (remove-constraint-event/internal foo rands))
+            (send-event (add-constraint-event/internal foo (list 6))))
+          '(((foo 11))))))
