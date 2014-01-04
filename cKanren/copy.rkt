@@ -35,11 +35,10 @@
    [else (add-constraint (copy t x sym))]))
 
 (define-constraint-interaction
-  copy-same-copy
-  [(copy ,x ,y ,sym) (copy ,x ,z ,sym)] => [(== y z) (copy x y sym)])
+  [(copy x y sym) (copy x z sym)] => [(== y z) (copy x y sym)])
 
 (define-constraint-interaction
-  [(copy ,x ,y ,sym) (copy ,y ,z ,(not sym))]
+  [(copy x y sym) (copy y z (not sym))]
   #:package (a [s c e])
   [(find-cycle z x c) [add (== x y) (== x z)]])
 
@@ -71,7 +70,7 @@
    [else (add-constraint (copylb t u))]))
 
 (define-constraint-interaction
-  [(copylb ,t ,u) (copylb ,t ,u^)] 
+  [(copylb t u) (copylb t u^)] 
   [(merge u u^) [(copylb t (merge u u^))]])
 
 (define-cvar-type fvar "f")

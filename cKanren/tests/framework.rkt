@@ -720,8 +720,7 @@
 (let ()
   (define-constraint (foo x) #:reified)
   (define-constraint-interaction
-    [(foo ,x) (foo, y)] 
-    [(not (= x y)) [(foo (+ x y))]])
+    [(foo x) (foo y)] [(not (= x y)) [(foo (+ x y))]])
 
   (test (run* () (foo 5) (foo 5)) '(((foo 5 5))))
   (test (run* () (foo 5) (foo 6)) '(((foo 11))))

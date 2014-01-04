@@ -196,7 +196,7 @@
              (define/with-syntax unique-expr
                (syntax-parse #'uniquekw.unique
                  [#t #'((define-constraint-interaction 
-                          [(fn-name ,args.arg ...) (fn-name ,args.arg ...)]
+                          [(fn-name args.arg ...) (fn-name args.arg ...)]
                           => [(fn-name args.arg ...)]))]
                  [#f #'()]))
              (define/with-syntax pattern
@@ -379,7 +379,7 @@
      ;; contains an oc that we are missing from ocs to make up
      ;; `((rands ...) ...)
      (define/with-syntax (unsat-patterns ...)
-       #'((cons (? (curry eq? rator) _) (list `rands ...))
+       #'((cons (? (curry eq? rator) _) (list rands ...))
           ...))  
      ;; expands to a FUNCTION that expects a new-oc and returns EITHER
      ;; #f, if the new-oc is irrelevant, OR a constraint that should be run!

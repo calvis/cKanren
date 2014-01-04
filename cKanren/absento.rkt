@@ -40,8 +40,7 @@
     [else (add-constraint (absento u v))])])
 
 (define-constraint-interaction
-  absento-subsume
-  [(absento ,u ,v) (absento ,u^ ,v^)]
+  [(absento u v) (absento u^ v^)]
   #:package [a [s c e]]
   [(subsumes? (cons u v) (cons u^ v^) s c e)
    [(absento u v)]])
@@ -71,8 +70,7 @@
    (=/= u v)))
 
 (define-constraint-interaction
-  neq-absento-subsume
-  [(!=/prefix ,prefix) (absento ,u ,v)]
+  [(!=/prefix prefix) (absento u v)]
   #:package (a [s c e])
   [(ormap
     (lambda (u/v)

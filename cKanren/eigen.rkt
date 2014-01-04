@@ -72,13 +72,13 @@
 
 ;; when you leave scope, get rid of both constraints
 (define-constraint-interaction
-  [(track-eigen ,x ,ls) (leave-eigen ,x)] => [succeed])
+  [(track-eigen x ls) (leave-eigen x)] => [succeed])
 
 ;; if you try to unify a symbol/number with an EigenVar, fails
 (define-constraint-interaction
-  [(track-eigen ,x ,ls) (symbol ,x)] => [fail])
+  [(track-eigen x ls) (symbol x)] => [fail])
 (define-constraint-interaction
-  [(track-eigen ,x ,ls) (number ,x)] => [fail])
+  [(track-eigen x ls) (number x)] => [fail])
 
 ;; EigenVar Var ConstraintStore Event -> Boolean
 ;; returns #t iff it is okay to unify ev and v based on ev's scope

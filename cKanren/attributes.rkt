@@ -80,11 +80,11 @@
             [else body]))
          (define-constraint-interaction
            name-fail-incompatible
-           [(name ,x) (inc-attrs ,x)] => [fail])
+           [(name x) (inc-attrs x)] => [fail])
          ...
          (define-constraint-interaction
            name-unique
-           [(name ,x) (name ,x)] => [(name x)])
+           [(name x) (name x)] => [(name x)])
          ;; (printf "~a: ~a\n" 'name x)
 
          ;; Value [List-of Attribute] -> Boolean

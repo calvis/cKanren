@@ -42,10 +42,7 @@
    [else fail]))
 
 (define-constraint-interaction
-  var-two-doms
-  [(dom ,x ,d) (dom ,x ,d^)]
-  =>
-  [(dom x (intersection-dom d d^))])
+ [(dom x d) (dom x d^)] => [(dom x (intersection-dom d d^))])
 
 (define (force-ans ocs)
   succeed
@@ -180,14 +177,12 @@
 
 (define-constraint-interaction
   =/=fd-interaction
-  [(=/=fd ,u ,v) (dom ,u ,d) (dom ,v ,d^)]
-  [(disjoint-dom? d d^) 
-   [(dom u d) (dom v d^)]])
+  [(=/=fd u v) (dom u d) (dom v d^)]
+  [(disjoint-dom? d d^) [(dom u d) (dom v d^)]])
 
 (define-constraint-interaction
-  [(=/=fd ,u ,v) (dom ,u ,d)]
-  [(value-dom? v)
-   [(dom u (remq-dom v d))]])
+  [(=/=fd u v) (dom u d)]
+  [(value-dom? v) [(dom u (remq-dom v d))]])
 
 ;; (define (distinctfd-c v*)
 ;;   (lambdam@ (a : s c)
@@ -265,10 +260,9 @@
 
 (define-constraint-interaction
   =fd-interaction
-  [(=fd ,u ,v) (dom ,u ,d) (dom ,v ,d^)]
+  [(=fd u v) (dom u d) (dom v d^)]
   =>
-  [(prtm "=fd-interaction triggered\n")
-   (dom u (intersection-dom d d^))
+  [(dom u (intersection-dom d d^))
    (dom v (intersection-dom d d^))])
 
 
@@ -289,7 +283,7 @@
 
 (define-constraint-interaction
   <=fd-interaction
-  [(<=fd ,u ,v) (dom ,u ,du) (dom ,v ,dv)]
+  [(<=fd u v) (dom u du) (dom v dv)]
   =>
   [(<=fd u v) 
    (dom u (copy-before-dom (curry < (max-dom dv)) du))
@@ -297,13 +291,13 @@
 
 (define-constraint-interaction
   <=fd-interaction-u
-  [(<=fd ,u ,v) (dom ,u ,du)]
+  [(<=fd u v) (dom u du)]
   [(value-dom? v)
    [(dom u (copy-before-dom (curry < v) du))]])
 
 (define-constraint-interaction
   <=fd-interaction-v
-  [(<=fd ,u ,v) (dom ,v ,dv)]
+  [(<=fd u v) (dom v dv)]
   [(value-dom? u)
    [(dom v (drop-before-dom (curry <= u) dv))]])
 

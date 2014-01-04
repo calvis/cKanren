@@ -379,7 +379,7 @@
    [else (add-constraint (neq-? u v))]))
 
 (define-constraint-interaction neq-?-subsume
-  [(neq-? ,u ,v) (neq-? ,u^ ,v^)]
+  [(neq-? u v) (neq-? u^ v^)]
   #:package (a [s c e])
   [(subsumes? (list (cons u v)) (list (cons u^ v^)) c)
    [(neq-? u v)]])
@@ -486,7 +486,7 @@
 
 (define-constraint-interaction
   !in-unique
-  [(!in ,x ,S) (!in ,x ,S)] => [(!in x S)])
+  [(!in x S) (!in x S)] => [(!in x S)])
 
 (define (make-not-in-t* x t* s c)
   (cond

@@ -66,7 +66,7 @@
 ;; in the constraint store, if the first subsumes the second, keep
 ;; only the first constraint.  this is reflexive by default.
 (define-constraint-interaction neq-subsume
-  [(!=/prefix ,p) (!=/prefix ,p^)]
+  [(!=/prefix p) (!=/prefix p^)]
   #:package (a [s c e])
   [(subsumes? p p^ c) [(!=/prefix p)]])
 
