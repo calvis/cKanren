@@ -36,9 +36,7 @@
 
 (define-constraint-interaction
   copy-same-copy
-  [(copy ,x ,y ,sym) (copy ,x ,z ,sym)] 
-  => 
-  [(copy x y sym) (== y z)])
+  [(copy ,x ,y ,sym) (copy ,x ,z ,sym)] => [(== y z) (copy x y sym)])
 
 (define-constraint-interaction
   [(copy ,x ,y ,sym) (copy ,y ,z ,(not sym))]
