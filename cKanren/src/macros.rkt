@@ -78,7 +78,7 @@
           name (constraint-exprs ...) (clauses ...)
           (a [s c e])))
      #'(extend-constraint-interactions
-        'name initfn)]))
+        initfn initfn)]))
 
 (begin-for-syntax
  (define-splicing-syntax-class reaction-keyword
