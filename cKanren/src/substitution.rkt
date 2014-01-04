@@ -73,7 +73,7 @@
   (if (empty-s? s) s^ (loop s^)))
 
 (define (occurs-check x v^ s)
-  (define v (walk/internal v^ s))
+  (define v (walk/internal v^ s #f))
   (cond
    [(var? v) (eq? v x)]
    [(pair? v) 
@@ -84,18 +84,14 @@
 (define walk
   (case-lambda
    [(u s)
-    (walk/internal u s)]
+    (walk/internal u s #f)]
    [(u s c e)
-    (cond
-     [(not (cvar? u)) u]
-     [(cond
-       [(findf (curry relevant? u) e)
-        => (curry walk/shortcut u)]
-       [else #f])]
-     [else (walk/internal u s)])]))
+    (walk/internal u s e)]))
 
-(define (walk/internal v s)
+(define (walk/internal v s e)
   (cond
    [(and (cvar? v) (assq v s))
-    => (lambda (a) (walk/internal (cdr a) s))]
+    => (lambda (a) (walk/internal (cdr a) s e))]
+   [(and (cvar? v) e (findf (curry relevant? v) e))
+    => (lambda (e^) (walk/internal (walk/shortcut v e^) s e))]
    [else v]))

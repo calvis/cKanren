@@ -12,6 +12,7 @@
  cKanren/src/triggers
  cKanren/src/macros
  cKanren/src/substitution
+ cKanren/src/mk-structs
  racket/generator
  "../tester.rkt")
 
@@ -22,6 +23,8 @@
 (define rator2 (lambda (x) x))
 (define rands2 (list 6))
 
+;; == EVENT TESTS ==============================================================
+
 (test
  (compose-events
   (constraint-event rator1 rands1)
@@ -29,6 +32,19 @@
  (running-event
   (add-association-event 'q 5)
   (constraint-event rator1 rands1)))
+
+(test
+ (compose-events
+  (add-substitution-prefix-event `((x . 5)))
+  (add-substitution-prefix-event `((x . 5))))
+ (add-substitution-prefix-event `((x . 5) (x . 5))))
+
+(test
+ (compose-events
+  (composite-event
+   (list (add-substitution-prefix-event `((x . 5)))))
+  (add-substitution-prefix-event `((x . 5))))
+ (add-substitution-prefix-event `((x . 5) (x . 5))))
 
 (test
  (<e (empty-event)
@@ -222,6 +238,8 @@
     (list (add-association-event 'q 7)
           (add-association-event 'q 6)))))
 
+;; == WALK TESTS ===============================================================
+
 (let ()
   (define test-event
     (build-chain-event
@@ -231,6 +249,39 @@
      (composite-event
       (list (add-substitution-prefix-event `((,u . b)))))))
   (test (walk u '() #f test-event) 'a))
+
+(let ([x (var 'x)])
+  (define test-event
+    (build-chain-event
+     (composite-event
+      (list (add-substitution-prefix-event `((,u . ,x)))
+            (add-substitution-prefix-event `((,x . 5)))))
+     (empty-event)
+     (empty-event)
+     (empty-event)))
+  (test (walk u '() #f test-event) 5))
+
+(let ([x (var 'x)])
+  (define test-event
+    (build-chain-event
+     (composite-event
+      (list (add-substitution-prefix-event `((,u . ,x)))
+            (add-substitution-prefix-event `((,x . 5)))))
+     (empty-event)
+     (empty-event)
+     (empty-event)))
+  (test (walk x '() #f test-event) 5))
+
+(let ([x (var 'x)])
+  (define test-event
+    (build-chain-event
+     (composite-event
+      (list (add-substitution-prefix-event `((r) (,u . ,x)))
+            (add-substitution-prefix-event `((r) (,x . 5)))))
+     (empty-event)
+     (empty-event)
+     (empty-event)))
+  (test (walk x '() #f test-event) 5))
 
 (let ()
   (define test-event
@@ -252,6 +303,8 @@
       (list (add-substitution-prefix-event `((,u . b)))))))
   (test (walk u '() #f test-event) 'b))
 
+;; == STREAM TESTS =============================================================
+
 (let ()
   (define a-inf (bindm empty-a (conj succeed succeed)))
   (test
@@ -272,6 +325,8 @@
    (let ([stream (generator () (take/lazy a-inf))])
      (take 1 stream))
    (list '_.0)))
+
+;; == RUN TESTS ================================================================
 
 (test
  (run 1 (q) succeed)
@@ -303,6 +358,8 @@
 
 (define-constraint (reifiedc x)
   #:reified)
+
+;; == CONSTRAINT TESTS =========================================================
 
 (test
  (run 1 (q) (add-constraint (reifiedc q)))
@@ -573,6 +630,8 @@
   (define-constraint (ex x)
     #:reify 5)
   (test (run* (q) (ex q)) '((_.0 : (ex 5)))))
+
+;; == CONSTRAINT INTERACTION TESTS =============================================
 
 (let ()
   (define rands (list 5))

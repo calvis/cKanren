@@ -181,7 +181,13 @@
 
 (struct add-substitution-prefix-event (p)
         #:transparent
-        #:methods gen:event []
+        #:methods gen:event 
+        [(define (gen-optimistic-merge e e^ relation)
+           (match-define (add-substitution-prefix-event p) e)
+           (match e^
+             [(add-substitution-prefix-event p^)
+              (add-substitution-prefix-event (append p p^))]
+             [_ #f]))]
         #:methods gen:association-event
         [(define (contains-relevant-var? e vars)
            (match-define (add-substitution-prefix-event p) e)
@@ -270,7 +276,7 @@
         [(define (gen-optimistic-merge e e^ relation)
            (match-define (build-chain-event r w tr new) e)
            (cond
-            [(optimistic-merge tr e^ relation)
+            [(empty-event? (optimistic-merge tr e^ relation))
              (running-event (optimistic-merge r e^ relation)
                             (compose-events w new))]
             [(optimistic-merge new e^ equal?)

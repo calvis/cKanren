@@ -274,7 +274,7 @@
     ;; if we are out of patterns, we have found all the things we are looking for!
     ;; all of the ocs are in scope and we just have to match them against the patterns
     [(create-initial-missing 
-      [[a s c e] name [pred? constraints ...] ...]
+      [[a s c e] name [pred? [constraints ...]] ...]
       (sat-ocs ... last-oc)
       (sat-patterns ...) 
       () ())
@@ -283,7 +283,11 @@
                ...
                (remove-constraint (oc (car last-oc) (cdr last-oc)))))
      (define/with-syntax (sat-constraints ...)
-       #'((conj rem-ocs constraints ...) ...))
+       (map (lambda (cs) 
+              (syntax-parse cs
+                [((~literal add) cs ...) #'(conj cs ...)]
+                [(cs ...) #'(conj rem-ocs cs ...)]))
+            (syntax->list #'([constraints ...] ...))))
      ;; YOU NEED PERMUTATIONS BECAUSE: REFLEXICVIVITY.
      (define/with-syntax ((patterns ...) ...)
        (permutations (syntax-e #'(sat-patterns ...))))
@@ -314,7 +318,7 @@
       (sat-ocs ...) (sat-patterns ...) (unsat-patterns ...) ())
      #'(lambda (new-oc) #f)]
     [(create-initial-missing 
-      [[a s c e] name [pred? constraints ...] ...]
+      [[a s c e] name [pred? [constraints ...]] ...]
       ;; the names of ocs that have been satisfied
       (sat-ocs ...)
       ;; the patterns satisfied by those ocs
@@ -339,7 +343,7 @@
                 ;; have to simply add a new constraint with a new missing?
                 ;; to the store
                 (let ([fn (create-initial-missing 
-                           [[a s c e] name [pred? constraints ...] ...]
+                           [[a s c e] name [pred? [constraints ...]] ...]
                            (sat-ocs ... new-oc)
                            (sat-patterns ... unsat-pattern)
                            () (unsat-patterns-pre ... unsat-patterns-post ...))])
@@ -349,7 +353,7 @@
                    [else (error 'wut "wututtututt")]))]
                [_
                 ((create-initial-missing
-                  [[a s c e] name [pred? constraints ...] ...]
+                  [[a s c e] name [pred? [constraints ...]] ...]
                   (sat-ocs ...) (sat-patterns ...)
                   (unsat-patterns-pre ... unsat-pattern) (unsat-patterns-post ...))
                  new-oc)])])))
@@ -366,7 +370,7 @@
     [(create-interaction-fn
       name 
       ([rator rands ...] ...)
-      ([pred? (constraints ...)] ...)
+      ([pred? [constraints ...]] ...)
       (a [s c e]))
      (define/with-syntax (missing new-oc ocs)
        (generate-temporaries #'(missing new-oc ocs)))
@@ -381,7 +385,7 @@
      ;; #f, if the new-oc is irrelevant, OR a constraint that should be run!
      (define/with-syntax initial-missing
        #'(create-initial-missing 
-          [[a s c e] name [pred? constraints ...] ...]
+          [[a s c e] name [pred? [constraints ...]] ...]
           () () ; sats
           ()    ; pre
           (unsat-patterns ...)))

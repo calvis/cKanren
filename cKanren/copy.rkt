@@ -40,6 +40,23 @@
   => 
   [(copy x y sym) (== y z)])
 
+(define-constraint-interaction
+  [(copy ,x ,y ,sym) (copy ,y ,z ,(not sym))]
+  #:package (a [s c e])
+  [(find-cycle z x c) [add (== x y) (== x z)]])
+
+(define (find-cycle z x c)
+  (define copys
+    (filter-map (match-lambda [(list x x g) #f] [(list a d g) (cons a d)])
+                (filter/rator copy c)))
+  (define (loop u visted)
+    (cond
+     [(eq? u x) #t]
+     [(memq u visted) #f]
+     [(assq u copys) => (lambda (v) (loop v (cons v visted)))]
+     [else #f]))
+  (loop z (list)))
+
 (define-constraint (copylb t u)
   #:reification-function
   (lambda (v r)
@@ -56,7 +73,6 @@
    [else (add-constraint (copylb t u))]))
 
 (define-constraint-interaction
-  merge-copylb
   [(copylb ,t ,u) (copylb ,t ,u^)] 
   [(merge u u^) [(copylb t (merge u u^))]])
 
@@ -150,7 +166,18 @@
   (test (run* (q) (copyo `(,q) q)) '())
 
   (test (run* (x y) (copyo x `(,y)) (== x `(5)))
-        '(((5) 5))))
+        '(((5) 5)))
+
+  (test
+   (run* (x y)
+     (copyo `((,x) (,x)) `((,x) (,y)))) 
+   '((_.0 _.0)))
+
+  (test
+   (run* (x y z)
+     (copyo `(,z (,x)) `((,x) (,y)))
+     (== `(,x) z))
+   '((_.0 _.0 (_.0)))))
 
 ;; harder tests
 
@@ -158,14 +185,6 @@
   (test 
    (run* (q) (copyo q 5) (copyo q 6)) 
    '((_.0 : (copy (_.0 f.1)))))
-
-  (test (run* (q)
-          (fresh (x y z)
-            (copyo x y)
-            (copyo y z)
-            (copyo z x)
-            (== q `(,x ,y ,z))))
-        '(((_.0 _.1 _.2) : (copy (_.0 _.1) (_.1 _.2) (_.2 _.0)))))
 
   (test (run* (q)
           (fresh (x) 
@@ -246,20 +265,17 @@
    ;;    x   y   m   n    g                y   n
    '(((_.0 _.1 _.0 _.2 (a _.0)) : (copy (_.1 _.2)))))
 
-  (test 
+  (test
    (run* (t t^)
      (fresh (t1 t2)
        (copyo `((,t1) (,t1 ,t2)) `((,t1) ,t^))))
    '((_.0 (_.1 _.2))))
 
-  (printf "=============================================================\n")
   (test 
    (run* (t t^)
      (fresh (t1 t2)
        (copyo `((,t1) ,t) `((,t1) ,t^))
-       (prtm "=============================================================\n")
-       (== `(,t1 ,t2) t)
-       (prtm "=============================================================\n")))
+       (== `(,t1 ,t2) t)))
    '((((_.0 _.1) (_.0 _.2)) : (copy (_.1 _.2)))))
 
   (test 
@@ -346,20 +362,17 @@
             (copyo q `(3 4))))
         '((_.0 : (copy (_.0 (f.1 f.2))))))
 
-  #;
+  (test (run* (x y)
+          (copyo x y)
+          (copyo y x))
+        '((_.0 _.0)))
+
   (test (run* (x y z)
           (copyo x y)
           (copyo y z)
-          (copyo z x))
+          (copyo z x)
+          (== z x))
         '((_.0 _.0 _.0)))
-
-  #;
-  (test (run* (q)
-          (fresh (x y)
-            (copyo x y)
-            (copyo y x)
-            (== q `(,x ,y))))
-        '((_.0 _.0)))
 
   (test (run* (q) (fresh (x) (copyo `(,x ,x) q)))
         '((_.0 _.0)))
@@ -618,7 +631,6 @@
           (copyo x `(,y ,z)))
         '((((5 . _.0) _.1 _.0 5 5) : (copy (_.0 (5))))))
 
-  #;
   (test (run* (x a d y z)
           (== 5 y)
           (copyo x `(,z ,y))
@@ -626,7 +638,6 @@
           (== `(5 . ,d) x))
         '((((5 . _.0) _.1 _.0 5 5) : (copy (_.0 (5))))))
 
-  #;
   (test (run* (x a d y z)
           (copyo x `(,z ,y))
           (copyo x `(,y ,z))
@@ -681,21 +692,18 @@
           (copyo x `(,y ,z)))
         '((((_.0 5) _.0 5 5) : (copy (_.0 5)))))
 
-  #;
   (test (run* (x a y z)
           (copyo x `(,z ,y))
           (copyo x `(,y ,z))
           (== `(,a 5) x))
         '((((_.0 5) _.0 5 5) : (copy (_.0 5)))))
 
-  #;
   (test (run* (x a y z)
           (copyo x `(,y ,z))
           (copyo x `(,z ,y))
           (== `(,a 5) x))
         '((((_.0 5) _.0 5 5) : (copy (_.0 5)))))
 
-  #;
   (test (run* (x a y z)
           (copyo x `(,y ,z))
           (== `(,a 5) x)
@@ -731,7 +739,6 @@
           (copyo x `(,y ,z)))
         '((((_.0 5) _.0 _.1 5) : (copy (_.0 _.1)))))
 
-  #;
   (test (run* (x a y z)
           (copyo x `(,y ,z))
           (== `(,a 5) x))
@@ -742,7 +749,6 @@
           (copyo b `(,y ,z)))
         '((((_.0 5) _.0 _.1 5) : (copy (_.0 _.1)))))
 
-  #;
   (test (run* (b a y z)
           (copyo b `(,y ,z))
           (== `(,a 5) b))
