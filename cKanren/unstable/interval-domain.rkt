@@ -34,7 +34,7 @@
         ((and (<= jmin imin) (>= jmax imax)) `((,jmin . ,jmax)))
         ((and (<= imin jmin) (>= jmax imax)) `((,imin . ,jmax)))
         ((and (<= jmin imin) (>= imax jmax)) `((,jmin . ,imax)))
-        (else (error 'interval-union "Not defined" i j))))))
+        (else (error 'interval-union "not defined for ~a ~a" i j))))))
 
 (define interval-difference
   (lambda (i j)
@@ -49,7 +49,7 @@
          `((,imin . ,(- jmin 1))))
         ((and (> imax jmax) (<= jmin imin))
          `((,(+ jmax 1) . ,imax)))
-        (else (error 'interval-difference "Not defined" i j))))))
+        (else (error 'interval-difference "not defined for ~a ~a" i j))))))
 
 (define interval-intersection
   (lambda (i j)
@@ -64,7 +64,7 @@
          `((,jmin . ,imax)))
         ((and (<= jmin imin) (<= jmax imax))
          `((,imin . ,jmax)))
-        (else (error 'interval-intersection "Not defined" i j))))))
+        (else (error 'interval-intersection "not defined for ~a ~a" i j))))))
 
 (define interval-memq?
   (lambda (x intvl)

@@ -1,15 +1,16 @@
 #lang racket
 
-(require "ck.rkt" "tree-unify.rkt")
+(require cKanren/ck cKanren/tree-unify cKanren/tester)
 (require (for-syntax racket racket/syntax syntax/parse))
-;; (provide matche defmatche)
-(provide (all-defined-out))
+
+(provide defmatche lambdae matche)
 
 (define-syntax (defmatche stx)
   (syntax-parse stx
     [(defmatche (name:id args:id ...) clause ...)
-     #'(define (name args ...)
-         (matche (args ...) clause ...))]))
+     (syntax/loc stx
+       (define (name args ...)
+         (matche (args ...) clause ...)))]))
 
 (define-syntax lambdae
   (syntax-rules ()
@@ -19,26 +20,26 @@
 (define-syntax (matche stx)
   (syntax-parse stx
     [(matche (v:id ...) ([pat ...] g ...) ...)
-     (unless 
-       (andmap (compose (curry = (length (syntax-e #'(v ...))))
-                        length syntax-e)
-               (syntax-e #'([pat ...] ...)))
-       (error 'matche "pattern wrong length blah"))
+     (define v-length (length (syntax-e #'(v ...))))
+     (for ([a-pat (syntax->list (syntax/loc stx ([pat ...] ...)))])
+       (unless (= (length (syntax->list a-pat)) v-length)
+         (raise-syntax-error 
+          'matche
+          (format "expected pattern of length ~a" v-length)
+          a-pat)))
      (define/with-syntax (([pat^ ...] (c ...) (x ...)) ...)
        (map (curry parse-pattern #'(v ...))
             (syntax-e #'([pat ...] ...))))
      (define/with-syntax ((x^ ...) ...) 
-       (map (compose (lambda (ls) 
-                       (remove-duplicates ls free-identifier=?))
-                     syntax-e)
+       (map (compose (curryr remove-duplicates free-identifier=?) syntax-e)
             (syntax-e #'((x ...) ...))))
      (define/with-syntax body
        #'(conde
           [(fresh (x^ ...) c ... (== `[pat^ ...] ls) g ...)]
           ...))
-     #'(let ([ls (list v ...)]) body)]
+     (syntax/loc stx (let ([ls (list v ...)]) body))]
     [(matche v:id (pat g ...) ...)
-     #'(matche (v) ([pat] g ...) ...)]))
+     (syntax/loc stx (matche (v) ([pat] g ...) ...))]))
 
 (define-for-syntax (parse-pattern args pat)
   (syntax-parse #`(#,args #,pat)
@@ -90,18 +91,17 @@
     [else (loop pat)]))
 
 (module+ test
-  (require (prefix-in ru: rackunit))
 
   (let ()
     (defmatche (foo a b)
       [[5 5]])
-    (ru:check-equal?
+    (test
      (run* (q) (foo 5 5))
      '(_.0))
-    (ru:check-equal?
+    (test
      (run* (q) (foo q 5))
      '(5))
-    (ru:check-equal?
+    (test
      (run* (x y) (foo x y))
      '((5 5))))
     
@@ -109,14 +109,14 @@
     (defmatche (bar a)
       [[(,x . ,y)]
        (== x y)])
-    (ru:check-equal?
+    (test
      (run* (q) (bar q))
      '((_.0 . _.0))))
 
   (let () 
     (defmatche (baby-rembero x ls out)
       [[,x () ()]])
-    (ru:check-equal?
+    (test
      (run* (q) (baby-rembero 'x '() '()))
      '(_.0))))
 

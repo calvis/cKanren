@@ -1,9 +1,18 @@
-#lang racket
+#lang cKanren
 
-(require "ck.rkt" racket/generic "src/framework.rkt" "src/events.rkt" "src/mk-structs.rkt"
-         "attributes.rkt" "src/constraint-store.rkt" "src/triggers.rkt")
-(provide == unify gen:unifiable gen-unify compatible? unify-two unify-walked unifiable?
-         unify-change)
+(require (except-in racket ==) racket/generic)
+
+(require cKanren/attributes 
+         cKanren/src/constraint-store
+         cKanren/src/triggers
+         cKanren/src/mk-structs
+         (only-in cKanren/src/events
+                  add-association-event
+                  add-substitution-prefix-event  
+                  empty-event))
+
+(provide == unify unify-two unify-walked unify-change)
+(provide gen:unifiable gen-unify compatible? unifiable?)
 
 ;; a generic that defines when things are unifiable!
 (define-generics unifiable
@@ -87,10 +96,8 @@
 (define (unify-new-prefix thing s c e)
   (match (unify (walk* thing s c e) s c e)
     [(cons s^ c^)
-     (cons (prefix-s s s^)
-           (prefix-c c c^))]
-    [#f #f]
-    [_ (error 'unify-new-prefix "got something strange")]))
+     (cons (prefix-s s s^) (prefix-c c c^))]
+    [#f #f]))
 
 (define-trigger (unify-change thing)
   #:package (a [s c e])

@@ -70,14 +70,10 @@
 
 ;; [Event -> Boolean] Event -> [Maybe Event]
 (define (findf fn e [ce #f])
-  (unless (event? e)
-    (error 'findf "not an event: ~a" e))
   (or (and (fn e) e) (gen-findf fn e ce)))
 
 ;; [Event -> Boolean] Event -> [List-of Event]
 (define (filter fn e)
-  (unless (event? e)
-    (error 'filter "not an event: ~a" e))
   (cond 
    [(compound-event? e)
     (gen-filter fn e)]
@@ -96,8 +92,6 @@
 
 ;; first try optimistically merging the events, then pessimistically
 (define (compose-events e e^)
-  (unless (and (event? e) (event? e^))
-    (error 'compose-events "wut no ~s ~s\n" e e^))
   (cond
    [(and (composite-event? e)
          (composite-event? e^))
@@ -228,9 +222,7 @@
            (findf fn r ce))
          (define (gen-filter fn e)
            (match-define (running-event r w) e)
-           (filter fn r))
-         (define (gen-solidify solid e)
-           (error 'gen-solidify "internal error: ~a" e))]
+           (filter fn r))]
         #:methods gen:compound-event [])
 
 (define (relevant? x e)

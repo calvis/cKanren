@@ -78,8 +78,7 @@
      ;; if we are already running, don't try to run again. just add
      ;; the event we are trying to send to the waiting events
      [(running-event? e-orig)
-      (make-a s c q t (compose-events new-e e-orig))]
-     [else (error 'send-event "found unsent event: ~a\n" e-orig)])))
+      (make-a s c q t (compose-events new-e e-orig))])))
 
 ;; ConstraintTransformer
 ;; sends each running event to all other running events
@@ -188,8 +187,7 @@
                            real-response
                            (unchain removing-self? answer))]
                          [else answer]))
-                      ct)]
-               [else (error 'run-response "~a" else)])]
+                      ct)])]
          [else ct]))
       (bindm a answer))))
 

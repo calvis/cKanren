@@ -48,8 +48,6 @@
   (syntax-parse stx
     [((~literal =>) stuff ...)
      #`(lambda (ans) 
-         (unless (pair? ans)
-           (error 'parse-responses "internal error: ~a\n" ans))
          ((let #,bindings stuff ...) 
           (car ans)))]
     [(stuff ...) 
@@ -307,9 +305,7 @@
            ;; much we can do
            ;; TODO: WTF LIST-NO-ORDER
            [(list patterns ...) a]
-           ...
-           ;; if we don't even satisfy the list-no-order, then wtf are we doing
-           [_ (error 'name "internal error ~a\n" (list sat-ocs ... last-oc))]))]
+           ...))]
     ;; if we are just out of post-patterns, that means we have already
     ;; made all the possible levels of matches and our new-oc just
     ;; doesn't work at all
@@ -332,7 +328,6 @@
             ;; if you IMMEDIATELY try to add a constraint that is ptr
             ;; equivalent to one you already have, give up
             [(memq (cdr new-oc) (map cdr (list sat-ocs ...))) #f]
-            ; (error 'name "internal error memq: ~a ~a\n" new-oc (list sat-ocs ...))
             [else
              (match (list new-oc (list sat-ocs ...))
                [(list unsat-pattern (list sat-patterns ...))
@@ -349,8 +344,7 @@
                            () (unsat-patterns-pre ... unsat-patterns-post ...))])
                   (cond
                    [(transformer? fn) fn]
-                   [(procedure? fn) (cons new-oc fn)]
-                   [else (error 'wut "wututtututt")]))]
+                   [(procedure? fn) (cons new-oc fn)]))]
                [_
                 ((create-initial-missing
                   [[a s c e] name [pred? [constraints ...]] ...]
@@ -412,8 +406,7 @@
                  (match-define (cons new-oc fn^) result)
                  (name (cons new-oc ocs) fn^)]
                 [(false? result)
-                 succeed]
-                [else (error 'name "here")]))
+                 succeed]))
              (conj (add-constraint (name ocs missing)) fn))])
         (lambda () (name (list) initial-missing)))]))
 
