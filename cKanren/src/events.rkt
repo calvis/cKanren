@@ -162,17 +162,6 @@
              (compose-events new-e (remove-chains e))))]
         #:methods gen:compound-event [])
 
-(struct add-association-event (x v)
-        #:transparent
-        #:methods gen:event []
-        #:methods gen:association-event
-        [(define (contains-relevant-var? e vars)
-           (match-define (add-association-event x v) e)
-           (memq x vars))
-         (define (walk/shortcut u e)
-           (match-define (add-association-event x v) e)
-           (and (eq? u x) v))])
-
 (struct add-substitution-prefix-event (p)
         #:transparent
         #:methods gen:event 
@@ -268,6 +257,8 @@
         [(define (gen-optimistic-merge e e^ relation)
            (match-define (build-chain-event r w tr new) e)
            (cond
+            ;; only if we have totally removed the trigger can we
+            ;; cancel the chain build
             [(empty-event? (optimistic-merge tr e^ relation))
              (running-event (optimistic-merge r e^ relation)
                             (compose-events w new))]
@@ -325,4 +316,11 @@
   (struct name (args ...)
           #:transparent
           #:methods gen:event []))
+
+
+(struct enforce-event (xs)
+        #:methods gen:event [])
+
+(struct enforce-in-event enforce-event ())
+(struct enforce-out-event enforce-event ())
 

@@ -108,7 +108,6 @@
   (test (run* (x) (infd x '(1 2))) 
         '(1 2))
   
-  (printf "=============================\n")
   (test (run* (x) (fresh (y) (infd x y '(1 2))))
         '(1 2))
   
@@ -188,18 +187,7 @@
      (=fd x y))
    `((2 2)))
   
-  #;
-  (test
-   (run* (q)
-     (fresh (x y)
-       (infd x '(1 2 3))
-       (infd y '(0 1 2 3 4))
-       (<fd x y)
-       (=/=fd x 1)
-       (=fd y 3)
-       (== q `(,x ,y))))
-   `((2 3)))
-  
+
   (test
    (run* (q)
      (fresh (x y z)
@@ -246,23 +234,52 @@
      (fresh (x)
        (<=fd x 5)
        (infd x q (range 0 10))
-       (prtm "==================================\n")
-       (=fd q x)
-       (prtm "==================================\n")))
+       (=fd q x)))
    `(0 1 2 3 4 5))
   
-;;   (test
-;;               (run* (q)
-;;                     (fresh (x y z)
-;;                            (infd x y z q (range 0 9))
-;;                            (=/=fd x y)
-;;                            (=/=fd y z)
-;;                            (=/=fd x z)
-;;                            (=fd x 2)
-;;                            (=fd q 3)
-;;                            (plusfd y 3 z)))
-;;               `(3))
-;;   
+  (test
+   (run* (x y)
+     (infd x '(1 2 3))
+     (infd y '(0 1 2 3 4))
+     (<=fd x y))
+   `((1 1) (1 2) (1 3) (1 4) (2 2) (2 3) (3 3) (2 4) (3 4)))
+  
+  (test
+   (run* (x y)
+     (infd x '(1 2 3))
+     (infd y '(0 1 2 3 4))
+     (<fd x y))
+   `((1 2) (1 3) (1 4) (2 3) (2 4) (3 4)))
+  
+  (test
+   (run* (x y)
+     (infd x '(1 2 3))
+     (infd y '(0 1 2 3 4))
+     (<fd x y)
+     (=/=fd x 1)
+     (=fd y 3))
+   `((2 3)))
+
+  #;
+  (test
+   (run* (x y z)
+     (infd x y z (range 0 3))
+     (plusfd x y z))
+   'error)
+  
+  #;
+  (test
+   (run* (q)
+     (fresh (x y z)
+       (infd x y z q (range 0 9))
+       (=/=fd x y)
+       (=/=fd y z)
+       (=/=fd x z)
+       (=fd x 2)
+       (=fd q 3)
+       (plusfd y 3 z)))
+   `(3))
+  
 ;;   (test
 ;;               (run* (q)
 ;;                     (distinctfd `(1 2 3 4 5)))

@@ -4,7 +4,9 @@
          cKanren/ck
          cKanren/src/framework
          cKanren/src/events
-         cKanren/src/constraints)
+         cKanren/src/constraints
+         cKanren/src/triggers
+         cKanren/src/operators)
 
 (provide (all-defined-out))
 
@@ -19,20 +21,11 @@
 
 (define-constraint (dom v [d #:constant])
   #:reaction
-  [(enforce (list v))
+  [(any-enforce (list v))
    (force-ans v d)]
   #:package (a [s c e])
-  ;; (printf "dom: ~a ~a\n" v d)
   (cond
-   [(and (value-dom? v)
-         (memv-dom? v d))
-    succeed]
-   #;
-   [(findf enforce-event? e)
-    => (match-lambda
-         [(enforce-event enforce-vars)
-          (conj (add-constraint (dom v d))
-                (enforce-domfd enforce-vars))])]
+   [(and (value-dom? v) (memv-dom? v d)) succeed]
    [(var? v)
     (cond
      [(null-dom? d) fail]
@@ -44,38 +37,18 @@
 (define-constraint-interaction
  [(dom x d) (dom x d^)] => [(dom x (intersection-dom d d^))])
 
-(define (force-ans ocs)
-  succeed
-  #;
-  (for/fold ([ct succeed]) ([an-oc ocs])
-    (match-define (list v d) (oc-rands an-oc))
-    (conj ((map-sum (curry update-s v)) d) ct)))
+(define (force-ans v d)
+  (map-sum (curry add-association v) d))
 
-(define (enforce-domfd enforce-vars)
-  (transformer
-   #:package (a [s c e])
-   (define doms (filter/rator dom c))
-   (define (relevant? oc)
-     (match-define (list v d) (oc-rands oc))
-     (memq v enforce-vars))
-   (define-values (relevant-doms irrelevant-doms)
-     (partition relevant? doms))
-   (printf "enforce: ~a ~a\n" relevant-doms irrelevant-doms)
-   (conj (force-ans relevant-doms)
-         ;(onceo (force-ans irrelevant-doms))
-         )))
+(define (<fd u v)
+  (conj (<=fd u v) (=/=fd u v)))
 
-;; (define (=/=fd u v)
-;;   (=/=fd-c u v))
-;; 
-;; (define (<fd u v)
-;;   (conj (<=fd u v) (=/=fd u v)))
 ;; 
 ;; (define (<=fd u v)
 ;;   (<=fd-c u v))
 ;; 
-;; (define (plusfd u v w)
-;;   (plusfd-c u v w))
+;; (define (+fd u v w)
+;;   (+fd-c u v w))
 ;; 
 ;; (define (timesfd u v w)
 ;;   (timesfd-c u v w))
@@ -141,42 +114,11 @@
 
 (define-constraint (=/=fd u v)
   (cond
-   [(and (var? u) (var? v))
-    (add-constraint (=/=fd u v))]
-   [(value-dom? v)
-    (cond
-     [(value-dom? u)
-      (cond
-       [(eq? u v) fail]
-       [else succeed])]
-     [else (add-constraint (=/=fd u v))])]
-   [else (add-constraint (=/=fd v u))])
-
-  #;
-  (let-dom (s c) ((u : d_u) (v : d_v))
-  (cond
-  ((or (not d_u) (not d_v))
-  ((update-c (build-oc =/=fd-c u v)) a))
-  ((and (singleton-dom? d_u)
-  (singleton-dom? d_v)
-  (= (singleton-element-dom d_u)
-  (singleton-element-dom d_v)))
-  mzerom)
-  ((disjoint-dom? d_u d_v) a)
-  (else
-  (let ((oc (build-oc =/=fd-c u v)))
-  (bindm a
-  (conj
-  (update-c oc)
-  (cond
-  [(singleton-dom? d_u)
-  (process-dom v (diff-dom d_v d_u))]
-  [(singleton-dom? d_v)
-  (process-dom u (diff-dom d_u d_v))]
-  [else identitym]))))))))
+   [(and (value-dom? u) (value-dom? v))
+    (succeed-iff (not (eq? u v)))]
+   [else (add-constraint (=/=fd u v))]))
 
 (define-constraint-interaction
-  =/=fd-interaction
   [(=/=fd u v) (dom u d) (dom v d^)]
   [(disjoint-dom? d d^) [(dom u d) (dom v d^)]])
 
@@ -247,13 +189,8 @@
 
 (define-constraint (=fd u v)
   (cond
-   [(value-dom? u)
-    (cond
-     [(value-dom? v)
-      (cond
-       [(eq? u v) succeed]
-       [else fail])]
-     [else (add-association v u)])]
+   [(and (value-dom? u) (value-dom? v))
+    (succeed-iff (eq? u v))]
    [(value-dom? v)
     (add-association u v)]
    [else (add-constraint (=fd u v))]))
@@ -269,50 +206,48 @@
 (define-constraint (<=fd u v)
   (cond
    [(and (value-dom? u) (value-dom? v))
-    (cond [(<= u v) succeed] [else fail])]
-   [else (add-constraint (<=fd u v))])
-  #;
-  (c-op <=fd-c ([u : d_u] [v : d_v])
-    (let ([umin (min-dom d_u)]
-          [vmax (max-dom d_v)])
-      (let ([new-u-dom (copy-before-dom (lambda (u) (< vmax u)) d_u)]
-            [new-v-dom (drop-before-dom (lambda (v) (<= umin v)) d_v)])
-        (conj
-         (process-dom u new-u-dom)
-         (process-dom v new-v-dom))))))
+    (succeed-iff (<= u v))]
+   [else (add-constraint (<=fd u v))]))
 
+;; if there are impossible elements in the high ranges of u's domain
+;; or the low ranges of v's dom, removes them
 (define-constraint-interaction
-  <=fd-interaction
   [(<=fd u v) (dom u du) (dom v dv)]
-  =>
-  [(<=fd u v) 
-   (dom u (copy-before-dom (curry < (max-dom dv)) du))
-   (dom v (drop-before-dom (curry <= (min-dom du)) dv))])
+  [(let ([du^ (copy-before-dom (curry < (max-dom dv)) du)]
+         [dv^ (drop-before-dom (curry <= (min-dom du)) dv)])
+     (or (not (equal? du du^))
+         (not (equal? dv dv^))))
+   [add (dom u (copy-before-dom (curry < (max-dom dv)) du))
+        (dom v (drop-before-dom (curry <= (min-dom du)) dv))]])
 
 (define-constraint-interaction
-  <=fd-interaction-u
   [(<=fd u v) (dom u du)]
-  [(value-dom? v)
-   [(dom u (copy-before-dom (curry < v) du))]])
+  [(value-dom? v) [(dom u (copy-before-dom (curry < v) du))]])
 
 (define-constraint-interaction
-  <=fd-interaction-v
   [(<=fd u v) (dom v dv)]
-  [(value-dom? u)
-   [(dom v (drop-before-dom (curry <= u) dv))]])
+  [(value-dom? u) [(dom v (drop-before-dom (curry <= u) dv))]])
 
-;; (define (plusfd-c u v w)
-;;   (c-op plusfd-c ([u : d_u] [v : d_v] [w : d_w])
-;;     (let ([wmin (min-dom d_w)] [wmax (max-dom d_w)]
-;;           [umin (min-dom d_u)] [umax (max-dom d_u)]
-;;           [vmin (min-dom d_v)] [vmax (max-dom d_v)])
-;;       (let ([new-w-dom (range (+ umin vmin) (+ umax vmax))]
-;;             [new-u-dom (range (- wmin vmax) (- wmax vmin))]
-;;             [new-v-dom (range (- wmin umax) (- wmax umin))])
-;;         (conj
-;;          (process-dom w new-w-dom)
-;;          (process-dom u new-u-dom)
-;;          (process-dom v new-v-dom))))))
+#;
+(define-constraint (+fd u v w)
+  (cond
+   [(andmap value-dom? (list u v w))
+    (succeed-iff (= (+ u v) w))]
+   [else (add-constraint (+fd u v w))])
+
+  #;
+  (c-op +fd-c ([u : d_u] [v : d_v] [w : d_w])
+        (let ([wmin (min-dom d_w)] [wmax (max-dom d_w)]
+              [umin (min-dom d_u)] [umax (max-dom d_u)]
+              [vmin (min-dom d_v)] [vmax (max-dom d_v)])
+          (let ([new-w-dom (range (+ umin vmin) (+ umax vmax))]
+                [new-u-dom (range (- wmin vmax) (- wmax vmin))]
+                [new-v-dom (range (- wmin umax) (- wmax umin))])
+            (conj
+             (process-dom w new-w-dom)
+             (process-dom u new-u-dom)
+             (process-dom v new-v-dom))))))
+
 ;; 
 ;; (define (timesfd-c u v w)
 ;;   (let ((safe-div (lambda (n c a) (if (zero? n) c (quotient a n)))))
@@ -350,7 +285,7 @@
 ;;            a))))))
 ;; 
 ;; (define fd-cs '(=/=fd-c distinctfd-c distinct/fd-c 
-;;                 <=fd-c =fd-c plusfd-c timesfd-c))
+;;                 <=fd-c =fd-c +fd-c timesfd-c))
 ;; (define (fd-c? oc) (memq (oc-rator oc) fd-cs))
 ;; 
 ;; (define (verify-all-bound s c bound-x*)

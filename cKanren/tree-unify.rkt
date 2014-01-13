@@ -7,7 +7,6 @@
          cKanren/src/triggers
          cKanren/src/mk-structs
          (only-in cKanren/src/events
-                  add-association-event
                   add-substitution-prefix-event  
                   empty-event))
 
@@ -101,11 +100,6 @@
 
 (define-trigger (unify-change thing)
   #:package (a [s c e])
-  [(add-association-event u v)
-   (=> abort)
-   (unless (memq u (filter*/var? thing))
-     (abort))
-   (unify-new-prefix thing s c e)]
   [(add-substitution-prefix-event p)
    (=> abort)
    (unless (ormap (lambda (x) (memq (car x) (filter*/var? thing))) p)

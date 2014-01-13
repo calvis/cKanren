@@ -35,8 +35,18 @@
 ;; splitting up the package
 (define-syntax (lambda@ stx)
   (syntax-parse stx
-    [(_ (a:id) body:expr ...)
-     (syntax/loc stx (-transformer (lambda (a) body ...)))]
+    [(k (a:id) body:expr ...)
+     (define/with-syntax src (build-srcloc-stx #'k))
+     (syntax/loc stx 
+       (let ()
+         (define a-lambda@
+           (case-lambda
+            [(a) (let () body ...)]
+            [r (raise
+                (exn:goal-as-fn
+                 (format "~s: misused lambda@" (format-source src))
+                 (current-continuation-marks)))]))
+         (-transformer a-lambda@)))]
     [(_ (a [s:id c:id q:id t:id e:id]) body:expr ...)
      (syntax/loc stx
        (lambda@ (a)

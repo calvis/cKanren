@@ -22,6 +22,9 @@
 
 (define onceo (lambda (g) (condu (g))))
 
+(define (succeed-iff bool)
+  (if bool succeed fail))
+
 ;; =============================================================================
 
 ;; shorthand for conjunction
@@ -81,7 +84,7 @@
 
 (define-syntax ifa
   (syntax-rules ()
-    ((_) fail)
+    ((_) mzerom)
     ((_ (e g ...) b ...)
      (let loop ((a-inf e))
        (case-inf a-inf
@@ -98,7 +101,7 @@
 
 (define-syntax ifu
   (syntax-rules ()
-    ((_) fail)
+    ((_) mzerom)
     ((_ (e g ...) b ...)
      (let loop ((a-inf e))
        (case-inf a-inf

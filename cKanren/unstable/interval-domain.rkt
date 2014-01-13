@@ -245,18 +245,17 @@
        (disjoint-dom? dom1 (cdr dom2)))
       (else #f))))
 
-(define map-sum
-  (lambda (f)
-    (letrec
-        ((loop
-          (lambda (dom)
-            (cond
-             [(null-dom? dom) fail]
-             [else
-              (conde
-               [(f (car-dom dom))]
-               [(loop (cdr-dom dom))])]))))
-      loop)))
+(define (map-sum f dom)
+  (letrec
+      ((loop
+        (lambda (dom)
+          (cond
+           [(null-dom? dom) fail]
+           [else
+            (conde
+             [(f (car-dom dom))]
+             [(loop (cdr-dom dom))])]))))
+    (loop dom)))
 
 ;; Uncomment for interval test programs!
 

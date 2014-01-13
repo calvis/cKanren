@@ -28,9 +28,9 @@
 (test
  (compose-events
   (constraint-event rator1 rands1)
-  (running-event (add-association-event 'q 5) (empty-event)))
+  (running-event (add-substitution-prefix-event `((q . 5))) (empty-event)))
  (running-event
-  (add-association-event 'q 5)
+  (add-substitution-prefix-event `((q . 5)))
   (constraint-event rator1 rands1)))
 
 (test
@@ -188,18 +188,18 @@
 (test
  (compose-events
   (build-chain-event
-   (add-association-event 'q 5)
-   (add-association-event 'q 5)
-   (add-association-event 'q 5)
+   (add-substitution-prefix-event `((q . 5)))
+   (add-substitution-prefix-event `((q . 5)))
+   (add-substitution-prefix-event `((q . 5)))
    (empty-event))
   (constraint-event rator1 rands1))
  (build-chain-event
-  (add-association-event 'q 5)
-  (add-association-event 'q 5)
-  (add-association-event 'q 5)
+  (add-substitution-prefix-event `((q . 5)))
+  (add-substitution-prefix-event `((q . 5)))
+  (add-substitution-prefix-event `((q . 5)))
   (constraint-event rator1 rands1)))
 
-(let ([trigger (add-association-event 'q 5)])
+(let ([trigger (add-substitution-prefix-event `((q . 5)))])
   (test
    (apply-chain
     (build-chain-event
@@ -219,31 +219,29 @@
        (constraint-event rator1 rands2)
        (constraint-event rator1 rands1)))))))
 
-(let ([tr (add-association-event 'q 5)])
+(let ([tr (add-substitution-prefix-event `((q . 5)))])
   (test
    (solidify
     (list tr)
-    (chain-event tr (add-association-event 'q 6)))
-   (add-association-event 'q 6)))
+    (chain-event tr (add-substitution-prefix-event `((q . 6)))))
+   (add-substitution-prefix-event `((q . 6)))))
 
-(let ([trigger1 (add-association-event 'q 5)]
+(let ([trigger1 (add-substitution-prefix-event `((q . 5)))]
       [trigger2 (add-constraint-event/internal rator1 rands1)])
   (test
    (solidify
     (list trigger1 trigger2)
     (composite-event
-     (list (chain-event trigger1 (add-association-event 'q 6))
-           (chain-event trigger2 (chain-event trigger1 (add-association-event 'q 7))))))
-   (composite-event
-    (list (add-association-event 'q 7)
-          (add-association-event 'q 6)))))
+     (list (chain-event trigger1 (add-substitution-prefix-event `((q . 6))))
+           (chain-event trigger2 (chain-event trigger1 (add-substitution-prefix-event `((q . 7))))))))
+   (add-substitution-prefix-event `((q . 7) (q . 6)))))
 
 ;; == WALK TESTS ===============================================================
 
 (let ()
   (define test-event
     (build-chain-event
-     (add-association-event u 'a)
+     (add-substitution-prefix-event `((,u . a)))
      (empty-event)
      (add-substitution-prefix-event '())
      (composite-event
@@ -314,10 +312,12 @@
 
 (let ()
   (define a-inf (bindm empty-a (conj succeed (enforce (var 'x)))))
-  (test
-   (let ([stream (generator () (take/lazy a-inf))])
-     (take 1 stream))
-   (list empty-a)))
+  (define ans (car (let ([stream (generator () (take/lazy a-inf))])
+                     (take 1 stream))))
+  (test (a-s ans) empty-s)
+  (test (a-c ans) empty-c)
+  (test (a-e ans) empty-e)
+  (test ans empty-a))
 
 (let ()
   (define a-inf (bindm empty-a (conj succeed (enforce (var 'x)) (reify (var 'x)))))
@@ -325,6 +325,49 @@
    (let ([stream (generator () (take/lazy a-inf))])
      (take 1 stream))
    (list '_.0)))
+
+(let ()
+  (define a-inf (bindm empty-a (conj (conde [succeed] [fail]) (enforce (var 'x)) (reify (var 'x)))))
+  (test
+   (let ([stream (generator () (take/lazy a-inf))])
+     (take 1 stream))
+   (list '_.0)))
+
+(let ()
+  (define a-inf (bindm empty-a (conj (conde [succeed] [succeed]) (enforce (var 'x)) (reify (var 'x)))))
+  (test
+   (let ([stream (generator () (take/lazy a-inf))])
+     (take 2 stream))
+   (list '_.0 '_.0)))
+
+(let ()
+  (define a-inf (bindm empty-a (conj (conde [succeed] [succeed]) (enforce (var 'x)) (reify (var 'x)))))
+  (test
+   (let ([stream (generator () (take/lazy a-inf))])
+     (take #f stream))
+   (list '_.0 '_.0)))
+
+(let ()
+  (define a-inf 
+    (bindm empty-a 
+           (conj (onceo (conde [succeed] [succeed]))
+                 (enforce (var 'x))
+                 (reify (var 'x)))))
+  (test
+   (let ([stream (generator () (take/lazy a-inf))])
+     (take #f stream))
+   (list '_.0)))
+
+(let ()
+  (define a-inf 
+    (bindm empty-a 
+           (conj (onceo fail)
+                 (enforce (var 'x))
+                 (reify (var 'x)))))
+  (test
+   (let ([stream (generator () (take/lazy a-inf))])
+     (take 1 stream))
+   (list)))
 
 ;; == RUN TESTS ================================================================
 

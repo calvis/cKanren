@@ -25,8 +25,6 @@
           racket/function
           "syntax-classes.rkt"))
 
-(require (rename-in (only-in racket filter) [filter ls:filter]))
-
 (provide send-event
          fresh-aux
          fresh
@@ -219,7 +217,7 @@
         (cond
          [(eq? x v) a]
          [(not (var? x)) #f]
-         [else (bindm a (send-event (add-association-event x v)))])))))
+         [else (bindm a (send-event (add-substitution-prefix-event `((,x . ,v)))))])))))
 
 (define (add-constraint an-oc)
   (match-define (oc rator rands) an-oc)
@@ -238,9 +236,9 @@
   (lambda@ (a [s c q t e])
     (make-a s (ext-c new-oc c) q t e)))
 
-(define (remove-from-c an-oc)
+(define (remove-from-c old-oc)
   (lambda@ (a [s c q t e])
-    (make-a s (remq-c an-oc c) q t e)))
+    (make-a s (remq-c old-oc c) q t e)))
 
 (define (remove-constraint an-oc)
   (match-define (oc rator rands) an-oc)
@@ -248,21 +246,20 @@
 
 (define (enforce x)
   (lambda@ (a [s c q t e])
-    a
-    #;
-    (let ([x (filter*/var? (walk x (substitution-s s)))])
-      (bindm a (conj (add-event (enforce-event x)) send-event)))))
+    (define xs (filter*/var? (walk* x s)))
+    (define ct
+      (conj (send-event (enforce-in-event xs))
+            (onceo (send-event (enforce-out-event xs)))))
+    (bindm a ct)))
 
 (define (reify x)
   (lambda@ (a [s c q t e])
     (define v (walk* x s c e))
     (define r (reify-s v empty-s))
     (define v^ (reify-term v r))
-    (define answer
-      (cond
-       [(null? r) v^]
-       [else (reify-constraints v^ r c)]))
-    answer))
+    (cond
+     [(null? r) v^]
+     [else (reify-constraints v^ r c)])))
 
 ;; reifies the substitution, returning the reified substitution
 (define (reify-s v^ s)
@@ -348,7 +345,6 @@
 
 ;; Event -> ConstraintTransformer
 (define/match (solidify-atomic-event e)
-  [((add-association-event u v)) (update-s u v)]
   [((add-substitution-prefix-event p)) (update-s p)]
   [((add-constraint-event/internal rator rands))
    (update-c (oc rator rands))]

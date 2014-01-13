@@ -48,9 +48,10 @@
 (define choiceg cons)
 
 (struct a #;a-inf (s c q t e)
-  #:extra-constructor-name make-a/internal
-  #:methods gen:custom-write 
-  [(define (write-proc . args) (apply write-package args))])
+        #:transparent
+        #:extra-constructor-name make-a/internal
+        #:methods gen:custom-write 
+        [(define (write-proc . args) (apply write-package args))])
 
 ;; controls how packages are displayed
 (define (write-package a port mode)
@@ -62,7 +63,7 @@
 ;; macro that delays expressions
 (define-syntax lambdaf@
   (syntax-rules ()
-    ((_ () e) (lambda () e))))
+    ((_ () e) (let () (define (a-delay) e) a-delay))))
 
 ;; delays an expression
 (define-syntax delay

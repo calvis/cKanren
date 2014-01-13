@@ -11,9 +11,11 @@
 (provide (struct-out trigger)
          define-trigger)
 
+;; some predefined triggers
 (provide enter-scope
          leave-scope
-         any-association-event)
+         any-association-event
+         any-enforce)
 
 (struct trigger (subs interp))
 
@@ -53,11 +55,6 @@
    (=> abort) (unless (or (not x) (eq? x y)) (abort)) y])
 
 (define-trigger (any-association-event x)
-  [(add-association-event y z)
-   (=> abort)
-   (unless (or (eq? x y) (memq x (filter*/var? z)))
-     (abort))
-   (list (cons y z))]
   [(add-substitution-prefix-event p)
    (=> abort)
    (define (assoc-contains-var? u/v)
@@ -67,3 +64,10 @@
      => (lambda (p) (when (null? p) (abort)) p)]
     [else (abort)])])
 
+(define-trigger (any-enforce ls)
+  [(enforce-in-event ls^)
+   (=> abort)
+   (unless (ormap (curryr memq ls) ls^) (abort))]
+  [(enforce-out-event ls^)
+   (=> abort)
+   (when (ormap (curryr memq ls) ls^) (abort))])

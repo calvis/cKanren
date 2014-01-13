@@ -30,13 +30,13 @@
           (make-error #,(build-srcloc-stx x)
                       (string-append
                        "error while running tests\n"
-                       "expression: ~a~%Expected: ~a~%Computed: ~a~%")
+                       "expression: ~a~%expected: ~a~%computed: ~a~%")
                       '#,te expected produced)]))))
   (syntax-case x ()
     ((_ title tested-expression expected-result)
      (quasisyntax/loc x
       (begin
-        (printf "Testing ~a\n" title)
+        (printf "warning: depricated testing format in ~a\n" title)
         #,(test-syntax #'tested-expression #'expected-result))))
     ((_ tested-expression expected-result)
      (quasisyntax/loc x
@@ -62,7 +62,7 @@
   (syntax-rules ()
     ((_ title tested-expression)
      (begin
-       (printf "Testing ~a (engine with ~s ticks fuel)\n" title max-ticks)
+       (printf "testing ~a (engine with ~s ticks fuel)\n" title max-ticks)
        (let ((eng (make-engine (lambda () tested-expression))))
          (eng max-ticks
            (lambda (t v)
@@ -74,7 +74,7 @@
 (define-syntax test-disable
   (syntax-rules ()
     ((_ title tested-expression expected-result)
-     (printf "Disable testing ~s\n" title))))
+     (printf "disable testing ~s\n" title))))
 
 (define-syntax (test-any-order x)
   (define (test-syntax te er)
@@ -91,13 +91,13 @@
           (make-error #,(build-srcloc-stx x)
                       (string-append
                        "error while running tests\n"
-                       "expression: ~a~%Expected: ~a~%Computed: ~a~%")
+                       "expression: ~a~%expected: ~a~%computed: ~a~%")
                       '#,te expected produced)]))))
   (syntax-case x ()
     ((_ title tested-expression expected-result)
      (quasisyntax/loc x
        (begin
-         (printf "Testing ~a\n" title)
+         (printf "testing ~a\n" title)
          #,(test-syntax #'tested-expression #'expected-result))))
     ((_ tested-expression expected-result)
      (quasisyntax/loc x
