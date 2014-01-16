@@ -63,7 +63,10 @@
          (error 'matche "argument ~s appears in pattern at an invalid depth" 
                 (syntax-e #'x)))
        #'((unquote x) () (x))]
-      [((~literal unquote) ((~literal ?) c:id x:id))
+      [((~literal unquote) ((~literal ?) c:expr))
+       (define/with-syntax _new (generate-temporary #'?_))
+       #'((unquote _new) ((c _new)) (_new))]
+      [((~literal unquote) ((~literal ?) c:expr x:id))
        (when (free-identifier=? #'x v)
          (error 'matche "argument ~s appears in pattern at an invalid depth" 
                 (syntax-e #'x)))

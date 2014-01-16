@@ -1,6 +1,6 @@
 #lang cKanren
 
-(require (except-in racket ==) racket/generic)
+(require (except-in racket == string) racket/generic)
 
 (require cKanren/attributes 
          cKanren/src/constraint-store

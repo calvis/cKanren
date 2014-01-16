@@ -25,12 +25,14 @@
   ;; same variable inside (ex. sets)
   (override-occurs-check? mk-struct)
 
+  #:fallbacks
+  [(define (override-occurs-check? mk) #f)]
+
   #:defaults
   ([pair?
     (define (recur p k)
       (k (car p) (cdr p)))
     (define (constructor p) cons)
-    (define (override-occurs-check? p) #f)
     (define (reify-mk-struct p r)
       (reify-pair p r))]
    [vector?
@@ -39,7 +41,6 @@
         (k (car v) (cdr v))))
     (define (constructor v)
       (compose list->vector cons))
-    (define (override-occurs-check? v) #f)
     (define (reify-mk-struct v r)
       (reify-vector v r))]))
 

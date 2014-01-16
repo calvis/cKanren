@@ -100,9 +100,13 @@
 
 (define-attribute symbol
   #:satisfied-when symbol?
-  #:incompatible-attributes (number))
+  #:incompatible-attributes (number string))
 
 (define-attribute number
   #:satisfied-when number?
-  #:incompatible-attributes (symbol))
+  #:incompatible-attributes (symbol string))
+
+(define-attribute string
+  #:satisfied-when string?
+  #:incompatible-attributes (number symbol))
 
