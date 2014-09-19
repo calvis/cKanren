@@ -1,4 +1,4 @@
-Copyright (C) 2013 Claire Alvis
+Copyright (C) 2013-4 Claire Alvis
 
 Copyright (C) 2011-2013 Daniel P. Friedman, Oleg Kiselyov,
 Claire E. Alvis, Jeremiah J. Willcock, Kyle M. Carter, William E. Byrd

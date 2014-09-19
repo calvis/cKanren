@@ -366,8 +366,6 @@
       ([rator rands ...] ...)
       ([pred? [constraints ...]] ...)
       (a [s c e]))
-     (define/with-syntax (missing new-oc ocs)
-       (generate-temporaries #'(missing new-oc ocs)))
      ;; a function that decides whether or not a new even e is
      ;; relevant to the constraint-interaction; i.e, whether it
      ;; contains an oc that we are missing from ocs to make up
