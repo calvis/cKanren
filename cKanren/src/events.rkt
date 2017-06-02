@@ -34,17 +34,18 @@
   ;; removes all of the unfounded chains from an event about to be sent
   (gen-remove-chains event)
 
-  #:fallbacks
-  [(define (gen-optimistic-merge e e^ relation)
-     #f)
-   (define (gen-pessimistic-merge e e^)
-     (make-composite-event (list e e^)))
-   (define (gen-findf fn e ce)
-     (and (fn e) e))
-   (define (gen-filter fn e)
-     (if (fn e) (list e) (list)))
-   (define (gen-solidify solid e) e)
-   (define (gen-remove-chains e) e)])
+  #:defaults
+  ([#t 
+    (define (gen-optimistic-merge e e^ relation)
+      #f)
+    (define (gen-pessimistic-merge e e^)
+      (make-composite-event (list e e^)))
+    (define (gen-findf fn e ce)
+      (and (fn e) e))
+    (define (gen-filter fn e)
+      (if (fn e) (list e) (list)))
+    (define (gen-solidify solid e) e)
+    (define (gen-remove-chains e) e)]))
 
 (define-generics compound-event)
 
