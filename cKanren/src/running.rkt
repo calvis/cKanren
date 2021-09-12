@@ -1,20 +1,20 @@
 #lang racket
 
-(require (for-syntax syntax/parse 
+(require (for-syntax syntax/parse
                      racket/syntax
                      "framework.rkt"
                      "syntax-classes.rkt")
-         "framework.rkt" 
+         "framework.rkt"
          syntax/parse
          racket/syntax
          racket/pretty
          "helpers.rkt"
-         "operators.rkt" 
+         "operators.rkt"
          "constraints.rkt"
          "events.rkt"
          "package.rkt"
          "syntax-classes.rkt"
-         racket/generator 
+         racket/generator
          "infs.rkt"
          "macros.rkt"
          "variables.rkt")
@@ -37,7 +37,7 @@
     [(run/lazy () g:expr ...)
      (define/with-syntax initialize-interactions
        #'(spawn-constraint-interactions))
-     (define/with-syntax prog 
+     (define/with-syntax prog
        #'(let ([x (var 'x)])
            (conj g ... (enforce x) (reifyc))))
      (define/with-syntax initial-a-inf
@@ -48,7 +48,7 @@
     [(run/lazy (x:id) g:expr ...)
      (define/with-syntax initialize-interactions
        #'(spawn-constraint-interactions))
-     (define/with-syntax prog 
+     (define/with-syntax prog
        #'(let ([x (var 'x)])
            (conj g ... (enforce x) (reify x))))
      (define/with-syntax initial-a-inf
@@ -57,7 +57,7 @@
        (let ([a-inf initial-a-inf])
          (generator () (take/lazy a-inf))))]))
 
-;; convenience macro to integrate Scheme and cKanren, 
+;; convenience macro to integrate Scheme and cKanren,
 ;; returns n answers to the goals g0 g1 ... where x is fresh
 (define-syntax (run stx)
   (syntax-parse stx
@@ -76,7 +76,7 @@
 ;; RUNS ALL THE THINGS
 (define-syntax (run* stx)
   (syntax-parse stx
-    [(_ (x ...) g ...) 
+    [(_ (x ...) g ...)
      (syntax/loc stx (run #f (x ...) g ...))]))
 
 (define-syntax (case/lazy stx)
@@ -85,39 +85,44 @@
      (syntax/loc stx
        (let ([g gen])
          (call-with-values (lambda () (g))
-           (case-lambda
-            [() no-answer-clause]
-            [(x) an-answer-clause]))))]))
+                           (case-lambda
+                             [() no-answer-clause]
+                             [(x) an-answer-clause]))))]))
 
-;; given a number n and a stream, takes n answers from f
+;; given a natural number n and a stream, takes n answers from f
 (define (take n stream)
+  (unless (or (false? n) (natural? n))
+    (raise-arguments-error 'take
+                           "n should be natural number or false."
+                           "n" n))
+
   (cond
-   [(and n (zero? n)) '()]
-   [else
-    (case/lazy stream
-     [() '()]
-     [(a _) (cons a (take (and n (- n 1)) stream))])]))
+    [(and n (zero? n)) '()]
+    [else
+     (case/lazy stream
+                [() '()]
+                [(a _) (cons a (take (and n (- n 1)) stream))])]))
 
 (define (take/lazy f)
   (case-inf (f)
-   [() (yield)]
-   [(f) (take/lazy f)]
-   [(a) (yield a)]
-   [(a f) (begin (yield a) (take/lazy f))]))
+            [() (yield)]
+            [(f) (take/lazy f)]
+            [(a) (yield a)]
+            [(a f) (begin (yield a) (take/lazy f))]))
 
 (struct running (x a-inf)
-        #:methods gen:custom-write 
-        [(define (write-proc ra port mode) 
-           ((parse-mode mode) "#<running/ir>" port))])
+  #:methods gen:custom-write
+  [(define (write-proc ra port mode)
+     ((parse-mode mode) "#<running/ir>" port))])
 
 (struct enforced running ()
-        #:methods gen:custom-write 
-        [(define (write-proc ra port mode) 
-           ((parse-mode mode) "#<running/ir>" port))])
+  #:methods gen:custom-write
+  [(define (write-proc ra port mode)
+     ((parse-mode mode) "#<running/ir>" port))])
 
 (define-syntax (start/ir stx)
   (syntax-parse stx
-    [(_ g ...) 
+    [(_ g ...)
      (define/with-syntax initialize-interactions
        #'(spawn-constraint-interactions))
      (define/with-syntax initial-a-inf
@@ -127,7 +132,7 @@
 
 (define-syntax (extend/ir stx)
   (syntax-parse stx
-    [(extend/ir state 
+    [(extend/ir state
                 (~optional (~seq #:var x)
                            #:defaults ([x (generate-temporary #'?x)]))
                 g ...)
@@ -136,15 +141,15 @@
                [a-inf (running-a-inf st)])
            (running x (bindm a-inf (conj succeed g ...)))))]))
 
-(define-syntax-rule 
-  (enforce/ir state)
+(define-syntax-rule
+    (enforce/ir state)
   (let ([st state])
     (let ([x (running-x st)]
           [a-inf (running-a-inf st)])
       (enforced x (bindm a-inf (enforce x))))))
 
 (define-syntax-rule
-  (reify/ir state)
+    (reify/ir state)
   (let ([st state])
     (unless (enforced? st)
       (error 'reify/ir "trying to reify an unenforced state ~s" st))
@@ -153,7 +158,7 @@
       (bindm a-inf (reify x)))))
 
 (define-syntax-rule
-  (reifyc/ir state)
+    (reifyc/ir state)
   (let ([st state])
     (unless (enforced? st)
       (error 'reify/ir "trying to reify an unenforced state ~s" st))
@@ -163,18 +168,18 @@
 
 (define-syntax (exit/ir stx)
   (syntax-parse stx
-    [(exit/ir st) 
+    [(exit/ir st)
      #'(exit/ir #f st)]
     [(exit/ir n state)
      #'(let ([stream
-              (generator 
+              (generator
                ()
                (take/lazy
                 (let ([st state])
                   (reify/ir
                    (cond
-                    [(enforced? st) st]
-                    [else (enforce/ir st)])))))])
+                     [(enforced? st) st]
+                     [else (enforce/ir st)])))))])
          (take n stream))]))
 
 (define-syntax-rule (exit*/ir state) (exit/ir #f state))
@@ -185,13 +190,12 @@
      #'(exitc/ir #f st)]
     [(exitc/ir n state)
      #'(let ([stream
-              (generator 
+              (generator
                ()
                (take/lazy
                 (let ([st state])
                   (reifyc/ir
                    (cond
-                    [(enforced? st) st]
-                    [else (enforce/ir st)])))))])
+                     [(enforced? st) st]
+                     [else (enforce/ir st)])))))])
          (take n stream))]))
-
