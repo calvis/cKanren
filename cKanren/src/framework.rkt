@@ -1,10 +1,10 @@
 #lang racket
 
-(require "constraints.rkt" 
+(require "constraints.rkt"
          "package.rkt"
          "mk-structs.rkt"
          "variables.rkt"
-         "errors.rkt" 
+         "errors.rkt"
          "infs.rkt"
          "helpers.rkt"
          "operators.rkt"
@@ -14,10 +14,10 @@
          "syntax-classes.rkt"
          "triggers.rkt")
 
-(require syntax/parse 
+(require syntax/parse
          racket/syntax)
 
-(require (for-syntax 
+(require (for-syntax
           racket
           syntax/parse
           racket/syntax
@@ -34,7 +34,9 @@
          remove-constraint
          add-association
          enforce
+         reify-aux
          reify
+         reify-list
          reifyc
          reify-s
          extend-rs
@@ -50,7 +52,7 @@
   (syntax-rules ()
     [(_ constructor (x ...) g g* ...)
      (let ([x (constructor (gensym 'x))] ...)
-       (conj 
+       (conj
         (send-event (enter-scope-event x)) ...
         g g* ...
         (send-event (leave-scope-event x)) ...))]))
@@ -60,7 +62,7 @@
   (fresh-aux var (x ...) g g* ...))
 
 ;; Event -> ConstraintTransformer
-;; runs all the constraints on the event in the store, 
+;; runs all the constraints on the event in the store,
 ;; accumulating all their new events and then recurring
 (define (send-event new-e)
   (lambda@ (a [s c q t e-orig])
@@ -133,8 +135,8 @@
   (lambda@ (a [s c q t e])
     (define store c)
     (define ct
-      (for/fold 
-        ([ct succeed]) 
+      (for/fold
+        ([ct succeed])
         ([(rator rands*) store])
         (lambda@ (a [s c q t e])
           (match-define (running-event r w) e)
@@ -166,20 +168,20 @@
          [(findf removing-self? e) ct]
          ;; is our constraint actually subscribed to our event?
          [(apply-response r rands a)
-          => (match-lambda 
+          => (match-lambda
                [(list (cons tr* ct*) ...)
                 ;; run-response-ct performs the changes the constraint
                 ;; would like to see given the trigger.  our goal is to
                 ;; capture what events it causes and chain them after the
                 ;; trigger.
-                (conj (for/fold 
+                (conj (for/fold
                         ([answer succeed])
                         ([tr (reverse tr*)] [real-response (reverse ct*)])
                         (cond
                          ;; if the event we are trying to subscribe to still exists in the
                          ;; current event, then we run the responses from our rands
                          [(findf (curry eq? tr) e)
-                          (conj 
+                          (conj
                            (chain tr)
                            (remove-constraint (oc rator rands))
                            real-response
@@ -197,7 +199,7 @@
 
 (define (unchain rs? ct)
   (lambda@ (a [s c q t e])
-    (match e 
+    (match e
       [(build-chain-event r w tr new)
        (define new-e (apply-chain e))
        (define new-a (make-a s c q t new-e))
@@ -228,7 +230,7 @@
    [(u v)
     (lambda@ (a [s c q t e])
       (make-a (ext-s (walk u s) (walk v s) s) c q t e))]
-   [(p) 
+   [(p)
     (lambda@ (a [s c q t e])
       (make-a (ext-s* (walk* p s) s) c q t e))]))
 
@@ -252,14 +254,20 @@
             (onceo (send-event (enforce-out-event xs)))))
     (bindm a ct)))
 
-(define (reify x)
+(define ((reify-aux return) x)
   (lambda@ (a [s c q t e])
     (define v (walk* x s c e))
     (define r (reify-s v empty-s))
     (define v^ (reify-term v r))
-    (cond
-     [(null? r) v^]
-     [else (reify-constraints v^ r c)])))
+
+    (return (cond
+              [(null? r) v^]
+              [else (reify-constraints v^ r c)]))))
+
+(define reify (procedure-rename (reify-aux identity) 'reify))
+
+;; returns a list to avoid that result confuses with #f
+(define reify-list (procedure-rename (reify-aux list) 'reify-list))
 
 ;; reifies the substitution, returning the reified substitution
 (define (reify-s v^ s)
@@ -267,7 +275,7 @@
   (cond
    [(cvar? v)
     (extend-rs v s)]
-   [(mk-struct? v) 
+   [(mk-struct? v)
     (define (k a d)
       (reify-s d (reify-s a s)))
     (recur v k)]
@@ -282,14 +290,14 @@
     ;; make a reified substitution for them
     (define v (walk* (filter*/var? (hash->list c)) s c e))
     (define r (reify-s v empty-s))
-    
+
     ;; then sort and return a reified version of all constraints
     (sort-store (run-reify-fns v r c #f))))
 
 (define (reify-constraints v r store)
   (define store^ (run-reify-fns v r store))
   (cond
-   [(null? store^) v] 
+   [(null? store^) v]
    [#t `(,v : . ,(sort-store store^))]
    [else `(,v . ,(sort-store store^))]))
 
@@ -319,7 +327,7 @@
          [_ (values h r)])]
       [else (values h r)])))
 
-   (hash->list 
+   (hash->list
     (for/fold
       ([h (hash)])
       ([(rator rands*) hash-store])
@@ -334,14 +342,14 @@
 ;; constraints in c-prefix still need to run
 (define (update-package s^ c^)
   (lambda@ (a [s c q t e])
-    (define s-prefix 
-      (map (match-lambda [(cons x v) (if (var? x) (cons x v) (cons v x))]) 
+    (define s-prefix
+      (map (match-lambda [(cons x v) (if (var? x) (cons x v) (cons v x))])
            (prefix-s s s^)))
     (define c-prefix (prefix-c c c^))
     (define add-event (add-substitution-prefix-event s-prefix))
     (cond
-     [(null? s-prefix) a]
-     [else (bindm a (conj (send-event add-event) (sum c-prefix)))])))
+      [(null? s-prefix) a]
+      [else (bindm a (conj (send-event add-event) (sum c-prefix)))])))
 
 ;; Event -> ConstraintTransformer
 (define/match (solidify-atomic-event e)
@@ -361,6 +369,3 @@
        [(null? (cdr args)) (car args)]
        [else args]))
     (reified-constraint sym reified-rands r)))
-
-
-

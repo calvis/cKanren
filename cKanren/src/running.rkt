@@ -50,7 +50,7 @@
        #'(spawn-constraint-interactions))
      (define/with-syntax prog
        #'(let ([x (var 'x)])
-           (conj g ... (enforce x) (reify x))))
+           (conj g ... (enforce x) (reify-list x))))
      (define/with-syntax initial-a-inf
        #'(delay (bindm empty-a (conj initialize-interactions prog))))
      (syntax/loc #'stx
@@ -68,7 +68,7 @@
     [(_ n:expr (x:id) g0:expr g1:expr ...)
      (syntax/loc stx
        (let ([stream (run/lazy (x) g0 g1 ...)])
-         (take n stream)))]
+         ((take-map car) n stream)))]
     [(_ n:expr (x:id ...) g:expr ...)
      (syntax/loc stx
        (run n (q) (fresh (x ...) (add-association q `(,x ...)) g ...)))]))
@@ -89,19 +89,20 @@
                              [() no-answer-clause]
                              [(x) an-answer-clause]))))]))
 
-;; given a natural number n and a stream, takes n answers from f
-(define (take n stream)
+;; given a natural number n and a stream, takes n answers from stream and maps them by f.
+(define ((take-map f) n stream)
   (unless (or (false? n) (natural? n))
-    (raise-arguments-error 'take
+    (raise-arguments-error 'take-map
                            "n should be natural number or false."
                            "n" n))
-
   (cond
     [(and n (zero? n)) '()]
     [else
      (case/lazy stream
                 [() '()]
-                [(a _) (cons a (take (and n (- n 1)) stream))])]))
+                [(a _) (cons (f a) ((take-map f) (and n (- n 1)) stream))])]))
+
+(define take (procedure-rename (take-map identity) 'take))
 
 (define (take/lazy f)
   (case-inf (f)
@@ -141,15 +142,13 @@
                [a-inf (running-a-inf st)])
            (running x (bindm a-inf (conj succeed g ...)))))]))
 
-(define-syntax-rule
-    (enforce/ir state)
+(define-syntax-rule (enforce/ir state)
   (let ([st state])
     (let ([x (running-x st)]
           [a-inf (running-a-inf st)])
       (enforced x (bindm a-inf (enforce x))))))
 
-(define-syntax-rule
-    (reify/ir state)
+(define-syntax-rule (reify/ir state)
   (let ([st state])
     (unless (enforced? st)
       (error 'reify/ir "trying to reify an unenforced state ~s" st))
@@ -157,8 +156,7 @@
           [a-inf (running-a-inf st)])
       (bindm a-inf (reify x)))))
 
-(define-syntax-rule
-    (reifyc/ir state)
+(define-syntax-rule (reifyc/ir state)
   (let ([st state])
     (unless (enforced? st)
       (error 'reify/ir "trying to reify an unenforced state ~s" st))

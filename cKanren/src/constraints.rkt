@@ -9,14 +9,14 @@
 ;; stored in the constraint store
 (struct -constraint (fn reaction reifyfn add rem)
         #:property prop:procedure
-        (lambda (this . args) 
+        (lambda (this . args)
           (oc this args)))
 
 ;; applying an oc acts like just calling the constraint on the
 ;; arguments; also has enough information to store in constraint store
 (struct oc (rator rands)
         #:transparent
-        #:methods gen:custom-write 
+        #:methods gen:custom-write
         [(define (write-proc this port mode)
            ((parse-mode mode) (format "#oc~a" (cons (oc-rator this) (oc-rands this))) port))]
         #:property prop:procedure
@@ -27,7 +27,7 @@
 ;; a transformer takes a package and returns a package
 (struct -transformer (fn)
         #:property prop:procedure (struct-field-index fn)
-        #:methods gen:custom-write 
+        #:methods gen:custom-write
         [(define (write-proc this port mode)
            ((parse-mode mode) "#<transformer>" port))])
 (define transformer? -transformer?)
@@ -37,7 +37,7 @@
   (syntax-parse stx
     [(k (a:id) body:expr ...)
      (define/with-syntax src (build-srcloc-stx #'k))
-     (syntax/loc stx 
+     (syntax/loc stx
        (let ()
          (define a-lambda@
            (case-lambda
@@ -50,7 +50,7 @@
     [(_ (a [s:id c:id q:id t:id e:id]) body:expr ...)
      (syntax/loc stx
        (lambda@ (a)
-         (let ([s (a-s a)] 
+         (let ([s (a-s a)]
                [c (a-c a)]
                [q (a-q a)]
                [t (a-t a)]
@@ -71,7 +71,7 @@
 ;; performs a conjunction over goals applied to an a-inf
 (define-syntax (bindm* stx)
   (syntax-parse stx
-    [(bindm* a-inf) 
+    [(bindm* a-inf)
      (syntax/loc stx a-inf)]
     [(bindm* a-inf g g* ...)
      (syntax/loc stx
@@ -82,9 +82,9 @@
   (lambda (a-inf f)
     (case-inf a-inf
       (() (f))
-      ((f^) (delay (mplusm (f) f^)))
+      ((f^) (delay (mplusm (f^) f)))
       ((a) (choiceg a f))
-      ((a f^) (choiceg a (delay (mplusm (f) f^)))))))
+      ((a f^) (choiceg a (delay (mplusm (f^) f)))))))
 
 ;; shorthand for combining a-infs
 (define-syntax mplusm*
@@ -110,7 +110,7 @@
 (define (wrap-goal val src)
   (cond
    [(transformer? val) val]
-   [(format-source src) => 
+   [(format-source src) =>
     (lambda (loc) (error loc (non-goal-error-msg val)))]
    [else (error (non-goal-error-msg val))]))
 
@@ -135,15 +135,15 @@
     (current-continuation-marks))))
 
 ;; The only correct application of a goal g is to a package a; i.e. (g a).
-(define-for-syntax (valid-app?-pred fn args) 
+(define-for-syntax (valid-app?-pred fn args)
   (syntax-case args ()
     [(a) #`(or (not (oc? #,fn)) (a? a))]
     [(a* ...) #`(not (oc? #,fn))]))
 
 (define-syntax (#%app-safe x)
-  (syntax-case x () 
+  (syntax-case x ()
     [(_ fn arg ...)
-     (with-syntax* ([(fn^ arg^ ...) 
+     (with-syntax* ([(fn^ arg^ ...)
                      (generate-temporaries #'(fn arg ...))]
                     [src (build-srcloc-stx #'fn)]
                     [valid-app? (valid-app?-pred #'fn^ #'(arg^ ...))])
@@ -153,4 +153,3 @@
             (cond
              [valid-app? (#%app fn^ arg^ ...)]
              [else (raise-goal-as-fn-exn src)])))))]))
-
