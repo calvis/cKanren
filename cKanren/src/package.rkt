@@ -1,6 +1,6 @@
 #lang racket
 
-(require "constraint-store.rkt" "substitution.rkt" "queue.rkt" 
+(require "constraint-store.rkt" "substitution.rkt" "queue.rkt"
          "debugging.rkt" "infs.rkt" "events.rkt")
 
 (provide (struct-out path))
@@ -11,7 +11,7 @@
 (provide (all-from-out "debugging.rkt"))
 (provide empty-a)
 
-(provide 
+(provide
  #;
  (contract-out
   [make-a
@@ -26,8 +26,7 @@
 ;; == PACKAGE ==================================================================
 
 ;; the empty package
-(define empty-a 
+(define empty-a
   (make-a/internal empty-s empty-c empty-q empty-t empty-e))
 
 (define make-a make-a/internal)
-

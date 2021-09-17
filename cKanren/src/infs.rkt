@@ -3,7 +3,7 @@
 (require "helpers.rkt")
 
 ;; == STREAMS ==================================================================
-;; 
+;;
 ;; A Stream is an A-Inf
 ;; An A-Inf is one of:
 ;; - Inc
@@ -13,7 +13,7 @@
 ;; A Choiceg is a (cons Package-Internal A-Inf)
 ;; An Inc is a (lambda () A-Inf)
 
-(provide 
+(provide
  ;; Any Any Any Any Any -> Package-Internal
  ;; the parts of the Package are defined later, for now, they can be anything
  make-a/internal
@@ -38,10 +38,10 @@
 ;; the simple manifestations of the stream
 ;; (struct mzerof a-inf ())
 ;; (struct choiceg a-inf (a f))
-;; (struct inc a-inf (e) 
+;; (struct inc a-inf (e)
 ;;         #:property prop:procedure (struct-field-index e)
-;;         #:methods gen:custom-write 
-;;         [(define (write-proc i port mode) 
+;;         #:methods gen:custom-write
+;;         [(define (write-proc i port mode)
 ;;            ((parse-mode mode) "#<inc>" port))])
 
 (define mzerof (lambda () #f))
@@ -50,7 +50,7 @@
 (struct a #;a-inf (s c q t e)
         #:transparent
         #:extra-constructor-name make-a/internal
-        #:methods gen:custom-write 
+        #:methods gen:custom-write
         [(define (write-proc . args) (apply write-package args))])
 
 ;; controls how packages are displayed
@@ -93,13 +93,10 @@
      (let ((a-inf e))
        (cond
         [(not a-inf) e0]
-        [(procedure? a-inf) 
+        [(procedure? a-inf)
          (let ([f^ a-inf]) e1)]
         [(not (and (pair? a-inf)
                    (procedure? (cdr a-inf))))
          (let ([a^ a-inf]) e2)]
-        [else (let ([a (car a-inf)] [f (cdr a-inf)]) 
+        [else (let ([a (car a-inf)] [f (cdr a-inf)])
                 e3)])))))
-
-
-
